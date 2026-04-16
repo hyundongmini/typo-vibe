@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 01-2 - 고양이 마음은 고양이가 안다 vol.2</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.20.0/matter.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#000;overflow:hidden;cursor:grab}
+body:active{cursor:grabbing}
+canvas{display:block;position:fixed;top:0;left:0}
+.day{position:fixed;bottom:14px;right:18px;color:rgba(255,255,255,0.08);
+  font:11px/1 monospace;pointer-events:none;z-index:9}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="day">day 01-2 / typo-vibe</div>
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+let W, H;
+function resize() { W = canvas.width = window.innerWidth; H = canvas.height = window.innerHeight; }
+resize();
+
+const { Engine, World, Bodies, Body, Mouse, MouseConstraint, Composite } = Matter;
+const engine = Engine.create({ gravity: { x: 0, y: 1.5 } });
+const world = engine.world;
+
+// Walls
+let walls = [];
+function makeWalls() {
+  if (walls.length) Composite.remove(world, walls);
+  const t = 80;
+  walls = [
+    Bodies.rectangle(W/2, H + t/2, W + 200, t, { isStatic: true }),
+    Bodies.rectangle(-t/2, H/2, t, H + 200, { isStatic: true }),
+    Bodies.rectangle(W + t/2, H/2, t, H + 200, { isStatic: true }),
+  ];
+  Composite.add(world, walls);
+}
+makeWalls();
+
+// The sentence, split into characters
+const sentence = '고양이마음은고양이가안다';
+const chars = sentence.split('');
+
+// Styles pool — different sizes, weights, fill/stroke
+const styles = [
+  { size: 140, weight: 900, mode: 'fill' },
+  { size: 120, weight: 900, mode: 'stroke' },
+  { size: 100, weight: 800, mode: 'fill' },
+  { size: 90, weight: 700, mode: 'stroke' },
+  { size: 80, weight: 900, mode: 'fill' },
+  { size: 70, weight: 600, mode: 'stroke' },
+  { size: 60, weight: 800, mode: 'fill' },
+  { size: 55, weight: 500, mode: 'stroke' },
+  { size: 50, weight: 700, mode: 'fill' },
+  { size: 45, weight: 400, mode: 'stroke' },
+  { size: 110, weight: 900, mode: 'stroke' },
+  { size: 95, weight: 800, mode: 'fill' },
+  { size: 75, weight: 700, mode: 'stroke' },
+  { size: 65, weight: 600, mode: 'fill' },
+  { size: 42, weight: 900, mode: 'fill' },
+  { size: 38, weight: 500, mode: 'stroke' },
+];
+
+const pieces = [];
+let charIndex = 0;
+let spawnTimer = 0;
+const SPAWN_INTERVAL = 120; // ms between each character
+let lastTime = 0;
+let totalSpawned = 0;
+const MAX_PIECES = 200;
+
+function sc() { return Math.min(W / 1400, H / 1000); }
+
+function measure(text, size, weight) {
+  ctx.font = `${weight} ${size}px 'Pretendard', -apple-system, sans-serif`;
+  return { w: ctx.measureText(text).width + 8, h: size * 1.15 };
+}
+
+function spawnChar() {
+  if (pieces.length >= MAX_PIECES) {
+    // Remove oldest
+    const old = pieces.shift();
+    Composite.remove(world, old.body);
+  }
+
+  const ch = chars[charIndex % chars.length];
+  charIndex++;
+
+  const st = styles[Math.floor(Math.random() * styles.length)];
+  const s = Math.round(st.size * sc());
+  const dim = measure(ch, s, st.weight);
+
+  // Spawn from random x at top, with some velocity
+  const x = W * 0.15 + Math.random() * W * 0.7;
+  const y = -dim.h - Math.random() * 100;
+
+  const body = Bodies.rectangle(x, y, dim.w, dim.h, {
+    chamfer: { radius: 3 },
+    restitution: 0.25,
+    friction: 0.5,
+    frictionAir: 0.008,
+    density: 0.003,
+    angle: (Math.random() - 0.5) * 0.6,
+  });
+
+  // Give it a slight horizontal push
+  Body.setVelocity(body, {
+    x: (Math.random() - 0.5) * 6,
+    y: 2 + Math.random() * 3
+  });
+
+  const piece = { body, text: ch, size: s, weight: st.weight, mode: st.mode, w: dim.w, h: dim.h };
+  pieces.push(piece);
+  Composite.add(world, body);
+  totalSpawned++;
+}
+
+// Mouse
+const mouse = Mouse.create(canvas);
+const mc = MouseConstraint.create(engine, {
+  mouse, constraint: { stiffness: 0.08, render: { visible: false } }
+});
+Composite.add(world, mc);
+
+// Render
+function frame(now) {
+  const dt = now - lastTime;
+  lastTime = now;
+
+  // Spawn characters continuously — faster at start, then steady
+  spawnTimer += dt;
+  const interval = totalSpawned < 30 ? 80 : SPAWN_INTERVAL;
+  while (spawnTimer >= interval) {
+    spawnChar();
+    spawnTimer -= interval;
+  }
+
+  // Physics
+  Engine.update(engine, 1000 / 60);
+
+  // Draw
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, W, H);
+
+  pieces.forEach(p => {
+    const { position, angle } = p.body;
+    ctx.save();
+    ctx.translate(position.x, position.y);
+    ctx.rotate(angle);
+    ctx.font = `${p.weight} ${p.size}px 'Pretendard', -apple-system, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    if (p.mode === 'fill') {
+      ctx.fillStyle = '#fff';
+      ctx.fillText(p.text, 0, 0);
+    } else {
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = Math.max(1, p.size * 0.018);
+      ctx.lineJoin = 'round';
+      ctx.strokeText(p.text, 0, 0);
+    }
+    ctx.restore();
+  });
+
+  requestAnimationFrame(frame);
+}
+
+// Shake on space
+document.addEventListener('keydown', e => {
+  if (e.code === 'Space') {
+    e.preventDefault();
+    pieces.forEach(p => {
+      Body.setVelocity(p.body, { x: (Math.random()-.5)*25, y: -12 - Math.random()*15 });
+      Body.setAngularVelocity(p.body, (Math.random()-.5)*.4);
+    });
+  }
+});
+
+// Double click = burst of chars
+canvas.addEventListener('dblclick', e => {
+  for (let i = 0; i < 8; i++) {
+    setTimeout(() => {
+      const ch = chars[Math.floor(Math.random() * chars.length)];
+      const st = styles[Math.floor(Math.random() * styles.length)];
+      const s = Math.round(st.size * sc());
+      const dim = measure(ch, s, st.weight);
+      const body = Bodies.rectangle(e.clientX + (Math.random()-.5)*40, e.clientY - 30, dim.w, dim.h, {
+        chamfer:{radius:3}, restitution:0.4, friction:0.4, frictionAir:0.01, density:0.003,
+        angle:(Math.random()-.5)*0.8
+      });
+      Body.setVelocity(body, { x:(Math.random()-.5)*15, y:-10-Math.random()*10 });
+      if (pieces.length >= MAX_PIECES) { const old=pieces.shift(); Composite.remove(world,old.body) }
+      pieces.push({ body, text:ch, size:s, weight:st.weight, mode:st.mode, w:dim.w, h:dim.h });
+      Composite.add(world, body);
+    }, i * 50);
+  }
+});
+
+document.fonts.ready.then(() => { lastTime = performance.now(); requestAnimationFrame(frame); });
+window.addEventListener('resize', () => { resize(); makeWalls(); });
+</script>
+</body>
+</html>
