@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 02 - 식탁도 비명</title>
+<style>
+@font-face{font-family:'BW';src:local('BAEMIN WORK'),local('배민 WORK'),local('BAEMIN WORK TT'),local('배민 WORK TT');font-weight:900;font-style:normal}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#fff;overflow:hidden;cursor:crosshair}
+canvas{position:fixed;top:0;left:0}
+.day{position:fixed;bottom:14px;right:18px;color:rgba(0,0,0,0.1);
+  font:11px/1 monospace;pointer-events:none;z-index:9}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="day">day 02 / typo-vibe</div>
+<script>
+const C=document.getElementById('c'),X=C.getContext('2d');
+let W,H;
+function resize(){W=C.width=window.innerWidth;H=C.height=window.innerHeight}
+resize();
+
+let mx=W/2,my=H*0.6;
+document.addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY});
+
+let shakeX=0,shakeY=0,shakeDecay=0,burstScale=0;
+
+// ========================
+// SPIKE BURST — alternating red/blue spikes, no overlap
+// ========================
+function drawSpikeBurst(cx,cy,radius,count,time,intensity,tiltX,tiltY){
+  const scale=0.9+intensity*0.3+burstScale*0.5;
+  const PINK='#ff1493';
+
+  // Seeded random for stable shapes across frames
+  function srand(s){return function(){s=(s*16807)%2147483647;return(s-1)/2147483646}}
+
+  function drawStar(seed,spikes,rMult,rotOff,valleyBase){
+    const rng=srand(seed);
+    const outerR=radius*rMult*scale;
+    X.fillStyle=PINK;
+    X.beginPath();
+
+    for(let i=0;i<spikes*2;i++){
+      const baseAngle=(i/(spikes*2))*Math.PI*2+rotOff;
+      const isTip=i%2===0;
+
+      // Add slight randomness to angle
+      const angleJitter=(rng()-.5)*0.08;
+      const a=baseAngle+angleJitter;
+
+      const tiltF=1+0.15*(Math.cos(a)*tiltX+Math.sin(a)*tiltY)*intensity;
+
+      let dist;
+      if(isTip){
+        // Spike tip — vary length
+        const lenVar=0.7+rng()*0.4; // 0.7 to 1.1
+        dist=outerR*lenVar*tiltF;
+      }else{
+        // Valley — vary depth slightly
+        const valVar=valleyBase*(0.7+rng()*0.6); // 0.7 to 1.3x
+        dist=outerR*valVar;
+      }
+
+      X.lineTo(cx+Math.cos(a)*dist,cy+Math.sin(a)*dist);
+    }
+    X.closePath();
+    X.fill();
+  }
+
+  // Multiple overlapping stars with different seeds/rotations
+  drawStar(42,   10, 1.35, 0,    0.30);
+  drawStar(137,  12, 1.15, 0.22, 0.28);
+  drawStar(256,  10, 0.85, 0.11, 0.32);
+  drawStar(789,  12, 0.62, 0.33, 0.30);
+  drawStar(1024, 10, 0.42, 0.05, 0.35);
+  drawStar(555,  8,  0.25, 0.28, 0.40);
+}
+
+// ========================
+// SCREAM TEXT — huge "비명"
+// ========================
+function drawScreamText(text,cx,cy,size,time,intensity){
+  X.font=`900 ${size}px 'BW','BAEMIN WORK','배민 WORK',sans-serif`;
+  X.textAlign='center';X.textBaseline='middle';
+
+  // Only show effects when intensity > threshold (mouse near)
+  if(intensity<0.15){
+    X.fillStyle='#0a0a0a';
+    X.fillText(text,cx,cy);
+    return;
+  }
+
+  const eff=(intensity-0.15)/0.85; // 0→1 normalized effect strength
+  const jx=(Math.random()-.5)*eff*12;
+  const jy=(Math.random()-.5)*eff*12;
+
+  // Spike halo from text
+  const tw=X.measureText(text).width;
+  const sN=Math.floor(eff*40);
+  for(let i=0;i<sN;i++){
+    const a=Math.random()*Math.PI*2;
+    const sR=Math.max(tw,size)*0.45;
+    const len=sR+40+Math.random()*100*eff;
+    X.strokeStyle='#ff1493';
+    X.globalAlpha=eff*(0.15+Math.random()*0.4);
+    X.lineWidth=1.5+Math.random()*3;
+    X.beginPath();
+    X.moveTo(cx+Math.cos(a)*sR,cy+Math.sin(a)*sR*0.5);
+    X.lineTo(cx+Math.cos(a)*len+(Math.random()-.5)*10,cy+Math.sin(a)*len*0.5+(Math.random()-.5)*10);
+    X.stroke();X.globalAlpha=1;
+  }
+
+  // Glitch slices
+  const sl=Math.floor(eff*12);
+  for(let i=0;i<sl;i++){
+    const sy=cy-size/2+Math.random()*size;
+    const sh=3+Math.random()*10;
+    const sx=(Math.random()-.5)*eff*50;
+    X.save();X.beginPath();X.rect(0,sy,W,sh);X.clip();
+    X.fillStyle=Math.random()>.3?'#0a0a0a':'#ff1493';
+    X.globalAlpha=0.4+Math.random()*0.6;
+    X.fillText(text,cx+sx+jx,cy+jy);X.restore();
+  }
+
+  // Split on high intensity
+  if(eff>0.4){
+    const sp=eff*18;
+    X.globalAlpha=0.5+eff*0.3;
+    X.save();X.beginPath();X.rect(0,0,cx,H);X.clip();
+    X.fillStyle='#0a0a0a';X.fillText(text,cx-sp+jx,cy+jy);X.restore();
+    X.save();X.beginPath();X.rect(cx,0,W,H);X.clip();
+    X.fillStyle='#0a0a0a';X.fillText(text,cx+sp+jx,cy+jy);X.restore();
+    X.globalAlpha=1;
+  }
+
+  // Chromatic
+  X.globalAlpha=eff*0.35;
+  X.fillStyle='#ff1493';X.fillText(text,cx-2-eff*8+jx,cy+jy);
+  X.fillStyle='#1e88e5';X.fillText(text,cx+2+eff*8+jx,cy+jy+1);
+  X.globalAlpha=1;
+
+  // Main
+  X.fillStyle='#0a0a0a';X.fillText(text,cx+jx,cy+jy);
+}
+
+// ========================
+// LEFT-ALIGNED HEADLINE
+// ========================
+function drawHeadline(time,intensity){
+  const sc=Math.min(W/1000,H/800);
+  const lx=W*0.06;
+  let y=H*0.05;
+  const size=Math.round(42*sc);
+  const gap=size*0.25;
+
+  const lines=[
+    '"치킨 1마리',
+    '3만원시대 온다"…',
+    '원재료값 폭등에',
+    '식탁도',
+  ];
+
+  X.textAlign='left';X.textBaseline='top';
+  X.font=`900 ${size}px 'BW','BAEMIN WORK','배민 WORK',sans-serif`;
+
+  lines.forEach(text=>{
+    X.fillStyle='#0a0a0a';
+    X.fillText(text,lx,y);
+    y+=size+gap;
+  });
+}
+
+// ========================
+// OVERLAY
+// ========================
+function drawOverlay(intensity){
+  if(intensity>0.1){
+    const eff=Math.min(1,(intensity-0.1)/0.6);
+    // Scanlines — stronger
+    X.fillStyle=`rgba(0,0,0,${0.01+eff*0.04})`;
+    for(let y=0;y<H;y+=2)X.fillRect(0,y,W,1);
+    // Noise — more
+    const noiseCount=Math.floor(eff*2000);
+    for(let i=0;i<noiseCount;i++){
+      X.fillStyle=`rgba(0,0,0,${Math.random()*0.05})`;
+      X.fillRect(Math.random()*W,Math.random()*H,1+Math.random(),1+Math.random());
+    }
+    // Glitch bars — more frequent, thicker
+    if(Math.random()<eff*0.15){
+      const barCount=1+Math.floor(Math.random()*3*eff);
+      for(let b=0;b<barCount;b++){
+        X.fillStyle=`rgba(255,20,147,${0.03+eff*0.08})`;
+        X.fillRect(0,Math.random()*H,W,3+Math.random()*15*eff);
+      }
+    }
+    // Horizontal shift glitch
+    if(Math.random()<eff*0.08){
+      const gy=Math.random()*H;
+      const gh=5+Math.random()*20;
+      const shift=(Math.random()-.5)*20*eff;
+      try{
+        const imgData=X.getImageData(0,gy,W,gh);
+        X.putImageData(imgData,shift,gy);
+      }catch(e){}
+    }
+  }
+}
+
+// ========================
+// FRAME
+// ========================
+let screamScale=1;
+
+function frame(now){
+  const t=now*0.001;
+  shakeDecay*=0.88;
+  shakeX=(Math.random()-.5)*shakeDecay;
+  shakeY=(Math.random()-.5)*shakeDecay;
+  burstScale*=0.9;
+  screamScale+=(1-screamScale)*0.08; // spring back to 1
+
+  X.save();X.translate(shakeX,shakeY);
+  X.fillStyle='#fff';X.fillRect(-10,-10,W+20,H+20);
+
+  const sc=Math.min(W/1000,H/800);
+
+  const spCX=W*0.55,spCY=H*0.68;
+  const dist=Math.sqrt((mx-spCX)**2+(my-spCY)**2);
+  const intensity=Math.max(0,1-dist/(H*0.4));
+  const tD=dist||1;
+  const tX=(mx-spCX)/tD,tY=(my-spCY)/tD;
+
+  // Spike burst
+  const burstR=Math.min(W,H)*0.48;
+  drawSpikeBurst(spCX,spCY,burstR,0,t,intensity,tX,tY);
+
+  // Headline
+  drawHeadline(t,intensity);
+
+  // 비명 — scale pulse on click
+  const screamSize=Math.round(220*sc*screamScale);
+  drawScreamText('비명',spCX,spCY,screamSize,t,intensity);
+
+  drawOverlay(intensity);
+
+  // Red flash on click
+  if(shakeDecay>5){
+    X.fillStyle=`rgba(255,20,147,${shakeDecay*0.003})`;
+    X.fillRect(-10,-10,W+20,H+20);
+  }
+
+  X.restore();
+  requestAnimationFrame(frame);
+}
+
+// Click = scream burst: shake + scale pulse + flash
+document.addEventListener('click',()=>{
+  shakeDecay=35;
+  burstScale=0.7;
+  screamScale=1.3; // text pops bigger then springs back
+});
+document.fonts.ready.then(()=>{requestAnimationFrame(frame)});
+window.addEventListener('resize',resize);
+</script>
+</body>
+</html>
