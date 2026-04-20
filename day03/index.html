@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 03 - 천재 AI의 위험한 뇌세포</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#e8b3ff;overflow-x:hidden;cursor:crosshair;color:#1a0033;min-height:100vh;
+  padding:40px 20px 80px;font-family:'SF Mono','Menlo',monospace}
+.wrap{max-width:1000px;margin:0 auto}
+pre{font-family:'SF Mono','Menlo','Consolas',monospace;white-space:pre;user-select:none;color:#1a0033}
+#headline{font-size:7px;line-height:7px;font-weight:700;letter-spacing:0;
+  text-align:center;margin-bottom:30px}
+#brain{font-size:13px;line-height:13px;font-weight:700;text-align:center;margin:0 auto;
+  cursor:crosshair}
+.meta{font-size:12px;color:rgba(26,0,51,0.6);margin-top:30px;line-height:1.8;text-align:center}
+.meta .d{color:#ff0066;font-weight:700}
+.status{position:fixed;top:20px;right:20px;font:11px/1.6 'SF Mono',monospace;
+  color:rgba(26,0,51,0.7);text-align:right;z-index:5}
+.day{position:fixed;bottom:14px;right:18px;font:11px/1 monospace;
+  color:rgba(26,0,51,0.3);z-index:9;pointer-events:none}
+.hint{position:fixed;bottom:14px;left:18px;font:11px/1 monospace;
+  color:rgba(26,0,51,0.5);z-index:9;pointer-events:none;transition:opacity 2s}
+.hint.hide{opacity:0}
+#cursor{position:fixed;pointer-events:none;z-index:10;font:11px/1 monospace;
+  color:#fff;background:#1a0033;padding:3px 7px;transform:translate(12px,12px);
+  opacity:0;transition:opacity .2s}
+.src{text-align:center;font-size:10px;color:rgba(26,0,51,0.35);letter-spacing:2px;margin-top:50px}
+#overlay{position:fixed;inset:0;display:none;align-items:center;justify-content:center;
+  background:rgba(232,179,255,0.95);z-index:100;flex-direction:column;text-align:center;
+  font-family:'SF Mono',monospace;color:#1a0033;font-weight:700}
+#overlay h1{font-size:48px;margin-bottom:20px;letter-spacing:-0.02em}
+#overlay p{font-size:14px;margin-bottom:30px;opacity:0.7}
+#overlay button{background:#1a0033;color:#e8b3ff;border:none;padding:14px 28px;
+  font:700 13px 'SF Mono',monospace;letter-spacing:2px;cursor:pointer;
+  transition:all .2s}
+#overlay button:hover{background:#ff0066}
+</style>
+</head>
+<body>
+<div class="wrap">
+<pre id="headline"></pre>
+<pre id="brain"></pre>
+<div class="meta">
+  <span class="d">[!]</span> 앤트로픽, 보안 우려에 '오퍼스 4.7' 긴급 투입<br>
+  <span class="d">&gt;&gt;</span> <span id="gameStatus">위험한 뇌세포를 찾아 도려내세요. 일반 세포를 클릭하면 주변이 드러납니다.</span>
+</div>
+<div class="src">/ KOREA IT NEWS / 2025.04.18 /</div>
+</div>
+
+<div class="status" id="status">
+  MINES: <span id="mineCount">00</span> / <span id="totalMines">00</span><br>
+  FLAGGED: <span id="flagCount">00</span><br>
+  REVEALED: <span id="revealed">0%</span>
+</div>
+
+<div id="overlay">
+  <h1 id="overlayTitle">SURGERY COMPLETE</h1>
+  <p id="overlayMsg">모든 위험 뇌세포를 제거했습니다.</p>
+  <button onclick="location.reload()">다시 수술하기 [ RESTART ]</button>
+</div>
+
+<div class="day">day 03 / typo-vibe</div>
+<div class="hint" id="hint">left-click: reveal ✦ right-click: flag ✦ [space] reset</div>
+<div id="cursor">[ SCALPEL ]</div>
+
+<script>
+// ============ ASCII TYPOGRAPHY ============
+function textToAscii(text,fontSize,charW,charH,chars,empty){
+  const c=document.createElement('canvas'),ctx=c.getContext('2d');
+  ctx.font=`900 ${fontSize}px 'Pretendard',sans-serif`;
+  const m=ctx.measureText(text);
+  const w=Math.ceil(m.width)+20,h=Math.ceil(fontSize*1.25);
+  c.width=w;c.height=h;
+  ctx.font=`900 ${fontSize}px 'Pretendard',sans-serif`;
+  ctx.fillStyle='#fff';ctx.fillRect(0,0,w,h);
+  ctx.fillStyle='#000';ctx.textBaseline='top';
+  ctx.fillText(text,10,2);
+  const d=ctx.getImageData(0,0,w,h).data;
+  const oc=Math.floor(w/charW),or=Math.floor(h/charH);
+  const lines=[];
+  for(let y=0;y<or;y++){
+    let ln='';
+    for(let x=0;x<oc;x++){
+      let dark=0,tot=0;
+      for(let py=0;py<charH;py++)for(let px=0;px<charW;px++){
+        const sx=x*charW+px,sy=y*charH+py;
+        if(sx<w&&sy<h){
+          const i=(sy*w+sx)*4,b=(d[i]+d[i+1]+d[i+2])/3;
+          if(b<128)dark++;tot++;
+        }
+      }
+      const den=dark/tot;
+      if(den>0.15){
+        const idx=Math.min(chars.length-1,Math.floor(den*chars.length));
+        ln+=chars[idx];
+      }else ln+=empty;
+    }
+    lines.push(ln);
+  }
+  return lines.join('\n');
+}
+
+// ============ FACE + BRAIN ASCII ============
+// Side-profile face with brain inside skull
+function generateScene(){
+  const W=90,H=40;
+  const grid=[];
+  for(let y=0;y<H;y++)grid.push(new Array(W).fill(' '));
+
+  // Face silhouette — side profile facing right
+  // Skull: circular, with jaw extending down
+  const fcx=W*0.5, fcy=H*0.5;
+  const skullRx=18, skullRy=14;
+
+  function inSkull(x,y){
+    const nx=(x-fcx)/skullRx, ny=(y-(fcy-2))/skullRy;
+    return nx*nx+ny*ny<1;
+  }
+
+  function inFace(x,y){
+    // Head shape (profile, facing right) — skull + face + chin
+    if(inSkull(x,y))return true;
+    // Jaw/chin extending forward-down
+    const jx=x-(fcx+5),jy=y-(fcy+8);
+    if(jx>-12&&jx<10&&jy>-4&&jy<6){
+      // Ellipse for chin
+      const en=(jx+2)/10, em=jy/5;
+      if(en*en+em*em<1)return true;
+    }
+    // Neck
+    if(x>=fcx-2&&x<=fcx+8&&y>=fcy+11&&y<=H-2)return true;
+    return false;
+  }
+
+  function inBrain(x,y){
+    // Brain inside upper skull
+    const bx=(x-fcx)/(skullRx*0.75);
+    const by=(y-(fcy-4))/(skullRy*0.6);
+    const angle=Math.atan2(by,bx);
+    const bumps=Math.sin(angle*7)*0.1+Math.sin(angle*13)*0.05;
+    const r=Math.sqrt(bx*bx+by*by);
+    return r<1+bumps&&y<fcy+2; // only top half (brain area)
+  }
+
+  // Fill face outline
+  for(let y=0;y<H;y++){
+    for(let x=0;x<W;x++){
+      if(!inFace(x,y))continue;
+      // Edge detection for face outline
+      const l=x>0?inFace(x-1,y):false;
+      const r=x<W-1?inFace(x+1,y):false;
+      const t=y>0?inFace(x,y-1):false;
+      const b=y<H-1?inFace(x,y+1):false;
+      if(!l||!r||!t||!b){
+        // outline char
+        const nx=x-fcx,ny=y-fcy;
+        if(Math.abs(nx)>Math.abs(ny))grid[y][x]=nx>0?')':'(';
+        else grid[y][x]=ny>0?'_':'~';
+      }
+    }
+  }
+
+  // Face features (eye, nose, mouth)
+  const eyeX=Math.floor(fcx+6),eyeY=Math.floor(fcy+2);
+  grid[eyeY][eyeX]='o';
+  // Eyebrow
+  grid[eyeY-2][eyeX-1]='~';grid[eyeY-2][eyeX]='~';grid[eyeY-2][eyeX+1]='~';
+  // Nose (profile pointing right)
+  grid[eyeY+1][eyeX+3]='>';
+  grid[eyeY+2][eyeX+3]='_';
+  // Mouth
+  grid[eyeY+4][eyeX+1]='-';grid[eyeY+4][eyeX+2]='-';
+  // Ear
+  grid[eyeY][Math.floor(fcx-2)]='C';
+
+  // BRAIN inside skull
+  for(let y=0;y<H;y++){
+    for(let x=0;x<W;x++){
+      if(inBrain(x,y)&&inSkull(x,y)){
+        const nx=(x-fcx)/skullRx, ny=(y-(fcy-4))/skullRy;
+        const r=Math.sqrt(nx*nx+ny*ny);
+        const fold=Math.sin(x*0.8+y*0.3)+Math.sin(y*0.9+x*0.2);
+        if(r>0.75){
+          grid[y][x]=fold>0.3?'~':fold<-0.3?'=':'-';
+        }else if(r>0.4){
+          grid[y][x]=fold>0.5?'≈':fold>0?'~':fold>-0.5?'-':':';
+        }else{
+          grid[y][x]=fold>0?':':'.';
+        }
+      }
+    }
+  }
+
+  // Central fissure in brain
+  for(let y=Math.floor(fcy-14);y<Math.floor(fcy+1);y++){
+    if(y>=0&&y<H&&grid[y][Math.floor(fcx)]&&grid[y][Math.floor(fcx)]!==' '){
+      grid[y][Math.floor(fcx)]='|';
+    }
+  }
+
+  return {grid,W,H,fcx,fcy,skullRx,skullRy};
+}
+
+// ============ MINESWEEPER LOGIC ============
+const scene=generateScene();
+const W=scene.W,H=scene.H;
+let baseGrid=scene.grid.map(r=>[...r]);  // what brain looks like
+let mines=[];      // [y][x] = true if mine
+let revealed=[];   // [y][x] = true if revealed
+let flagged=[];    // [y][x] = true if flagged
+let adjacentMines=[]; // number of adjacent mines
+let gameOver=false;
+let gameWon=false;
+let explodedMines=new Set();
+
+function initMines(){
+  mines=Array(H).fill().map(()=>Array(W).fill(false));
+  revealed=Array(H).fill().map(()=>Array(W).fill(false));
+  flagged=Array(H).fill().map(()=>Array(W).fill(false));
+  adjacentMines=Array(H).fill().map(()=>Array(W).fill(0));
+
+  // Place mines — only on brain tissue cells
+  const brainCells=[];
+  for(let y=0;y<H;y++){
+    for(let x=0;x<W;x++){
+      const ch=baseGrid[y][x];
+      // Brain cells are the fill chars (not face outline, not face features)
+      if(':-=~≈.'.includes(ch)){
+        brainCells.push([x,y]);
+      }
+    }
+  }
+
+  // Place 15 mines randomly in brain
+  const mineCount=15;
+  for(let i=0;i<Math.min(mineCount,brainCells.length);i++){
+    const idx=Math.floor(Math.random()*brainCells.length);
+    const [x,y]=brainCells.splice(idx,1)[0];
+    mines[y][x]=true;
+  }
+
+  // Calculate adjacent mine counts
+  for(let y=0;y<H;y++){
+    for(let x=0;x<W;x++){
+      if(mines[y][x])continue;
+      let count=0;
+      for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
+        if(dx===0&&dy===0)continue;
+        const nx=x+dx,ny=y+dy;
+        if(nx>=0&&nx<W&&ny>=0&&ny<H&&mines[ny][nx])count++;
+      }
+      adjacentMines[y][x]=count;
+    }
+  }
+}
+
+function isBrainCell(x,y){
+  if(x<0||x>=W||y<0||y>=H)return false;
+  return ':-=~≈.'.includes(baseGrid[y][x]);
+}
+
+function reveal(x,y){
+  if(x<0||x>=W||y<0||y>=H)return;
+  if(revealed[y][x]||flagged[y][x])return;
+  if(!isBrainCell(x,y))return;
+
+  revealed[y][x]=true;
+
+  if(mines[y][x]){
+    // BOOM
+    explodedMines.add(`${x},${y}`);
+    gameOver=true;
+    showOverlay('SURGERY FAILED','위험 세포를 건드렸습니다. AI가 폭주했습니다.',true);
+    return;
+  }
+
+  // Flood fill if 0 adjacent
+  if(adjacentMines[y][x]===0){
+    for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
+      if(dx===0&&dy===0)continue;
+      reveal(x+dx,y+dy);
+    }
+  }
+
+  checkWin();
+}
+
+function toggleFlag(x,y){
+  if(revealed[y][x])return;
+  if(!isBrainCell(x,y))return;
+  flagged[y][x]=!flagged[y][x];
+  checkWin();
+}
+
+function checkWin(){
+  // Win: all mines flagged correctly AND no wrong flags
+  let correctFlags=0, wrongFlags=0, totalMines=0;
+  for(let y=0;y<H;y++){
+    for(let x=0;x<W;x++){
+      if(mines[y][x]){
+        totalMines++;
+        if(flagged[y][x])correctFlags++;
+      }else if(flagged[y][x]){
+        wrongFlags++;
+      }
+    }
+  }
+  // Alternate win: all non-mine brain cells revealed
+  let totalBrainCells=0, revealedCells=0;
+  for(let y=0;y<H;y++){
+    for(let x=0;x<W;x++){
+      if(isBrainCell(x,y)&&!mines[y][x]){
+        totalBrainCells++;
+        if(revealed[y][x])revealedCells++;
+      }
+    }
+  }
+
+  document.getElementById('mineCount').textContent=String(totalMines-correctFlags).padStart(2,'0');
+  document.getElementById('totalMines').textContent=String(totalMines).padStart(2,'0');
+  document.getElementById('flagCount').textContent=String(correctFlags).padStart(2,'0');
+  document.getElementById('revealed').textContent=Math.round(revealedCells/totalBrainCells*100)+'%';
+
+  if((correctFlags===totalMines&&wrongFlags===0)||revealedCells===totalBrainCells){
+    gameWon=true;
+    setTimeout(()=>showOverlay('SURGERY COMPLETE ✓','모든 위험 뇌세포를 안전하게 제거했습니다.',false),300);
+  }
+}
+
+function showOverlay(title,msg,isFail){
+  const ov=document.getElementById('overlay');
+  document.getElementById('overlayTitle').textContent=title;
+  document.getElementById('overlayTitle').style.color=isFail?'#ff0066':'#1a0033';
+  document.getElementById('overlayMsg').textContent=msg;
+  ov.style.display='flex';
+  if(isFail){
+    // Reveal all mines
+    for(let y=0;y<H;y++)for(let x=0;x<W;x++){
+      if(mines[y][x])revealed[y][x]=true;
+    }
+  }
+}
+
+// ============ RENDER ============
+function renderBrain(){
+  let html='';
+  for(let y=0;y<H;y++){
+    for(let x=0;x<W;x++){
+      const base=baseGrid[y][x];
+      if(base===' '){html+=' ';continue}
+
+      let ch=base,col='#1a0033',weight='700',bg='';
+
+      if(isBrainCell(x,y)){
+        if(revealed[y][x]){
+          if(mines[y][x]){
+            // Exploded mine
+            ch='※';col='#fff';bg='#ff0066';
+          }else{
+            // Revealed - show number or empty
+            const n=adjacentMines[y][x];
+            if(n===0){
+              ch='·';col='rgba(26,0,51,0.3)';
+            }else{
+              ch=String(n);
+              const colors=['','#0066ff','#009966','#ff0066','#6600cc','#990000','#006699','#000','#666'];
+              col=colors[n];
+            }
+          }
+        }else if(flagged[y][x]){
+          ch='⚑';col='#ff0066';
+        }else{
+          // Hidden brain cell
+          ch='█';col='#1a0033';
+        }
+      }
+      // Face features & outline — always visible
+
+      const esc=ch==='<'?'&lt;':ch==='>'?'&gt;':ch==='&'?'&amp;':ch;
+      if(bg){
+        html+=`<span style="color:${col};background:${bg};font-weight:${weight}">${esc}</span>`;
+      }else if(col!=='#1a0033'){
+        html+=`<span style="color:${col};font-weight:${weight}">${esc}</span>`;
+      }else{
+        html+=esc;
+      }
+    }
+    if(y<H-1)html+='\n';
+  }
+  document.getElementById('brain').innerHTML=html;
+}
+
+// ============ MOUSE INTERACTION ============
+const cursor=document.getElementById('cursor');
+const hintEl=document.getElementById('hint');
+
+document.addEventListener('mousemove',e=>{
+  cursor.style.left=e.clientX+'px';
+  cursor.style.top=e.clientY+'px';
+  cursor.style.opacity='1';
+});
+document.addEventListener('mouseleave',()=>{cursor.style.opacity='0'});
+
+function getGridCoords(clientX,clientY){
+  const el=document.getElementById('brain');
+  const rect=el.getBoundingClientRect();
+  const cw=rect.width/W,ch=rect.height/H;
+  return {
+    x:Math.floor((clientX-rect.left)/cw),
+    y:Math.floor((clientY-rect.top)/ch)
+  };
+}
+
+document.getElementById('brain').addEventListener('click',e=>{
+  if(gameOver||gameWon)return;
+  const {x,y}=getGridCoords(e.clientX,e.clientY);
+  hintEl.classList.add('hide');
+  reveal(x,y);
+});
+
+document.getElementById('brain').addEventListener('contextmenu',e=>{
+  e.preventDefault();
+  if(gameOver||gameWon)return;
+  const {x,y}=getGridCoords(e.clientX,e.clientY);
+  toggleFlag(x,y);
+});
+
+document.addEventListener('keydown',e=>{
+  if(e.code==='Space'){
+    e.preventDefault();
+    location.reload();
+  }
+});
+
+// ============ INIT ============
+let originalHeadline='';
+document.fonts.ready.then(()=>{
+  const h1=textToAscii("'천재 AI'의 위험한",54,4,6,['░','▒','▓','█'],' ');
+  const h2=textToAscii("뇌세포만 도려냈다",60,4,6,['░','▒','▓','█'],' ');
+  originalHeadline=h1+'\n\n'+h2;
+  document.getElementById('headline').textContent=originalHeadline;
+
+  // Occasional glitch
+  setInterval(()=>{
+    if(Math.random()<0.4){
+      const glitched=originalHeadline.split('').map(c=>{
+        if(c===' '||c==='\n')return c;
+        if(Math.random()<0.03)return ['$','#','!','?','@','%','&','*'][Math.floor(Math.random()*8)];
+        return c;
+      }).join('');
+      document.getElementById('headline').textContent=glitched;
+      setTimeout(()=>document.getElementById('headline').textContent=originalHeadline,80);
+    }
+  },1000);
+
+  initMines();
+  checkWin(); // initial counter update
+  renderBrain();
+
+  // Animation loop for flicker
+  function loop(){
+    renderBrain();
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+});
+</script>
+</body>
+</html>
