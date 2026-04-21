@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 04 - 대표업무에 쓰임새 있으면 좋겠네</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#ededed;overflow:hidden;min-height:100vh;
+  font-family:'Pretendard',-apple-system,sans-serif;color:#111}
+
+.stage{position:fixed;inset:0;overflow:hidden;z-index:1}
+
+.stack{position:absolute;left:50%;top:50%;
+  transform:translate(-50%,-50%);
+  transition:transform 0.4s ease;
+  will-change:transform}
+
+.card{position:absolute;left:50%;top:50%;
+  width:260px;height:340px;
+  margin-left:-130px;margin-top:-170px;
+  background-size:cover;background-position:center;
+  box-shadow:0 8px 28px rgba(0,0,0,0.12),0 0 1px rgba(0,0,0,0.08);
+  cursor:pointer;
+  transition:transform 0.35s cubic-bezier(.25,.8,.25,1),box-shadow 0.35s ease;
+  will-change:transform}
+.card.hover{transform:translate(var(--tx),calc(var(--ty) - 60px)) scale(var(--scale)) !important;
+  box-shadow:0 25px 50px rgba(0,0,0,0.25)}
+
+.card.scatter{
+  transition:transform 1.2s cubic-bezier(.2,.8,.3,1),box-shadow 1.2s ease}
+
+/* Blur backdrop — between stage and flipped card */
+.overlay-bg{position:fixed;inset:0;z-index:100;display:none;
+  background:rgba(237,237,237,0.4);
+  backdrop-filter:blur(20px);
+  -webkit-backdrop-filter:blur(20px);
+  cursor:zoom-out}
+.overlay-bg.show{display:block;animation:fadeIn 0.4s ease}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+
+/* Flipped card — above blur backdrop */
+.flipped-layer{position:fixed;inset:0;z-index:200;pointer-events:none;
+  display:none;align-items:center;justify-content:center}
+.flipped-layer.show{display:flex}
+.flipped-card{position:absolute;width:260px;height:340px;
+  background-size:cover;background-position:center;
+  box-shadow:0 40px 100px rgba(0,0,0,0.35);
+  transition:transform 1s cubic-bezier(.5,0,.3,1);
+  will-change:transform}
+
+.header{position:fixed;top:30px;left:30px;z-index:10;max-width:400px;
+  font-weight:900;font-size:15px;line-height:1.4;color:#111;letter-spacing:-0.01em;
+  pointer-events:none}
+.header .date{font-weight:400;font-size:11px;color:#666;letter-spacing:2px;
+  margin-bottom:6px;font-family:'SF Mono',monospace}
+.header .title{font-weight:900;font-size:clamp(20px,2.2vw,28px);line-height:1.3}
+.center-label{position:fixed;top:30px;left:50%;transform:translateX(-50%);z-index:10;
+  font:11px/1 'SF Mono',monospace;color:#666;letter-spacing:3px;pointer-events:none}
+.side-label{position:fixed;top:50%;right:30px;transform:translateY(-50%);z-index:10;
+  font:10px/1.6 'SF Mono',monospace;color:rgba(0,0,0,0.35);text-align:right;
+  pointer-events:none}
+.day{position:fixed;bottom:14px;right:18px;font:11px/1 monospace;
+  color:rgba(0,0,0,0.3);z-index:9;pointer-events:none}
+.hint{position:fixed;bottom:14px;left:18px;font:11px/1 monospace;
+  color:rgba(0,0,0,0.4);z-index:9;pointer-events:none}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="date" id="dateLabel"></div>
+  <div class="title">대표업무에<br>쓰임새 있으면 좋겠네</div>
+</div>
+
+<div class="center-label">every : moment</div>
+
+<div class="side-label" id="sideLabel">
+  all <span id="totalCount">00</span><br>
+  current <span id="currentIdx">—</span>
+</div>
+
+<div class="stage">
+  <div class="stack" id="stack"></div>
+</div>
+
+<div class="overlay-bg" id="overlayBg"></div>
+
+<div class="flipped-layer" id="flippedLayer">
+  <div class="flipped-card" id="flippedCard"></div>
+</div>
+
+<div class="hint">[space] scatter · [click] open · [wheel] scroll</div>
+<div class="day">day 04 / typo-vibe</div>
+
+<script>
+const images=[
+  '변도동정면.jpg',
+  '스크린샷 2026-02-25 오후 5.15.07.png',
+  '스크린샷 2026-02-26 오전 2.13.04.png',
+  '스크린샷 2026-02-26 오전 2.40.59.png',
+  '스크린샷 2026-02-26 오전 2.47.28.png',
+  '스크린샷 2026-02-26 오전 2.47.37.png',
+  'eaf2eaf6-531f-4e5d-8d53-f66245dc65ed (2).png',
+];
+
+const stack=document.getElementById('stack');
+const overlayBg=document.getElementById('overlayBg');
+const flippedCardEl=document.getElementById('flippedCard');
+const flippedLayer=document.getElementById('flippedLayer');
+
+const CARD_COUNT=60;
+const STEP_X=-28;
+const STEP_Y=20;
+
+document.getElementById('totalCount').textContent=String(CARD_COUNT).padStart(2,'0');
+
+const today=new Date();
+const dateStr=`${today.getFullYear()}.${String(today.getMonth()+1).padStart(2,'0')}.${String(today.getDate()).padStart(2,'0')}`;
+document.getElementById('dateLabel').textContent=dateStr;
+
+// Generate cards
+const cards=[];
+for(let i=0;i<CARD_COUNT;i++){
+  const card=document.createElement('div');
+  card.className='card';
+  const imgSrc=images[i%images.length];
+  card.style.backgroundImage=`url('${encodeURIComponent(imgSrc)}')`;
+  const mid=CARD_COUNT/2;
+  const offset=i-mid;
+  const x=offset*STEP_X;
+  const y=offset*STEP_Y;
+  const scale=1-(CARD_COUNT-1-i)*0.003;
+  card.style.transform=`translate(${x}px,${y}px) scale(${scale})`;
+  card.style.setProperty('--tx',`${x}px`);
+  card.style.setProperty('--ty',`${y}px`);
+  card.style.setProperty('--scale',scale);
+  card.style.zIndex=i;
+  card.dataset.idx=i;
+  card.dataset.src=imgSrc;
+  stack.appendChild(card);
+  cards.push(card);
+}
+
+// ====== STATE ======
+let flippedIdx=-1;
+let hoverIdx=-1;
+let scattered=false;
+let gridMode=false;
+let scatterData=[];
+
+// ====== HOVER ======
+cards.forEach((card,i)=>{
+  card.addEventListener('mouseenter',()=>{
+    if(flippedIdx>=0||scattered)return;
+    if(hoverIdx>=0&&cards[hoverIdx])cards[hoverIdx].classList.remove('hover');
+    card.classList.add('hover');
+    hoverIdx=i;
+    document.getElementById('currentIdx').textContent=String(i+1).padStart(2,'0');
+  });
+  card.addEventListener('mouseleave',()=>{
+    card.classList.remove('hover');
+    if(hoverIdx===i)hoverIdx=-1;
+    document.getElementById('currentIdx').textContent='—';
+  });
+  card.addEventListener('click',()=>{
+    if(flippedIdx>=0)return;
+    flipCard(i);
+  });
+});
+
+// ====== FLIP ======
+function flipCard(idx){
+  flippedIdx=idx;
+  const src=cards[idx].dataset.src;
+  flippedCardEl.style.backgroundImage=`url('${encodeURIComponent(src)}')`;
+
+  // Start from card's current screen position
+  const rect=cards[idx].getBoundingClientRect();
+  const startX=rect.left+rect.width/2-window.innerWidth/2;
+  const startY=rect.top+rect.height/2-window.innerHeight/2;
+
+  // Scale start based on card's rendered size vs flipped (260x340)
+  const startScale=rect.width/260;
+
+  // Hide original card (keep its space)
+  cards[idx].style.opacity='0';
+
+  // Show flipped layer
+  flippedLayer.classList.add('show');
+  overlayBg.classList.add('show');
+
+  // Set initial transform instantly
+  flippedCardEl.style.transition='none';
+  flippedCardEl.style.transform=`translate(${startX}px,${startY}px) scale(${startScale}) rotateY(0deg)`;
+
+  // Force reflow then animate to center with flip
+  requestAnimationFrame(()=>{
+    flippedCardEl.style.transition='transform 1s cubic-bezier(.5,0,.3,1)';
+    const targetScale=Math.min(window.innerWidth*0.55/260,window.innerHeight*0.75/340);
+    flippedCardEl.style.transform=`translate(0,0) scale(${targetScale}) rotateY(360deg)`;
+  });
+}
+
+function closeFlipped(){
+  if(flippedIdx<0)return;
+  const card=cards[flippedIdx];
+  const rect=card.getBoundingClientRect();
+  const endX=rect.left+rect.width/2-window.innerWidth/2;
+  const endY=rect.top+rect.height/2-window.innerHeight/2;
+  const endScale=rect.width/260;
+
+  flippedCardEl.style.transform=`translate(${endX}px,${endY}px) scale(${endScale}) rotateY(720deg)`;
+
+  const idxToRestore=flippedIdx;
+  flippedIdx=-1;
+  setTimeout(()=>{
+    overlayBg.classList.remove('show');
+    flippedLayer.classList.remove('show');
+    // Restore the original card so it's visible again
+    cards[idxToRestore].style.opacity='';
+  },1000);
+}
+
+overlayBg.addEventListener('click',closeFlipped);
+
+// ====== KEYBOARD ======
+document.addEventListener('keydown',e=>{
+  if(e.code==='Escape'){
+    closeFlipped();
+    if(scattered)regather();
+    if(gridMode)exitGrid();
+  }
+  if(e.code==='Space'){
+    e.preventDefault();
+    if(flippedIdx>=0||gridMode)return;
+    if(!scattered)scatter();else regather();
+  }
+  if(e.code==='Enter'){
+    e.preventDefault();
+    if(flippedIdx>=0||scattered)return;
+    if(!gridMode)enterGrid();else exitGrid();
+  }
+  if(flippedIdx>=0){
+    if(e.code==='ArrowRight'||e.code==='ArrowDown'){
+      e.preventDefault();cycleFlipped(1);
+    }else if(e.code==='ArrowLeft'||e.code==='ArrowUp'){
+      e.preventDefault();cycleFlipped(-1);
+    }
+  }
+});
+
+function cycleFlipped(dir){
+  if(flippedIdx<0)return;
+  const next=(flippedIdx+dir+CARD_COUNT)%CARD_COUNT;
+  const old=flippedIdx;
+  // Restore previous card silently (user doesn't see it because blur+new card is up)
+  cards[old].style.opacity='';
+  flippedIdx=-1;
+  flipCard(next);
+}
+
+// ====== GRID EXHIBITION MODE ======
+function enterGrid(){
+  gridMode=true;
+  // Stop parallax for now — reset stack position to center
+  stack.style.transform='translate(-50%,-50%)';
+
+  const cardW=260,cardH=340;
+  const padding=24;
+  // How many columns fit
+  const availW=window.innerWidth-120;
+  const cols=Math.max(3,Math.min(8,Math.floor(availW/(cardW*0.45+padding))));
+  const scale=0.42;
+  const cellW=cardW*scale+padding;
+  const cellH=cardH*scale+padding;
+
+  const totalW=cols*cellW-padding;
+  const rows=Math.ceil(CARD_COUNT/cols);
+  const totalH=rows*cellH-padding;
+  const startX=-totalW/2+cardW*scale/2;
+  const startY=-totalH/2+cardH*scale/2;
+
+  cards.forEach((card,i)=>{
+    const col=i%cols;
+    const row=Math.floor(i/cols);
+    const x=startX+col*cellW;
+    const y=startY+row*cellH;
+    card.classList.add('scatter');
+    setTimeout(()=>{
+      card.style.transform=`translate(${x}px,${y}px) scale(${scale})`;
+    },i*15);
+  });
+}
+
+function exitGrid(){
+  gridMode=false;
+  cards.forEach((card,i)=>{
+    setTimeout(()=>{
+      const tx=card.style.getPropertyValue('--tx');
+      const ty=card.style.getPropertyValue('--ty');
+      const scale=card.style.getPropertyValue('--scale');
+      card.style.transform=`translate(${tx},${ty}) scale(${scale}) rotate(0deg)`;
+      setTimeout(()=>card.classList.remove('scatter'),1200);
+    },i*10);
+  });
+}
+
+// ====== SCATTER ======
+function scatter(){
+  scattered=true;
+  scatterData=[];
+  cards.forEach((card,i)=>{
+    // Random position within viewport
+    const rx=(Math.random()-0.5)*window.innerWidth*0.85;
+    const ry=(Math.random()-0.5)*window.innerHeight*0.85;
+    const rot=(Math.random()-0.5)*60;
+    const sc=0.7+Math.random()*0.5;
+    scatterData[i]={rx,ry,rot,sc};
+    card.classList.add('scatter');
+    card.classList.remove('hover');
+    // Stagger
+    setTimeout(()=>{
+      card.style.transform=`translate(${rx}px,${ry}px) rotate(${rot}deg) scale(${sc})`;
+    },Math.random()*200);
+  });
+}
+
+function regather(){
+  scattered=false;
+  cards.forEach((card,i)=>{
+    setTimeout(()=>{
+      const tx=card.style.getPropertyValue('--tx');
+      const ty=card.style.getPropertyValue('--ty');
+      const scale=card.style.getPropertyValue('--scale');
+      card.style.transform=`translate(${tx},${ty}) scale(${scale}) rotate(0deg)`;
+      setTimeout(()=>card.classList.remove('scatter'),1200);
+    },Math.random()*200);
+  });
+}
+
+// ====== MOUSE PARALLAX ======
+document.addEventListener('mousemove',e=>{
+  if(flippedIdx>=0||scattered||gridMode)return;
+  const nx=(e.clientX/window.innerWidth)-0.5;
+  const ny=(e.clientY/window.innerHeight)-0.5;
+  stack.style.transform=`translate(calc(-50% + ${nx*-30}px),calc(-50% + ${ny*-20}px))`;
+});
+
+// ====== WHEEL ======
+let scrollOffset=0;
+document.addEventListener('wheel',e=>{
+  if(flippedIdx>=0||scattered||gridMode)return;
+  e.preventDefault();
+  scrollOffset+=e.deltaY*0.5;
+  cards.forEach((card,i)=>{
+    const mid=CARD_COUNT/2;
+    const offset=i-mid+scrollOffset*0.02;
+    const x=offset*STEP_X;
+    const y=offset*STEP_Y;
+    const scale=card.style.getPropertyValue('--scale');
+    card.style.setProperty('--tx',`${x}px`);
+    card.style.setProperty('--ty',`${y}px`);
+    if(!card.classList.contains('hover')){
+      card.style.transform=`translate(${x}px,${y}px) scale(${scale})`;
+    }
+  });
+},{passive:false});
+</script>
+</body>
+</html>
