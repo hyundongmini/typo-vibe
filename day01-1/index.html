@@ -206,5 +206,37 @@ canvas.addEventListener('dblclick', e => {
 document.fonts.ready.then(() => { lastTime = performance.now(); requestAnimationFrame(frame); });
 window.addEventListener('resize', () => { resize(); makeWalls(); });
 </script>
+
+<a href="../" class="back-to-archive" aria-label="아카이브로 돌아가기">
+  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+  <span>뒤로가기</span>
+</a>
+<style>
+.back-to-archive{
+  position:fixed;top:16px;left:16px;z-index:9999;
+  display:inline-flex;align-items:center;gap:6px;
+  padding:8px 14px 8px 12px;
+  background:rgba(255,255,255,0.9);
+  color:#111;
+  font:500 12px/1 -apple-system,'Pretendard','SF Pro Text',sans-serif;
+  letter-spacing:-0.01em;
+  text-decoration:none;
+  border:1px solid rgba(0,0,0,0.08);
+  border-radius:100px;
+  box-shadow:0 2px 8px rgba(0,0,0,0.12),0 1px 2px rgba(0,0,0,0.06);
+  backdrop-filter:blur(10px);
+  -webkit-backdrop-filter:blur(10px);
+  transition:background 0.2s ease,transform 0.2s ease,box-shadow 0.2s ease;
+  user-select:none;
+}
+.back-to-archive:hover{
+  background:#fff;
+  transform:translateX(-2px);
+  box-shadow:0 4px 12px rgba(0,0,0,0.18),0 2px 4px rgba(0,0,0,0.08);
+}
+.back-to-archive svg{flex:none;transition:transform 0.2s ease}
+.back-to-archive:hover svg{transform:translateX(-2px)}
+</style>
+
 </body>
 </html>
