@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 05 - BEEF</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;overflow:hidden}
+body{background:#000;cursor:none;font-family:'Pretendard',-apple-system,sans-serif;
+  position:relative;user-select:none}
+
+/* Layer 1: background image (normal view) */
+#bg{position:fixed;inset:0;background-image:url('beef.jpg?v=2');
+  background-size:cover;background-position:center;z-index:1;
+  filter:brightness(0.7) saturate(0.85)}
+
+/* Layer 2: zoom layer */
+#zoom{position:fixed;inset:0;z-index:2;pointer-events:none;
+  -webkit-mask:url(#binoReveal);
+  mask:url(#binoReveal)}
+
+.zoomedBg{position:absolute;inset:0;
+  background-image:url('beef.jpg?v=2');
+  background-size:cover;
+  background-position:center;
+  transform-origin:50% 50%;
+  transform:scale(var(--zoom,1)) translate(var(--panX,0),var(--panY,0));
+  filter:brightness(1.1) saturate(1.25)}
+
+.beef-text{position:absolute;left:50%;top:50%;
+  transform:translate(-50%,-50%) scale(var(--zoom,1));
+  font-family:'Pretendard',sans-serif;font-weight:900;
+  font-size:clamp(280px,38vw,560px);
+  letter-spacing:-0.06em;color:#fff;
+  text-shadow:0 0 80px rgba(0,0,0,0.9),0 10px 40px rgba(0,0,0,0.7);
+  pointer-events:none;white-space:nowrap;
+  transition:opacity 0.3s ease;opacity:var(--beefOpacity,1)}
+
+/* Frame SVG */
+#frameSvg{position:fixed;inset:0;z-index:3;pointer-events:none;width:100%;height:100%}
+#lensOverlay{position:fixed;inset:0;z-index:4;pointer-events:none;width:100%;height:100%}
+
+.header{position:fixed;top:30px;left:30px;z-index:10;max-width:400px;
+  font-weight:900;color:#fff;letter-spacing:-0.01em;pointer-events:none}
+.header .label{font-weight:400;font-size:11px;letter-spacing:3px;
+  margin-bottom:8px;font-family:'SF Mono',monospace;opacity:0.8;color:#fff}
+.header .title{font-size:clamp(18px,2.2vw,26px);line-height:1.3;color:#fff;
+  text-shadow:0 2px 8px rgba(0,0,0,0.6)}
+
+/* HUD */
+.hud{position:fixed;top:30px;right:30px;z-index:10;
+  font:11px/1.7 'SF Mono',monospace;color:#fff;letter-spacing:1px;
+  text-align:right;pointer-events:none;
+  text-shadow:0 1px 4px rgba(0,0,0,0.8)}
+.hud .row{opacity:0.85}
+.hud .row .val{color:#ff6060;font-weight:700}
+.hud .row.focus{margin-top:10px;font-size:10px;opacity:0.6}
+
+.hint{position:fixed;bottom:20px;left:30px;z-index:10;
+  font:11px/1.6 'SF Mono',monospace;color:#fff;letter-spacing:2px;
+  pointer-events:none;opacity:0.7;text-shadow:0 1px 4px rgba(0,0,0,0.6)}
+.day{position:fixed;bottom:14px;right:18px;font:11px/1 monospace;
+  color:rgba(255,255,255,0.5);z-index:10;pointer-events:none;
+  text-shadow:0 1px 4px rgba(0,0,0,0.6)}
+
+/* Signal bar */
+#signalBar{position:fixed;bottom:60px;right:30px;z-index:10;
+  font:10px/1.4 'SF Mono',monospace;color:#fff;
+  text-align:right;pointer-events:none;opacity:0.9;
+  text-shadow:0 1px 4px rgba(0,0,0,0.8)}
+#signalBar .label{letter-spacing:2px;opacity:0.7;margin-bottom:4px}
+#signalBar .bar{width:140px;height:4px;background:rgba(255,255,255,0.15);
+  overflow:hidden;margin-left:auto}
+#signalBar .fill{height:100%;background:#60ff60;width:0%;
+  transition:width 0.15s linear,background 0.3s ease}
+#signalBar.strong .fill{background:#ff3030;box-shadow:0 0 12px #ff3030}
+
+/* Hidden message reveal screen */
+#revealScreen{position:fixed;inset:0;z-index:999;
+  background:#000;opacity:0;visibility:hidden;
+  display:flex;align-items:center;justify-content:center;
+  transition:opacity 0.8s ease,visibility 0.8s;
+  cursor:pointer}
+#revealScreen.show{opacity:1;visibility:visible}
+.rev-inner{text-align:center;max-width:80vw;color:#ff3030;
+  font-family:'Pretendard',sans-serif}
+.rev-warn{font:700 11px/1 'SF Mono',monospace;letter-spacing:4px;
+  color:#ff3030;margin-bottom:40px;opacity:0.8;
+  animation:blink 1.2s infinite}
+.rev-text{font-size:clamp(32px,5vw,60px);font-weight:900;
+  line-height:1.35;letter-spacing:-0.02em;color:#fff;
+  min-height:1.5em}
+.rev-text::after{content:'▊';color:#ff3030;margin-left:0.1em;
+  animation:caret 0.6s steps(1) infinite}
+.rev-text.done::after{display:none}
+.rev-hint{margin-top:60px;font:10px/1 'SF Mono',monospace;
+  color:rgba(255,255,255,0.35);letter-spacing:3px;opacity:0;
+  transition:opacity 1s ease 0.5s}
+.rev-text.done + .rev-hint{opacity:1}
+@keyframes blink{0%,60%{opacity:0.9}70%,100%{opacity:0.3}}
+@keyframes caret{50%{opacity:0}}
+
+/* Screen flash on trigger */
+#flashScreen{position:fixed;inset:0;z-index:998;pointer-events:none;
+  background:rgba(255,0,0,0);transition:background 0.1s}
+#flashScreen.flash{background:rgba(255,0,0,0.3)}
+
+/* Hide YouTube player — audio only */
+#ytPlayer{position:fixed;bottom:-100px;left:-100px;width:1px;height:1px;
+  opacity:0;pointer-events:none}
+
+/* Start overlay */
+#startOverlay{position:fixed;inset:0;z-index:9999;
+  background:#000;display:flex;align-items:center;justify-content:center;
+  cursor:pointer;transition:opacity 0.8s ease,visibility 0.8s}
+#startOverlay.hide{opacity:0;visibility:hidden}
+.start-inner{text-align:center;color:#fff;font-family:'SF Mono',monospace}
+.start-label{font-size:14px;letter-spacing:6px;font-weight:700;
+  animation:pulse 1.5s ease infinite}
+.start-hint{font-size:10px;letter-spacing:3px;margin-top:12px;
+  color:rgba(255,255,255,0.4)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}
+
+/* Audio toggle button */
+#audioToggle{position:fixed;bottom:60px;left:30px;z-index:11;
+  width:32px;height:32px;background:rgba(0,0,0,0.5);border:1px solid rgba(255,255,255,0.3);
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  color:#fff;font-size:14px;transition:all 0.2s}
+#audioToggle:hover{background:rgba(0,0,0,0.8);border-color:#fff}
+</style>
+</head>
+<body>
+
+<div id="flashScreen"></div>
+
+<!-- Start overlay (required for browser autoplay policy) -->
+<div id="startOverlay">
+  <div class="start-inner">
+    <div class="start-label">▶ CLICK TO BEGIN</div>
+    <div class="start-hint">with sound</div>
+  </div>
+</div>
+
+<!-- Hidden YouTube player for background music -->
+<div id="ytPlayer"></div>
+
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <mask id="binoReveal">
+      <rect width="100%" height="100%" fill="black"/>
+      <g filter="url(#softEdgeReveal)">
+        <circle id="revealLeft" cx="400" cy="400" r="240" fill="white"/>
+        <circle id="revealRight" cx="620" cy="400" r="240" fill="white"/>
+      </g>
+    </mask>
+    <filter id="softEdgeReveal" x="-10%" y="-10%" width="120%" height="120%">
+      <feGaussianBlur stdDeviation="8"/>
+    </filter>
+  </defs>
+</svg>
+
+<div id="bg"></div>
+
+<div id="zoom">
+  <div class="zoomedBg"></div>
+  <div class="beef-text">BEEF</div>
+</div>
+
+<!-- Binocular outside darkness -->
+<svg id="frameSvg" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <filter id="softEdge" x="-10%" y="-10%" width="120%" height="120%">
+      <feGaussianBlur stdDeviation="6"/>
+    </filter>
+    <mask id="holeMask">
+      <rect width="100%" height="100%" fill="white"/>
+      <g filter="url(#softEdge)">
+        <circle id="holeLeft" cx="400" cy="400" r="240" fill="black"/>
+        <circle id="holeRight" cx="620" cy="400" r="240" fill="black"/>
+      </g>
+    </mask>
+  </defs>
+  <rect width="100%" height="100%" fill="rgba(0,0,0,0.92)" mask="url(#holeMask)"/>
+</svg>
+
+<!-- Inner lens vignette + dust overlay -->
+<svg id="lensOverlay" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <mask id="lensMask">
+      <rect width="100%" height="100%" fill="black"/>
+      <g filter="url(#softEdgeReveal)">
+        <circle id="vignLeft" cx="400" cy="400" r="240" fill="white"/>
+        <circle id="vignRight" cx="620" cy="400" r="240" fill="white"/>
+      </g>
+    </mask>
+  </defs>
+  <g mask="url(#lensMask)">
+    <!-- Dust particles only -->
+    <g id="lensDust" fill="rgba(255,255,255,0.08)"></g>
+  </g>
+</svg>
+
+<div class="header">
+  <div class="label">DAY 05 / TELESCOPE</div>
+  <div class="title">BEEF</div>
+</div>
+
+<div class="hud" id="hud">
+  <div class="row">ZOOM <span class="val" id="hudZoom">1.0</span>x</div>
+  <div class="row">LAT <span class="val" id="hudLat">00°00'N</span></div>
+  <div class="row">LONG <span class="val" id="hudLng">00°00'E</span></div>
+  <div class="row focus">FOCUS <span id="hudFocus">LOCKED</span></div>
+</div>
+
+<div class="hint">MOVE to search • SCROLL to zoom • FIND the word</div>
+<div class="day">day 05 / typo-vibe</div>
+<div id="audioToggle" title="Toggle audio">♪</div>
+
+<!-- Signal bar -->
+<div id="signalBar">
+  <div class="label">SIGNAL</div>
+  <div class="bar"><div class="fill" id="signalFill"></div></div>
+</div>
+
+<!-- Hidden message reveal -->
+<div id="revealScreen">
+  <div class="rev-inner">
+    <div class="rev-warn" id="revWarn">TRANSMISSION INTERCEPTED</div>
+    <div class="rev-text" id="revText"></div>
+    <div class="rev-hint">[CLICK to return]</div>
+  </div>
+</div>
+
+<script>
+// ========== YOUTUBE BACKGROUND MUSIC ==========
+let ytPlayer;
+let audioOn=true;
+const YT_VIDEO_ID='r7oD4axU91k';
+
+// Load YouTube iframe API
+const tag=document.createElement('script');
+tag.src='https://www.youtube.com/iframe_api';
+document.head.appendChild(tag);
+
+window.onYouTubeIframeAPIReady=function(){
+  ytPlayer=new YT.Player('ytPlayer',{
+    height:'1',width:'1',
+    videoId:YT_VIDEO_ID,
+    playerVars:{
+      autoplay:0,
+      controls:0,
+      loop:1,
+      playlist:YT_VIDEO_ID,
+      modestbranding:1,
+      playsinline:1
+    },
+    events:{
+      onReady:(e)=>{e.target.setVolume(40)}
+    }
+  });
+};
+
+// Start overlay click starts music
+document.getElementById('startOverlay').addEventListener('click',()=>{
+  document.getElementById('startOverlay').classList.add('hide');
+  if(ytPlayer&&ytPlayer.playVideo){
+    ytPlayer.playVideo();
+  }
+});
+
+// Audio toggle
+document.getElementById('audioToggle').addEventListener('click',(e)=>{
+  e.stopPropagation();
+  audioOn=!audioOn;
+  if(!ytPlayer)return;
+  if(audioOn){
+    ytPlayer.unMute();
+    ytPlayer.playVideo();
+    document.getElementById('audioToggle').textContent='♪';
+    document.getElementById('audioToggle').style.opacity='1';
+  }else{
+    ytPlayer.mute();
+    document.getElementById('audioToggle').textContent='✕';
+    document.getElementById('audioToggle').style.opacity='0.5';
+  }
+});
+</script>
+
+<script>
+const root=document.documentElement;
+let mouseX=window.innerWidth/2, mouseY=window.innerHeight/2;
+let targetX=mouseX,targetY=mouseY;
+let zoom=1;
+let targetZoom=1;
+let shakeX=0,shakeY=0;
+
+const EYE_OFFSET_BASE=180;
+const EYE_R_BASE=240;
+
+// SVG refs
+const revealLeft=document.getElementById('revealLeft');
+const revealRight=document.getElementById('revealRight');
+const holeLeft=document.getElementById('holeLeft');
+const holeRight=document.getElementById('holeRight');
+const vignLeft=document.getElementById('vignLeft');
+const vignRight=document.getElementById('vignRight');
+const lensDust=document.getElementById('lensDust');
+
+// Generate random dust particles per lens
+function generateDust(){
+  const particles=[];
+  for(let i=0;i<25;i++){
+    const eye=i%2===0?'L':'R';
+    const cx=eye==='L'?400:620;
+    const cy=400;
+    const angle=Math.random()*Math.PI*2;
+    const r=Math.random()*200;
+    particles.push({
+      eye,
+      dx:Math.cos(angle)*r,
+      dy:Math.sin(angle)*r,
+      size:0.4+Math.random()*1.8,
+      opacity:0.1+Math.random()*0.25
+    });
+  }
+  lensDust.innerHTML=particles.map(p=>{
+    const cx=p.eye==='L'?400:620;
+    return `<circle cx="${cx+p.dx}" cy="${400+p.dy}" r="${p.size}" fill-opacity="${p.opacity}" data-eye="${p.eye}" data-dx="${p.dx}" data-dy="${p.dy}"/>`;
+  }).join('');
+}
+generateDust();
+
+// HUD refs
+const hudZoom=document.getElementById('hudZoom');
+const hudLat=document.getElementById('hudLat');
+const hudLng=document.getElementById('hudLng');
+const hudFocus=document.getElementById('hudFocus');
+
+// Mouse stability detection for focus
+let lastMouseMoveTime=0;
+let isFocused=true;
+
+// ========== HIDDEN HOTSPOTS ==========
+// Normalized coordinates (0-1) on screen for hidden message triggers
+const HOTSPOTS=[
+  {x:0.78,y:0.22,message:'새들은 노래하는 게 아니야,\n고통에 울부짖는 거지.'},
+  {x:0.12,y:0.38,message:'들리지 않는 것이\n들리지 않는 게 아니다.'},
+  {x:0.55,y:0.82,message:'모든 살은 풀이었고,\n풀은 다시 살이 되었다.'},
+];
+let hotspotProgress=0;  // 0..1 dwell time
+let activeHotspot=null;
+let revealed=false;
+
+function checkHotspot(){
+  if(revealed)return;
+  const nx=targetX/window.innerWidth;
+  const ny=targetY/window.innerHeight;
+  let nearest=null;
+  let nearestDist=Infinity;
+  for(const h of HOTSPOTS){
+    const dx=(h.x-nx)*window.innerWidth;
+    const dy=(h.y-ny)*window.innerHeight;
+    const d=Math.sqrt(dx*dx+dy*dy);
+    if(d<nearestDist){nearestDist=d;nearest=h}
+  }
+  // Signal strength based on distance
+  const DETECTION_RADIUS=200;
+  const sig=Math.max(0,1-nearestDist/DETECTION_RADIUS);
+  document.getElementById('signalFill').style.width=(sig*100)+'%';
+  document.getElementById('signalBar').classList.toggle('strong',sig>0.6);
+
+  // If within hotspot, accumulate dwell time
+  if(sig>0.4){
+    hotspotProgress+=0.008;
+    activeHotspot=nearest;
+    if(hotspotProgress>=1){
+      triggerReveal(nearest.message);
+    }
+  }else{
+    hotspotProgress=Math.max(0,hotspotProgress-0.015);
+    activeHotspot=null;
+  }
+}
+
+function triggerReveal(msg){
+  revealed=true;
+  // Flash
+  const flash=document.getElementById('flashScreen');
+  flash.classList.add('flash');
+  setTimeout(()=>flash.classList.remove('flash'),100);
+  setTimeout(()=>flash.classList.add('flash'),200);
+  setTimeout(()=>flash.classList.remove('flash'),300);
+
+  // Show reveal screen
+  setTimeout(()=>{
+    const screen=document.getElementById('revealScreen');
+    screen.classList.add('show');
+    typeMessage(msg);
+  },400);
+}
+
+function typeMessage(msg){
+  const el=document.getElementById('revText');
+  el.textContent='';
+  el.classList.remove('done');
+  let i=0;
+  const interval=setInterval(()=>{
+    if(i>=msg.length){
+      clearInterval(interval);
+      el.classList.add('done');
+      return;
+    }
+    // Occasional glitch
+    if(Math.random()<0.15){
+      const glitchChar=['▓','█','#','?','※','◆'][Math.floor(Math.random()*6)];
+      el.textContent=msg.substring(0,i)+glitchChar;
+      setTimeout(()=>{
+        el.textContent=msg.substring(0,i+1);
+        i++;
+      },50);
+    }else{
+      el.textContent=msg.substring(0,i+1);
+      i++;
+    }
+  },70);
+}
+
+document.getElementById('revealScreen').addEventListener('click',()=>{
+  document.getElementById('revealScreen').classList.remove('show');
+  setTimeout(()=>{
+    revealed=false;
+    hotspotProgress=0;
+  },800);
+});
+
+function updateEyes(){
+  const tx=targetX+shakeX;
+  const ty=targetY+shakeY;
+
+  const lx=tx-EYE_OFFSET_BASE, ly=ty;
+  const rx=tx+EYE_OFFSET_BASE, ry=ty;
+
+  [revealLeft,holeLeft,vignLeft].forEach(c=>{
+    c.setAttribute('cx',lx);c.setAttribute('cy',ly);
+  });
+  [revealRight,holeRight,vignRight].forEach(c=>{
+    c.setAttribute('cx',rx);c.setAttribute('cy',ry);
+  });
+
+  // Move dust with the eyes
+  lensDust.setAttribute('transform',`translate(${tx-510},${ty-400})`);
+}
+
+// Hand shake — MUCH stronger, breathing-like variation
+function updateShake(t){
+  // Multiple frequency layers for realistic handheld feel
+  const breathe=Math.sin(t*0.0008)*0.5+0.5;  // slow breathing 0..1
+  const shakeAmp=6+breathe*6;  // 6-12px
+  shakeX=Math.sin(t*0.0018)*shakeAmp +
+         Math.sin(t*0.0043)*3 +
+         Math.sin(t*0.011)*1.5;
+  shakeY=Math.cos(t*0.0016)*shakeAmp +
+         Math.cos(t*0.0039)*3 +
+         Math.cos(t*0.013)*1.5;
+  // Occasional jolt
+  if(Math.random()<0.002){
+    shakeX+=(Math.random()-0.5)*20;
+    shakeY+=(Math.random()-0.5)*20;
+  }
+}
+
+document.addEventListener('mousemove',e=>{
+  mouseX=e.clientX;mouseY=e.clientY;
+  lastMouseMoveTime=performance.now();
+});
+
+// Scroll zoom
+document.addEventListener('wheel',e=>{
+  e.preventDefault();
+  targetZoom+=e.deltaY*-0.002;
+  targetZoom=Math.max(0.7,Math.min(3,targetZoom));
+},{passive:false});
+
+// Update HUD
+function updateHUD(){
+  hudZoom.textContent=zoom.toFixed(1);
+  // Fake lat/long from position
+  const nx=targetX/window.innerWidth;
+  const ny=targetY/window.innerHeight;
+  const lat=Math.abs(ny*60-30);
+  const lng=Math.abs(nx*120-60);
+  const latDir=ny>0.5?'S':'N';
+  const lngDir=nx>0.5?'E':'W';
+  hudLat.textContent=`${Math.floor(lat).toString().padStart(2,'0')}°${Math.floor((lat%1)*60).toString().padStart(2,'0')}'${latDir}`;
+  hudLng.textContent=`${Math.floor(lng).toString().padStart(2,'0')}°${Math.floor((lng%1)*60).toString().padStart(2,'0')}'${lngDir}`;
+  hudFocus.textContent=isFocused?'LOCKED':'ADJUSTING';
+  hudFocus.style.color=isFocused?'#60ff60':'#ff8800';
+}
+
+// Focus blur — much stronger when moving
+function updateFocus(t){
+  const dt=t-lastMouseMoveTime;
+  const targetFocus=dt>400;
+  isFocused=targetFocus;
+  // Base blur always slightly present (imperfect optics)
+  const baseBlur=0.8;
+  const moveBlur=isFocused?0:Math.min(10,targetZoom*3.5);
+  document.getElementById('zoom').style.filter=`blur(${baseBlur+moveBlur}px)`;
+}
+
+function loop(t){
+  targetX+=(mouseX-targetX)*0.22;
+  targetY+=(mouseY-targetY)*0.22;
+  zoom+=(targetZoom-zoom)*0.15;
+
+  updateShake(t);
+  updateEyes();
+  updateFocus(t);
+  updateHUD();
+  checkHotspot();
+
+  // Breathing zoom — subtle in-out pulse
+  const breathZoom=1+Math.sin(t*0.0008)*0.025;
+  root.style.setProperty('--zoom',zoom*breathZoom);
+
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+document.addEventListener('touchmove',e=>{
+  e.preventDefault();
+  const t=e.touches[0];
+  mouseX=t.clientX;mouseY=t.clientY;
+  lastMouseMoveTime=performance.now();
+},{passive:false});
+</script>
+</body>
+</html>
