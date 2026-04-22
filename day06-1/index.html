@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 06 - 자신을 믿고 자랑스럽게 여겨라</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;overflow:hidden}
+body{
+  background:#e8ddc4;
+  font-family:'Pretendard',-apple-system,sans-serif;
+  position:relative;user-select:none;
+  /* old paper / print stain texture */
+  background-image:
+    radial-gradient(ellipse at 20% 30%, rgba(180,140,90,0.22) 0%, transparent 40%),
+    radial-gradient(ellipse at 80% 70%, rgba(150,110,70,0.18) 0%, transparent 45%),
+    radial-gradient(circle at 50% 10%, rgba(100,70,40,0.15) 0%, transparent 30%),
+    linear-gradient(180deg,#eadcc0 0%,#d9c8a6 100%);
+}
+
+/* paper grain */
+body::before{
+  content:'';position:fixed;inset:0;pointer-events:none;z-index:1;
+  background-image:
+    repeating-linear-gradient(0deg,
+      rgba(0,0,0,0.015) 0px,
+      rgba(0,0,0,0.015) 1px,
+      transparent 1px,
+      transparent 3px),
+    repeating-linear-gradient(90deg,
+      rgba(0,0,0,0.01) 0px,
+      rgba(0,0,0,0.01) 1px,
+      transparent 1px,
+      transparent 2px);
+  opacity:0.5;
+}
+
+/* paper stains and specks */
+body::after{
+  content:'';position:fixed;inset:0;pointer-events:none;z-index:2;
+  background-image:
+    radial-gradient(circle at 15% 85%, rgba(120,80,40,0.3) 0%, transparent 2%),
+    radial-gradient(circle at 72% 18%, rgba(140,90,50,0.25) 0%, transparent 1.5%),
+    radial-gradient(circle at 92% 60%, rgba(160,110,60,0.2) 0%, transparent 2.5%),
+    radial-gradient(circle at 8% 45%, rgba(100,70,30,0.15) 0%, transparent 1.2%);
+}
+
+.poster{
+  position:relative;z-index:3;width:100%;height:100vh;
+  display:flex;flex-direction:column;align-items:center;justify-content:flex-start;
+  padding:6vh 20px 20px;
+  transform:rotate(-0.6deg);
+}
+
+/* Top label — matches original image */
+.label-banner{
+  background:#f0e4c9;
+  border-top:4px double #2d3f6b;
+  border-bottom:4px double #2d3f6b;
+  padding:18px 60px 14px;
+  margin-bottom:3.5vh;
+  transform:rotate(0.3deg);
+  box-shadow:2px 4px 0 rgba(80,50,20,0.1);
+  position:relative;
+}
+.label-banner::before,.label-banner::after{
+  content:'';position:absolute;left:50%;transform:translateX(-50%);
+  width:60%;height:2px;background:#2d3f6b;
+}
+.label-banner::before{top:8px}
+.label-banner::after{bottom:8px}
+
+.label-banner h1{
+  font-family:'Pretendard',sans-serif;
+  font-weight:900;
+  font-size:clamp(22px,3.2vw,38px);
+  color:#2d3f6b;
+  letter-spacing:-0.02em;
+  line-height:1.3;
+  text-align:center;
+  text-shadow:1px 1px 0 rgba(45,63,107,0.15);
+}
+
+/* Scene area */
+.scene{
+  position:relative;
+  width:min(540px,85vw);
+  height:min(560px,62vh);
+  background:linear-gradient(180deg,#faf4e6 0%,#eaddbd 100%);
+  box-shadow:
+    inset 0 0 80px rgba(140,100,60,0.15),
+    3px 6px 0 rgba(80,50,20,0.12);
+  border:1px solid rgba(100,70,40,0.2);
+  display:flex;align-items:flex-end;justify-content:center;
+  overflow:hidden;
+}
+
+/* scene vignette */
+.scene::after{
+  content:'';position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(ellipse at center,transparent 40%,rgba(90,60,30,0.25) 100%);
+}
+
+/* Floor shadow */
+.floor{
+  position:absolute;bottom:30px;left:50%;transform:translateX(-50%);
+  width:70%;height:20px;
+  background:radial-gradient(ellipse,rgba(60,40,20,0.25) 0%,transparent 70%);
+  filter:blur(8px);
+}
+
+/* Cat (back view) */
+.cat-wrap{
+  position:absolute;bottom:60px;left:20%;
+  width:35%;aspect-ratio:1/1.2;
+  z-index:5;
+  transition:opacity 0.4s ease;
+}
+.cat-svg{width:100%;height:100%;filter:drop-shadow(0 4px 8px rgba(60,40,20,0.2))}
+
+/* Mirror */
+.mirror{
+  position:absolute;bottom:55px;right:8%;
+  width:42%;height:68%;
+  z-index:6;
+}
+
+.mirror-frame{
+  position:absolute;inset:0;
+  background:
+    linear-gradient(135deg,#3a1f0a 0%,#6b3920 40%,#8b5430 60%,#4a2810 100%);
+  border-radius:50% 50% 48% 48% / 55% 55% 45% 45%;
+  box-shadow:
+    inset 0 0 30px rgba(0,0,0,0.5),
+    inset 0 5px 15px rgba(255,200,150,0.15),
+    5px 10px 20px rgba(60,30,10,0.4),
+    0 15px 25px rgba(60,30,10,0.3);
+}
+.mirror-frame::before{
+  content:'';position:absolute;inset:0;border-radius:inherit;
+  background:
+    repeating-linear-gradient(45deg,
+      transparent 0px,transparent 3px,
+      rgba(0,0,0,0.08) 3px,rgba(0,0,0,0.08) 4px);
+}
+
+/* Mirror stand */
+.mirror-stand{
+  position:absolute;left:50%;bottom:-50px;transform:translateX(-50%);
+  width:55%;height:55px;z-index:0;
+}
+.mirror-stand::before{
+  content:'';position:absolute;left:50%;top:0;transform:translateX(-50%);
+  width:12px;height:30px;
+  background:linear-gradient(90deg,#3a1f0a,#6b3920,#3a1f0a);
+}
+.mirror-stand::after{
+  content:'';position:absolute;left:50%;bottom:0;transform:translateX(-50%);
+  width:80%;height:12px;
+  background:linear-gradient(180deg,#6b3920,#3a1f0a);
+  border-radius:4px;
+  box-shadow:0 3px 8px rgba(60,30,10,0.4);
+}
+
+/* Mirror inner (the "beast reveal" area) */
+.mirror-inner{
+  position:absolute;inset:5%;
+  border-radius:50% 50% 48% 48% / 55% 55% 45% 45%;
+  overflow:hidden;
+  background:linear-gradient(160deg,#1a1a2e 0%,#2d1810 60%,#0f0a05 100%);
+  box-shadow:inset 0 0 40px rgba(0,0,0,0.8);
+}
+
+/* Mirror glass shine */
+.mirror-inner::before{
+  content:'';position:absolute;top:10%;left:15%;width:25%;height:40%;
+  background:linear-gradient(135deg,rgba(255,255,255,0.12) 0%,transparent 60%);
+  border-radius:50%;filter:blur(4px);pointer-events:none;z-index:10;
+}
+
+/* Beast visual inside mirror */
+.beast{
+  position:absolute;inset:0;
+  display:flex;align-items:center;justify-content:center;
+  opacity:0;
+  transition:opacity 0.6s ease;
+}
+.beast.show{opacity:1}
+.beast svg{width:100%;height:100%}
+
+/* Lightning flash overlay */
+.flash{
+  position:absolute;inset:0;pointer-events:none;
+  background:#fff;opacity:0;z-index:20;mix-blend-mode:screen;
+}
+.flash.on{animation:lightning 0.6s ease}
+@keyframes lightning{
+  0%{opacity:0}
+  10%{opacity:1}
+  20%{opacity:0.3}
+  30%{opacity:1}
+  50%{opacity:0.1}
+  70%{opacity:0.6}
+  100%{opacity:0}
+}
+
+/* Power rays from mirror */
+.rays{
+  position:absolute;inset:-50%;pointer-events:none;z-index:3;
+  opacity:0;transition:opacity 0.6s ease;
+}
+.rays.show{opacity:0.6;animation:rayRotate 8s linear infinite}
+@keyframes rayRotate{to{transform:rotate(360deg)}}
+.rays svg{width:100%;height:100%}
+
+/* Glitch lines on mirror during transition */
+.glitch{
+  position:absolute;inset:0;pointer-events:none;z-index:15;
+  opacity:0;
+}
+.glitch.on{animation:glitchAnim 0.5s steps(5) 2}
+@keyframes glitchAnim{
+  0%{opacity:0;transform:translateX(0)}
+  20%{opacity:0.8;transform:translateX(-4px)}
+  40%{opacity:0.6;transform:translateX(3px)}
+  60%{opacity:0.9;transform:translateX(-2px)}
+  80%{opacity:0.4;transform:translateX(5px)}
+  100%{opacity:0;transform:translateX(0)}
+}
+.glitch::before,.glitch::after{
+  content:'';position:absolute;left:0;right:0;height:2px;
+  background:rgba(255,100,100,0.8);
+}
+.glitch::before{top:30%;box-shadow:0 80px 0 rgba(100,200,255,0.6),0 -40px 0 rgba(255,255,100,0.5)}
+.glitch::after{top:60%;box-shadow:0 30px 0 rgba(255,100,200,0.6),0 -20px 0 rgba(100,255,100,0.5)}
+
+/* Thumbnail picker */
+.picker{
+  position:absolute;bottom:24px;left:50%;transform:translateX(-50%);
+  z-index:10;
+  display:flex;gap:12px;
+  background:rgba(240,228,201,0.85);
+  padding:10px 14px;
+  border:1px solid rgba(100,70,40,0.3);
+  box-shadow:2px 4px 0 rgba(80,50,20,0.15);
+  backdrop-filter:blur(4px);
+}
+.thumb{
+  width:46px;height:46px;
+  border:2px solid rgba(100,70,40,0.4);
+  background:#faf4e6;
+  cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  transition:all 0.2s ease;
+  position:relative;
+  overflow:hidden;
+}
+.thumb:hover{transform:translateY(-3px);border-color:#2d3f6b}
+.thumb.active{
+  border-color:#2d3f6b;border-width:3px;
+  box-shadow:0 0 0 2px rgba(45,63,107,0.2),0 4px 12px rgba(45,63,107,0.3);
+  transform:translateY(-2px);
+}
+.thumb svg{width:70%;height:70%}
+
+/* Caption under scene */
+.caption{
+  margin-top:14px;
+  font-family:'Pretendard',sans-serif;
+  font-size:12px;color:#2d3f6b;
+  opacity:0.6;letter-spacing:2px;
+  text-transform:uppercase;
+  text-align:center;
+}
+.caption .name{font-weight:700;font-size:14px;letter-spacing:1px;text-transform:none}
+.caption .arrow{margin:0 10px;opacity:0.5}
+
+/* Day indicator */
+.day-tag{
+  position:fixed;bottom:14px;right:18px;z-index:100;
+  font:11px/1 monospace;
+  color:rgba(45,63,107,0.5);
+  letter-spacing:1px;
+  pointer-events:none;
+}
+
+/* Hint */
+.hint{
+  position:fixed;top:14px;right:18px;z-index:100;
+  font:10px/1.4 monospace;
+  color:rgba(45,63,107,0.45);
+  letter-spacing:2px;
+  text-align:right;
+  pointer-events:none;
+}
+
+/* Tape corners for poster feel */
+.tape{
+  position:absolute;width:70px;height:22px;
+  background:rgba(240,220,170,0.6);
+  border:1px solid rgba(160,130,90,0.3);
+  z-index:20;
+  pointer-events:none;
+}
+.tape.tl{top:-10px;left:-10px;transform:rotate(-35deg)}
+.tape.tr{top:-10px;right:-10px;transform:rotate(35deg)}
+
+@media(max-width:600px){
+  .label-banner{padding:14px 30px 10px}
+  .scene{height:56vh}
+  .cat-wrap{bottom:40px}
+  .mirror{bottom:35px}
+  .picker{bottom:12px;padding:8px 10px;gap:8px}
+  .thumb{width:40px;height:40px}
+}
+</style>
+</head>
+<body>
+
+<div class="poster">
+  <div class="label-banner">
+    <span class="tape tl"></span>
+    <span class="tape tr"></span>
+    <h1>자신을 믿고 자랑스럽게<br>여겨라</h1>
+  </div>
+
+  <div class="scene" id="scene">
+    <div class="floor"></div>
+
+    <!-- Cat (back view, swaps based on selection) -->
+    <div class="cat-wrap" id="catWrap"></div>
+
+    <!-- Mirror -->
+    <div class="mirror">
+      <div class="mirror-stand"></div>
+      <div class="mirror-frame"></div>
+      <div class="mirror-inner">
+        <div class="rays" id="rays"></div>
+        <div class="beast" id="beast"></div>
+        <div class="glitch" id="glitch"></div>
+      </div>
+    </div>
+
+    <div class="flash" id="flash"></div>
+
+    <!-- Thumbnail picker -->
+    <div class="picker" id="picker"></div>
+  </div>
+
+  <div class="caption">
+    <span class="name" id="catName">치즈냥이</span>
+    <span class="arrow">→</span>
+    <span class="name" id="beastName">사자</span>
+  </div>
+</div>
+
+<div class="hint">↓ 아래 썸네일 클릭</div>
+<div class="day-tag">day 06 / typo-vibe</div>
+
+<script>
+// ========== ANIMAL SVG LIBRARY ==========
+// Cat (back view) — param'd by fur color
+function catBackSvg(fur,stripe){
+  return `<svg viewBox="0 0 200 240" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <radialGradient id="furG${fur}" cx="50%" cy="30%" r="70%">
+        <stop offset="0%" stop-color="${lighten(fur,20)}"/>
+        <stop offset="70%" stop-color="${fur}"/>
+        <stop offset="100%" stop-color="${darken(fur,30)}"/>
+      </radialGradient>
+    </defs>
+    <!-- tail curled around -->
+    <path d="M 160 200 Q 190 180 180 150 Q 170 130 150 140" stroke="${darken(fur,15)}" stroke-width="22" stroke-linecap="round" fill="none"/>
+    <path d="M 160 200 Q 190 180 180 150 Q 170 130 150 140" stroke="url(#furG${fur})" stroke-width="18" stroke-linecap="round" fill="none"/>
+    <!-- body (teardrop from behind) -->
+    <ellipse cx="100" cy="160" rx="60" ry="75" fill="url(#furG${fur})"/>
+    <!-- back stripes -->
+    ${stripe?`<path d="M 60 140 Q 80 135 100 140 M 60 165 Q 80 160 100 165 M 60 190 Q 80 185 100 190" stroke="${darken(fur,25)}" stroke-width="3" fill="none" opacity="0.5"/>
+    <path d="M 100 140 Q 120 135 140 140 M 100 165 Q 120 160 140 165 M 100 190 Q 120 185 140 190" stroke="${darken(fur,25)}" stroke-width="3" fill="none" opacity="0.5"/>`:''}
+    <!-- head (from behind, shows ear tips and a bit of cheek) -->
+    <ellipse cx="100" cy="90" rx="48" ry="55" fill="url(#furG${fur})"/>
+    ${stripe?`<path d="M 75 70 L 80 85 M 100 65 L 100 80 M 125 70 L 120 85" stroke="${darken(fur,25)}" stroke-width="3" fill="none" opacity="0.6"/>`:''}
+    <!-- ears -->
+    <path d="M 60 65 L 52 20 L 82 55 Z" fill="${darken(fur,20)}"/>
+    <path d="M 62 60 L 58 30 L 78 52 Z" fill="${lighten('#ffcccc',-5)}" opacity="0.5"/>
+    <path d="M 140 65 L 148 20 L 118 55 Z" fill="${darken(fur,20)}"/>
+    <path d="M 138 60 L 142 30 L 122 52 Z" fill="${lighten('#ffcccc',-5)}" opacity="0.5"/>
+    <!-- subtle cheek hint -->
+    <ellipse cx="148" cy="95" rx="8" ry="12" fill="${darken(fur,10)}" opacity="0.4"/>
+  </svg>`;
+}
+
+// Beast SVGs — stylized front-facing portraits
+const BEASTS={
+  lion:`<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <radialGradient id="maneG" cx="50%" cy="50%" r="60%">
+        <stop offset="0%" stop-color="#d98c3a"/>
+        <stop offset="70%" stop-color="#8b4a1a"/>
+        <stop offset="100%" stop-color="#3d1f08"/>
+      </radialGradient>
+      <radialGradient id="faceG" cx="50%" cy="45%" r="55%">
+        <stop offset="0%" stop-color="#f4c472"/>
+        <stop offset="100%" stop-color="#a06820"/>
+      </radialGradient>
+    </defs>
+    <!-- mane -->
+    <circle cx="100" cy="100" r="90" fill="url(#maneG)"/>
+    <g stroke="#6b3920" stroke-width="2" fill="url(#maneG)">
+      ${Array.from({length:24}).map((_,i)=>{const a=i*15*Math.PI/180;const r1=70;const r2=95;return `<path d="M ${100+Math.cos(a)*r1} ${100+Math.sin(a)*r1} L ${100+Math.cos(a)*r2} ${100+Math.sin(a)*r2}"/>`;}).join('')}
+    </g>
+    <!-- face -->
+    <ellipse cx="100" cy="105" rx="48" ry="52" fill="url(#faceG)"/>
+    <!-- eyes -->
+    <ellipse cx="82" cy="95" rx="6" ry="8" fill="#fff"/>
+    <ellipse cx="118" cy="95" rx="6" ry="8" fill="#fff"/>
+    <circle cx="82" cy="96" r="4" fill="#2d1800"/>
+    <circle cx="118" cy="96" r="4" fill="#2d1800"/>
+    <circle cx="83" cy="94" r="1.5" fill="#fff"/>
+    <circle cx="119" cy="94" r="1.5" fill="#fff"/>
+    <!-- eye brow ridge -->
+    <path d="M 72 85 Q 82 82 92 86" stroke="#6b3920" stroke-width="2.5" fill="none"/>
+    <path d="M 108 86 Q 118 82 128 85" stroke="#6b3920" stroke-width="2.5" fill="none"/>
+    <!-- nose -->
+    <path d="M 92 115 L 108 115 L 100 125 Z" fill="#3d1f08"/>
+    <!-- mouth -->
+    <path d="M 100 125 L 100 135 M 100 135 Q 88 140 82 135 M 100 135 Q 112 140 118 135" stroke="#3d1f08" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <!-- whisker spots -->
+    <circle cx="86" cy="128" r="1" fill="#3d1f08"/>
+    <circle cx="114" cy="128" r="1" fill="#3d1f08"/>
+  </svg>`,
+
+  whiteTiger:`<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <radialGradient id="tigerFaceG" cx="50%" cy="50%" r="55%">
+        <stop offset="0%" stop-color="#ffffff"/>
+        <stop offset="70%" stop-color="#e8e4dc"/>
+        <stop offset="100%" stop-color="#8a8578"/>
+      </radialGradient>
+    </defs>
+    <!-- head shape -->
+    <path d="M 30 100 Q 30 40 100 30 Q 170 40 170 100 Q 170 170 100 180 Q 30 170 30 100 Z" fill="url(#tigerFaceG)"/>
+    <!-- ears -->
+    <path d="M 50 55 L 35 25 L 70 45 Z" fill="#e8e4dc"/>
+    <path d="M 55 52 L 48 35 L 68 45 Z" fill="#ffb3b3"/>
+    <path d="M 150 55 L 165 25 L 130 45 Z" fill="#e8e4dc"/>
+    <path d="M 145 52 L 152 35 L 132 45 Z" fill="#ffb3b3"/>
+    <!-- stripes (dark) -->
+    <g fill="#1a1a1a" opacity="0.85">
+      <path d="M 60 55 Q 65 65 70 55 L 68 80 Q 63 85 58 80 Z"/>
+      <path d="M 85 45 L 88 60 Q 85 65 82 60 Z"/>
+      <path d="M 100 40 L 102 58 Q 100 62 98 58 Z"/>
+      <path d="M 115 45 L 112 60 Q 115 65 118 60 Z"/>
+      <path d="M 140 55 Q 135 65 130 55 L 132 80 Q 137 85 142 80 Z"/>
+      <path d="M 35 90 Q 45 93 55 90 L 50 100 Q 40 102 32 100 Z"/>
+      <path d="M 165 90 Q 155 93 145 90 L 150 100 Q 160 102 168 100 Z"/>
+      <path d="M 40 130 Q 55 132 70 130 L 65 140 Q 50 142 38 140 Z"/>
+      <path d="M 130 130 Q 145 132 160 130 L 162 140 Q 150 142 135 140 Z"/>
+    </g>
+    <!-- eyes — icy blue -->
+    <ellipse cx="78" cy="95" rx="10" ry="8" fill="#fff"/>
+    <ellipse cx="122" cy="95" rx="10" ry="8" fill="#fff"/>
+    <circle cx="78" cy="95" r="6" fill="#4a90c4"/>
+    <circle cx="122" cy="95" r="6" fill="#4a90c4"/>
+    <ellipse cx="78" cy="95" rx="2" ry="5" fill="#000"/>
+    <ellipse cx="122" cy="95" rx="2" ry="5" fill="#000"/>
+    <circle cx="80" cy="92" r="1.5" fill="#fff"/>
+    <circle cx="124" cy="92" r="1.5" fill="#fff"/>
+    <!-- nose -->
+    <path d="M 90 120 L 110 120 Q 108 130 100 132 Q 92 130 90 120 Z" fill="#d4738c"/>
+    <!-- mouth -->
+    <path d="M 100 132 L 100 142 M 100 142 Q 88 148 80 142 M 100 142 Q 112 148 120 142" stroke="#1a1a1a" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <!-- fangs -->
+    <path d="M 92 143 L 90 152 L 94 148 Z" fill="#fff"/>
+    <path d="M 108 143 L 110 152 L 106 148 Z" fill="#fff"/>
+  </svg>`,
+
+  panther:`<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <radialGradient id="pantherG" cx="50%" cy="45%" r="55%">
+        <stop offset="0%" stop-color="#3a3a3a"/>
+        <stop offset="70%" stop-color="#1a1a1a"/>
+        <stop offset="100%" stop-color="#000"/>
+      </radialGradient>
+    </defs>
+    <!-- head -->
+    <path d="M 35 110 Q 35 50 100 40 Q 165 50 165 110 Q 165 175 100 180 Q 35 175 35 110 Z" fill="url(#pantherG)"/>
+    <!-- subtle rosette hints -->
+    <g fill="#000" opacity="0.6">
+      <ellipse cx="65" cy="85" rx="5" ry="3"/>
+      <ellipse cx="135" cy="85" rx="5" ry="3"/>
+      <ellipse cx="55" cy="130" rx="4" ry="2.5"/>
+      <ellipse cx="145" cy="130" rx="4" ry="2.5"/>
+      <ellipse cx="70" cy="150" rx="4" ry="2.5"/>
+      <ellipse cx="130" cy="150" rx="4" ry="2.5"/>
+    </g>
+    <!-- ears -->
+    <path d="M 50 60 L 40 30 L 72 50 Z" fill="#1a1a1a"/>
+    <path d="M 150 60 L 160 30 L 128 50 Z" fill="#1a1a1a"/>
+    <!-- glowing yellow eyes -->
+    <ellipse cx="78" cy="100" rx="11" ry="9" fill="#ffd700" filter="url(#eyeGlow)"/>
+    <ellipse cx="122" cy="100" rx="11" ry="9" fill="#ffd700"/>
+    <defs>
+      <filter id="eyeGlow"><feGaussianBlur stdDeviation="1"/></filter>
+    </defs>
+    <ellipse cx="78" cy="100" rx="2" ry="7" fill="#000"/>
+    <ellipse cx="122" cy="100" rx="2" ry="7" fill="#000"/>
+    <!-- eye shine -->
+    <circle cx="82" cy="97" r="2" fill="#fff" opacity="0.9"/>
+    <circle cx="126" cy="97" r="2" fill="#fff" opacity="0.9"/>
+    <!-- nose -->
+    <path d="M 92 128 L 108 128 Q 105 138 100 140 Q 95 138 92 128 Z" fill="#0a0a0a"/>
+    <!-- mouth with fangs -->
+    <path d="M 100 140 L 100 150 M 100 150 Q 85 154 78 148 M 100 150 Q 115 154 122 148" stroke="#000" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <path d="M 93 151 L 91 160 L 95 156 Z" fill="#fff"/>
+    <path d="M 107 151 L 109 160 L 105 156 Z" fill="#fff"/>
+  </svg>`,
+
+  cheetah:`<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <radialGradient id="cheetahG" cx="50%" cy="45%" r="55%">
+        <stop offset="0%" stop-color="#f0d078"/>
+        <stop offset="70%" stop-color="#c89030"/>
+        <stop offset="100%" stop-color="#6e4810"/>
+      </radialGradient>
+    </defs>
+    <path d="M 35 110 Q 35 50 100 40 Q 165 50 165 110 Q 165 175 100 180 Q 35 175 35 110 Z" fill="url(#cheetahG)"/>
+    <!-- spots -->
+    <g fill="#1a0a05">
+      ${Array.from({length:40}).map((_,i)=>{
+        const x=45+Math.random()*110;const y=55+Math.random()*115;const r=2+Math.random()*3;
+        return `<circle cx="${x}" cy="${y}" r="${r}" opacity="${0.6+Math.random()*0.4}"/>`;
+      }).join('')}
+    </g>
+    <!-- ears -->
+    <path d="M 50 55 L 40 25 L 72 48 Z" fill="#a07020"/>
+    <path d="M 150 55 L 160 25 L 128 48 Z" fill="#a07020"/>
+    <!-- tear stripes (signature cheetah) -->
+    <path d="M 80 108 Q 78 125 88 150" stroke="#1a0a05" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+    <path d="M 120 108 Q 122 125 112 150" stroke="#1a0a05" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+    <!-- eyes — amber -->
+    <ellipse cx="78" cy="100" rx="9" ry="7" fill="#fff"/>
+    <ellipse cx="122" cy="100" rx="9" ry="7" fill="#fff"/>
+    <circle cx="78" cy="100" r="5" fill="#d47a1a"/>
+    <circle cx="122" cy="100" r="5" fill="#d47a1a"/>
+    <circle cx="78" cy="100" r="2.5" fill="#000"/>
+    <circle cx="122" cy="100" r="2.5" fill="#000"/>
+    <circle cx="80" cy="98" r="1.2" fill="#fff"/>
+    <circle cx="124" cy="98" r="1.2" fill="#fff"/>
+    <!-- nose -->
+    <path d="M 92 128 L 108 128 Q 105 138 100 140 Q 95 138 92 128 Z" fill="#2a1505"/>
+    <!-- mouth -->
+    <path d="M 100 140 L 100 150 M 100 150 Q 88 155 82 150 M 100 150 Q 112 155 118 150" stroke="#1a0a05" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  </svg>`,
+
+  wolf:`<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <radialGradient id="wolfG" cx="50%" cy="45%" r="55%">
+        <stop offset="0%" stop-color="#9a9a9a"/>
+        <stop offset="60%" stop-color="#5a5a5a"/>
+        <stop offset="100%" stop-color="#2a2a2a"/>
+      </radialGradient>
+    </defs>
+    <!-- head shape (pointier for wolf) -->
+    <path d="M 30 120 Q 30 60 60 45 Q 100 30 140 45 Q 170 60 170 120 Q 160 170 100 180 Q 40 170 30 120 Z" fill="url(#wolfG)"/>
+    <!-- snout -->
+    <path d="M 75 135 Q 85 170 100 175 Q 115 170 125 135 Z" fill="#6a6a6a"/>
+    <!-- fur texture strokes -->
+    <g stroke="#2a2a2a" stroke-width="1.5" fill="none" opacity="0.5">
+      <path d="M 40 80 L 45 95 M 55 70 L 58 85 M 70 60 L 72 75 M 130 60 L 128 75 M 145 70 L 142 85 M 160 80 L 155 95"/>
+    </g>
+    <!-- ears pointed -->
+    <path d="M 50 50 L 35 10 L 75 42 Z" fill="#4a4a4a"/>
+    <path d="M 54 48 L 48 25 L 68 42 Z" fill="#2a2a2a"/>
+    <path d="M 150 50 L 165 10 L 125 42 Z" fill="#4a4a4a"/>
+    <path d="M 146 48 L 152 25 L 132 42 Z" fill="#2a2a2a"/>
+    <!-- eyes — yellow -->
+    <ellipse cx="75" cy="95" rx="9" ry="6" fill="#fff"/>
+    <ellipse cx="125" cy="95" rx="9" ry="6" fill="#fff"/>
+    <circle cx="75" cy="95" r="5" fill="#d4a020"/>
+    <circle cx="125" cy="95" r="5" fill="#d4a020"/>
+    <circle cx="75" cy="95" r="2.5" fill="#000"/>
+    <circle cx="125" cy="95" r="2.5" fill="#000"/>
+    <circle cx="77" cy="93" r="1" fill="#fff"/>
+    <circle cx="127" cy="93" r="1" fill="#fff"/>
+    <!-- nose -->
+    <ellipse cx="100" cy="148" rx="8" ry="6" fill="#1a1a1a"/>
+    <!-- mouth (slight snarl) -->
+    <path d="M 100 154 L 100 165 M 100 165 Q 85 170 78 163 M 100 165 Q 115 170 122 163" stroke="#1a1a1a" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <!-- fangs -->
+    <path d="M 93 166 L 91 174 L 95 170 Z" fill="#fff"/>
+    <path d="M 107 166 L 109 174 L 105 170 Z" fill="#fff"/>
+  </svg>`,
+};
+
+// Cat presets matched to beasts
+const PRESETS=[
+  {id:'orange',name:'치즈냥이',fur:'#d48430',stripe:true,beast:'lion',beastName:'사자'},
+  {id:'persian',name:'페르시안',fur:'#f0ead6',stripe:false,beast:'whiteTiger',beastName:'백호'},
+  {id:'black',name:'검은 고양이',fur:'#1a1a1a',stripe:false,beast:'panther',beastName:'흑표범'},
+  {id:'siamese',name:'시암',fur:'#c8a878',stripe:false,beast:'cheetah',beastName:'치타'},
+  {id:'gray',name:'러시안블루',fur:'#6a7585',stripe:false,beast:'wolf',beastName:'늑대'},
+];
+
+// Color utils
+function lighten(hex,pct){const {r,g,b}=hex2rgb(hex);const f=1+pct/100;return rgb2hex(Math.min(255,r*f),Math.min(255,g*f),Math.min(255,b*f))}
+function darken(hex,pct){const {r,g,b}=hex2rgb(hex);const f=1-pct/100;return rgb2hex(Math.max(0,r*f),Math.max(0,g*f),Math.max(0,b*f))}
+function hex2rgb(h){h=h.replace('#','');return{r:parseInt(h.slice(0,2),16),g:parseInt(h.slice(2,4),16),b:parseInt(h.slice(4,6),16)}}
+function rgb2hex(r,g,b){return '#'+[r,g,b].map(x=>Math.round(x).toString(16).padStart(2,'0')).join('')}
+
+// ========== RENDER ==========
+const catWrap=document.getElementById('catWrap');
+const beast=document.getElementById('beast');
+const picker=document.getElementById('picker');
+const flash=document.getElementById('flash');
+const rays=document.getElementById('rays');
+const glitch=document.getElementById('glitch');
+const catName=document.getElementById('catName');
+const beastName=document.getElementById('beastName');
+
+// Rays SVG (once)
+rays.innerHTML=`<svg viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="rayCenter" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="rgba(255,240,180,0.8)"/>
+      <stop offset="100%" stop-color="transparent"/>
+    </radialGradient>
+  </defs>
+  ${Array.from({length:16}).map((_,i)=>{
+    const a=i*22.5;
+    return `<polygon points="200,200 ${200+Math.cos((a-2)*Math.PI/180)*300},${200+Math.sin((a-2)*Math.PI/180)*300} ${200+Math.cos((a+2)*Math.PI/180)*300},${200+Math.sin((a+2)*Math.PI/180)*300}" fill="rgba(255,220,140,0.4)"/>`;
+  }).join('')}
+  <circle cx="200" cy="200" r="80" fill="url(#rayCenter)"/>
+</svg>`;
+
+// Build picker thumbnails
+PRESETS.forEach((p,idx)=>{
+  const btn=document.createElement('button');
+  btn.className='thumb'+(idx===0?' active':'');
+  btn.dataset.idx=idx;
+  btn.innerHTML=catBackSvg(p.fur,p.stripe);
+  btn.addEventListener('click',()=>selectPreset(idx));
+  picker.appendChild(btn);
+});
+
+let currentIdx=-1;
+function selectPreset(idx){
+  if(idx===currentIdx)return;
+  const prev=currentIdx;
+  currentIdx=idx;
+  const p=PRESETS[idx];
+  // Update active thumb
+  document.querySelectorAll('.thumb').forEach((t,i)=>t.classList.toggle('active',i===idx));
+  // Update cat back
+  catWrap.innerHTML=catBackSvg(p.fur,p.stripe);
+  catName.textContent=p.name;
+
+  // Transition sequence
+  if(prev!==-1){
+    // Hide beast, flash, glitch, then show new beast
+    beast.classList.remove('show');
+    rays.classList.remove('show');
+    setTimeout(()=>{
+      flash.classList.remove('on');void flash.offsetWidth;flash.classList.add('on');
+      glitch.classList.remove('on');void glitch.offsetWidth;glitch.classList.add('on');
+    },50);
+    setTimeout(()=>{
+      beast.innerHTML=BEASTS[p.beast];
+      beastName.textContent=p.beastName;
+      beast.classList.add('show');
+      rays.classList.add('show');
+    },350);
+  }else{
+    // First render — immediate
+    setTimeout(()=>{
+      beast.innerHTML=BEASTS[p.beast];
+      beastName.textContent=p.beastName;
+      beast.classList.add('show');
+      rays.classList.add('show');
+    },400);
+  }
+}
+
+// Initial selection
+selectPreset(0);
+</script>
+
+</body>
+</html>
