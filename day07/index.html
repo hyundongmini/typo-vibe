@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 07 - 아이들이 세상을 바라보는 방법에 대한 탐색</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{min-height:100%}
+body{
+  background:#fff;
+  font-family:'Pretendard',-apple-system,sans-serif;
+  color:#000;
+  padding:80px 24px 120px;
+  -webkit-font-smoothing:antialiased;
+}
+
+.wrap{max-width:720px;margin:0 auto;position:relative}
+
+h1.head{
+  font-weight:900;
+  font-size:clamp(28px,4.4vw,44px);
+  letter-spacing:-0.03em;
+  line-height:1.25;
+  margin-bottom:48px;
+  cursor:text;
+}
+
+article{
+  font-size:15px;
+  line-height:1.85;
+  letter-spacing:-0.005em;
+  color:#111;
+}
+article p{margin-bottom:1.3em}
+article p:last-child{margin-bottom:0}
+
+/* ======= Collected chips (stacked bricks) ======= */
+.chips-wrap{
+  margin-top:80px;
+  padding-top:40px;
+  border-top:1px solid rgba(0,0,0,0.08);
+  position:relative;
+}
+.chips-label{
+  font:500 11px/1 monospace;
+  letter-spacing:3px;
+  color:rgba(0,0,0,0.4);
+  text-transform:uppercase;
+  margin-bottom:20px;
+  display:flex;align-items:center;gap:10px;
+}
+.chips-label .count{
+  display:inline-flex;align-items:center;justify-content:center;
+  min-width:22px;height:22px;padding:0 7px;
+  background:#000;color:#fff;border-radius:100px;
+  font:600 11px/1 monospace;letter-spacing:0.5px;
+}
+.chips{
+  display:flex;flex-wrap:wrap;gap:6px;align-items:flex-start;
+}
+.chip{
+  font-family:'Pretendard',-apple-system,sans-serif;
+  font-weight:900;
+  font-size:clamp(20px,3.2vw,34px);
+  letter-spacing:-0.02em;
+  line-height:1.1;
+  color:#000;
+  padding:10px 14px 12px;
+  border:none;
+  cursor:pointer;
+  user-select:none;
+  animation:chipIn .22s cubic-bezier(.2,1.2,.3,1) both;
+  transition:transform .15s ease,filter .15s ease;
+  display:inline-block;
+  white-space:pre-wrap;
+  word-break:keep-all;
+  position:relative;
+}
+.chip:hover{transform:translateY(-2px) rotate(-0.5deg);filter:saturate(1.15)}
+.chip:active{transform:translateY(0) scale(0.98)}
+.chip::after{
+  content:'×';
+  position:absolute;top:-6px;right:-6px;
+  width:18px;height:18px;border-radius:50%;
+  background:#000;color:#fff;font-size:12px;font-weight:700;
+  display:flex;align-items:center;justify-content:center;
+  opacity:0;transition:opacity .15s ease;
+  pointer-events:none;
+}
+.chip:hover::after{opacity:1}
+.chip.round{
+  border-radius:100px;
+  padding:10px 18px 12px;
+}
+@keyframes chipIn{
+  from{opacity:0;transform:translateY(-4px) scale(0.92)}
+  to{opacity:1;transform:translateY(0) scale(1)}
+}
+
+/* Highlight layer sits on top of text but visually blends behind */
+.hl-layer{
+  position:absolute;inset:0;
+  pointer-events:none;
+  z-index:1;
+}
+.hl-layer rect{
+  mix-blend-mode:multiply;
+  opacity:0.85;
+}
+
+/* Text stays above highlight visually via z-index stacking context */
+.wrap{position:relative}
+h1.head, article{position:relative;z-index:2}
+
+/* When dragging, prevent text selection flashing so experience is clean */
+body.drawing{
+  cursor:crosshair;
+  user-select:none;
+  -webkit-user-select:none;
+}
+body.drawing h1.head,
+body.drawing article{cursor:crosshair}
+
+/* ======= Palette (fixed bottom) ======= */
+.palette{
+  position:fixed;bottom:20px;left:50%;transform:translateX(-50%);
+  display:flex;gap:10px;align-items:center;
+  padding:10px 14px;
+  background:rgba(255,255,255,0.95);
+  border:1px solid rgba(0,0,0,0.08);
+  border-radius:100px;
+  box-shadow:0 4px 20px rgba(0,0,0,0.08),0 1px 3px rgba(0,0,0,0.05);
+  backdrop-filter:blur(10px);
+  z-index:100;
+}
+.color-btn{
+  width:30px;height:30px;
+  border-radius:50%;
+  border:2px solid rgba(0,0,0,0.06);
+  cursor:pointer;
+  transition:transform 0.15s ease,border-color 0.15s ease;
+  padding:0;
+}
+.color-btn:hover{transform:scale(1.1)}
+.color-btn.active{
+  border-color:#000;
+  transform:scale(1.15);
+  box-shadow:0 0 0 3px rgba(0,0,0,0.08);
+}
+.divider{
+  width:1px;height:22px;
+  background:rgba(0,0,0,0.1);
+  margin:0 4px;
+}
+.tool-btn{
+  width:32px;height:32px;
+  border-radius:50%;
+  border:2px solid rgba(0,0,0,0.06);
+  background:#fff;
+  cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  transition:all 0.15s ease;
+  padding:0;
+}
+.tool-btn:hover{background:#f5f5f5;transform:scale(1.08)}
+.tool-btn.active{
+  border-color:#000;
+  background:#000;color:#fff;
+}
+.tool-btn svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+
+.day-tag{
+  position:fixed;bottom:14px;right:18px;
+  font:11px/1 monospace;
+  color:rgba(0,0,0,0.35);
+  letter-spacing:1px;
+  pointer-events:none;
+  z-index:99;
+}
+.hint{
+  position:fixed;top:14px;right:18px;
+  font:10px/1.4 monospace;
+  color:rgba(0,0,0,0.35);
+  letter-spacing:2px;
+  text-align:right;
+  pointer-events:none;
+  z-index:99;
+}
+
+/* Back-to-archive */
+.back-to-archive{
+  position:fixed;top:16px;left:16px;z-index:9999;
+  display:inline-flex;align-items:center;gap:6px;
+  padding:8px 14px 8px 12px;
+  background:rgba(255,255,255,0.9);
+  color:#111;
+  font:500 12px/1 -apple-system,'Pretendard','SF Pro Text',sans-serif;
+  letter-spacing:-0.01em;
+  text-decoration:none;
+  border:1px solid rgba(0,0,0,0.08);
+  border-radius:100px;
+  box-shadow:0 2px 8px rgba(0,0,0,0.12),0 1px 2px rgba(0,0,0,0.06);
+  backdrop-filter:blur(10px);
+  -webkit-backdrop-filter:blur(10px);
+  transition:background 0.2s ease,transform 0.2s ease,box-shadow 0.2s ease;
+  user-select:none;
+}
+.back-to-archive:hover{
+  background:#fff;
+  transform:translateX(-2px);
+  box-shadow:0 4px 12px rgba(0,0,0,0.18),0 2px 4px rgba(0,0,0,0.08);
+}
+.back-to-archive svg{flex:none;transition:transform 0.2s ease;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.back-to-archive:hover svg{transform:translateX(-2px)}
+
+@media(max-width:640px){
+  body{padding:70px 20px 100px}
+  h1.head{font-size:28px;margin-bottom:36px}
+  article{font-size:14px;line-height:1.8}
+  .palette{gap:8px;padding:8px 12px}
+  .color-btn{width:26px;height:26px}
+  .tool-btn{width:28px;height:28px}
+}
+</style>
+</head>
+<body>
+
+<a href="../" class="back-to-archive" aria-label="아카이브로 돌아가기">
+  <svg viewBox="0 0 24 24" width="14" height="14"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+  <span>뒤로가기</span>
+</a>
+
+<div class="wrap" id="wrap">
+  <svg class="hl-layer" id="hlLayer" xmlns="http://www.w3.org/2000/svg"></svg>
+
+  <h1 class="head">아이들이 세상을<br>바라보는 방법에 대한 탐색</h1>
+
+  <article id="article">
+    <p>어쩌면 이 영화가 그 제목을 통해 말하려 했던 것은, 아이들의 존재와 생존을 위한 몸부림을 '아무도 몰랐던' 어른-사회의 무책임에 대한 반성의 촉구 같은 것이 아닐지도 모른다. 정작 아무도 몰랐던 것 그리고 지금까지도 아무도 잘 모르고 있는 것은, 그 아이들이 보여준 놀라운 삶에의 의지와 삶의 감각(감독은 그것을 "삶의 리얼리티를 느낄 수 있는 육체적인 기억"이라고 표현한다)일 것이라고, 영화는 말한다.</p>
+
+    <p>영화는 그들을 어떻게 바라보아야 하는가가 아니라, 그들이 세상을 어떻게 바라보고 느꼈었는가를 질문하고 탐색한다. 마치 &lt;말아톤&gt;이 초원이를 어떻게 바라보아야 할 것인가에 대한 도덕적 다그침이 아니라, 초원이가 바라보는 세상과 삶의 감각이 무엇인가를 포착함으로써 새로워질 수 있었던 것처럼, 그렇게 &lt;아무도 모른다&gt;는 새로운 영화가 된다. 그것은 영화가 영화를 넘어서는 놀라운 기적의 순간들이다.</p>
+
+    <p>그때 영화는 사실과 허구, 다큐와 픽션의 경계를 넘어선 화법으로, 쉽게 선과 악의 이분법으로 재단해낼 수 없는 삶의 진실에 이야기한다. 도덕적 폭력이 되지 않아야 할, 그저 끊임없는 새로운 윤리적 질문의 출발점이기만 해야 할 연민과 분노만을 낮고 조용히, 그러나 끈질기게 환기시킨다.</p>
+
+    <p>고레에다 감독의 전작 &lt;원더풀 라이프&gt;(1999)에는, 또 하나의 아이-소녀가 등장한다. 기억하고 싶은 삶의 가장 아름다운 순간으로 습관적으로 디즈니랜드를 떠올렸던 소녀는, 그것이 이미 많은 아이들의 것이었다는 이야기를 듣는 순간, 그것이 자신의 가장 소중한 것일 수 없음을 느낀다. 그 소녀가 대신 찾아낸 가장 행복했던 기억은 "무릎에 누이고 귀를 파주던 엄마의 살냄새"였다.</p>
+
+    <p>상식적이고 자동화된 우리의 반응에 대한 새로운 윤리적 질문은 이렇듯 늘 새로운 삶의 감각과 함께 비로소 작동한다. &lt;아무도 모른다&gt;는 그 새로운 윤리적 질문, 새로운 삶의 감각으로 충만해 있는, 아름답고 새로운 영화이다.</p>
+
+    <p>다음과 같은 고레에다 감독의 진심어린 연출의 변은, 그 새로움을 찾는 모든 감독들이 스스로에게 던지는 질문이자 다짐일 것이다. "소년의 옆에서 어깨를 다독여주고자 했다. 안아주는 건 안 된다… 나도 카메라도 거리를 유지할 필요가 있었다."</p>
+  </article>
+
+  <section class="chips-wrap" id="chipsWrap" hidden>
+    <div class="chips-label">
+      <span>Collected</span>
+      <span class="count" id="chipCount">0</span>
+    </div>
+    <div class="chips" id="chips"></div>
+  </section>
+</div>
+
+<div class="palette" id="palette">
+  <button class="color-btn active" data-color="#7ef9ff" style="background:#7ef9ff" aria-label="시안"></button>
+  <button class="color-btn" data-color="#fff176" style="background:#fff176" aria-label="노랑"></button>
+  <button class="color-btn" data-color="#b5ff9e" style="background:#b5ff9e" aria-label="연두"></button>
+  <button class="color-btn" data-color="#ff9ec7" style="background:#ff9ec7" aria-label="핑크"></button>
+  <button class="color-btn" data-color="#ffb570" style="background:#ffb570" aria-label="주황"></button>
+  <button class="color-btn" data-color="#c9a7ff" style="background:#c9a7ff" aria-label="보라"></button>
+  <div class="divider"></div>
+  <button class="tool-btn" id="eraseBtn" aria-label="지우개">
+    <svg viewBox="0 0 24 24"><path d="M20 20H9l-5-5a1 1 0 0 1 0-1.4L14.5 3a1 1 0 0 1 1.4 0l5 5a1 1 0 0 1 0 1.4L11 20"/><path d="M22 20h-6"/></svg>
+  </button>
+  <button class="tool-btn" id="clearBtn" aria-label="전체 지우기">
+    <svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+  </button>
+</div>
+
+<div class="hint">DRAG to highlight</div>
+<div class="day-tag">day 07 / typo-vibe</div>
+
+<script>
+const wrap=document.getElementById('wrap');
+const hlLayer=document.getElementById('hlLayer');
+const palette=document.getElementById('palette');
+const eraseBtn=document.getElementById('eraseBtn');
+const clearBtn=document.getElementById('clearBtn');
+const chipsSection=document.getElementById('chipsWrap');
+const chipsEl=document.getElementById('chips');
+const chipCountEl=document.getElementById('chipCount');
+
+let currentColor='#7ef9ff';
+let eraseMode=false;
+let lastRangeText=''; // updated during drag for commit on mouseup
+let stripeId=0;
+
+// === PALETTE ===
+palette.querySelectorAll('.color-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    palette.querySelectorAll('.color-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    currentColor=btn.dataset.color;
+    eraseMode=false;
+    eraseBtn.classList.remove('active');
+  });
+});
+
+eraseBtn.addEventListener('click',()=>{
+  eraseMode=!eraseMode;
+  eraseBtn.classList.toggle('active',eraseMode);
+  if(eraseMode){
+    palette.querySelectorAll('.color-btn').forEach(b=>b.classList.remove('active'));
+  }else{
+    // reactivate current color
+    const active=palette.querySelector(`.color-btn[data-color="${currentColor}"]`);
+    if(active)active.classList.add('active');
+  }
+});
+
+clearBtn.addEventListener('click',()=>{
+  hlLayer.innerHTML='';
+  chipsEl.innerHTML='';
+  updateChipsVisibility();
+});
+
+// === RESIZE SVG LAYER ===
+function resizeLayer(){
+  const r=wrap.getBoundingClientRect();
+  hlLayer.setAttribute('width',r.width);
+  hlLayer.setAttribute('height',r.height);
+  hlLayer.setAttribute('viewBox',`0 0 ${r.width} ${r.height}`);
+}
+resizeLayer();
+window.addEventListener('resize',resizeLayer);
+// Also refresh after web fonts settle
+if(document.fonts&&document.fonts.ready){document.fonts.ready.then(resizeLayer)}
+
+// === DRAG TO HIGHLIGHT ===
+let dragging=false;
+let startX=0,startY=0;
+let currentRect=null;
+let currentStripe=null; // for multi-line
+
+function mousePos(e){
+  const r=wrap.getBoundingClientRect();
+  const x=(e.touches?e.touches[0].clientX:e.clientX)-r.left;
+  const y=(e.touches?e.touches[0].clientY:e.clientY)-r.top;
+  return {x,y};
+}
+
+function shouldSkip(target){
+  return target.closest('.palette')||target.closest('.back-to-archive');
+}
+
+function onDown(e){
+  if(shouldSkip(e.target))return;
+  // Only start on primary button for mouse
+  if(e.button!==undefined&&e.button!==0)return;
+
+  const {x,y}=mousePos(e);
+  dragging=true;
+  startX=x;startY=y;
+  lastRangeText='';
+  currentStripe=document.createElementNS('http://www.w3.org/2000/svg','g');
+  stripeId++;
+  currentStripe.setAttribute('data-id','s'+stripeId);
+  hlLayer.appendChild(currentStripe);
+
+  // Single rect to start (will grow)
+  currentRect=createRect(x,y,0,0);
+  currentStripe.appendChild(currentRect);
+
+  document.body.classList.add('drawing');
+  e.preventDefault();
+}
+
+function onMove(e){
+  if(!dragging)return;
+  const {x,y}=mousePos(e);
+  updateStripe(startX,startY,x,y);
+  e.preventDefault();
+}
+
+function onUp(){
+  if(!dragging)return;
+  dragging=false;
+  document.body.classList.remove('drawing');
+
+  if(eraseMode&&currentStripe){
+    // In erase mode: remove intersecting stripes (and their chips) then remove the eraser stripe itself
+    const eraser=currentStripe.getBoundingClientRect();
+    const stripes=[...hlLayer.querySelectorAll(':scope > g')];
+    stripes.forEach(g=>{
+      if(g===currentStripe)return;
+      const br=g.getBoundingClientRect();
+      const intersect=!(br.right<eraser.left||br.left>eraser.right||br.bottom<eraser.top||br.top>eraser.bottom);
+      if(intersect){
+        const id=g.getAttribute('data-id');
+        if(id){
+          const chip=chipsEl.querySelector(`.chip[data-id="${id}"]`);
+          if(chip)chip.remove();
+        }
+        g.remove();
+      }
+    });
+    currentStripe.remove();
+  }else if(currentStripe){
+    // Commit chip for this highlight
+    const text=cleanText(lastRangeText);
+    if(text){
+      addChip(text,currentColor,currentStripe.getAttribute('data-id'));
+    }else{
+      // nothing meaningful captured — drop the empty stripe so we don't leave orphan marks
+      if(currentStripe.children.length===0)currentStripe.remove();
+    }
+  }
+
+  currentStripe=null;
+  currentRect=null;
+  lastRangeText='';
+}
+
+function cleanText(s){
+  if(!s)return '';
+  return s.replace(/\s+/g,' ').trim();
+}
+
+function addChip(text,color,linkedId){
+  const b=document.createElement('button');
+  b.className='chip';
+  // Shorter chips (< ~8 chars) get rounded pill look — matches the poster vibe
+  if([...text].length<=8)b.classList.add('round');
+  b.style.background=color;
+  b.textContent=text;
+  if(linkedId)b.setAttribute('data-id',linkedId);
+  b.title='클릭해서 삭제';
+  b.addEventListener('click',()=>{
+    const id=b.getAttribute('data-id');
+    b.remove();
+    if(id){
+      const g=hlLayer.querySelector(`g[data-id="${id}"]`);
+      if(g)g.remove();
+    }
+    updateChipsVisibility();
+  });
+  chipsEl.appendChild(b);
+  updateChipsVisibility();
+}
+
+function updateChipsVisibility(){
+  const n=chipsEl.children.length;
+  chipCountEl.textContent=n;
+  chipsSection.hidden=n===0;
+}
+
+// Build a rect-creating helper
+function createRect(x,y,w,h){
+  const r=document.createElementNS('http://www.w3.org/2000/svg','rect');
+  const color=eraseMode?'rgba(0,0,0,0.08)':currentColor;
+  r.setAttribute('x',x);
+  r.setAttribute('y',y);
+  r.setAttribute('width',w);
+  r.setAttribute('height',h);
+  r.setAttribute('fill',color);
+  r.setAttribute('rx',2);
+  if(eraseMode){
+    r.setAttribute('stroke','rgba(0,0,0,0.4)');
+    r.setAttribute('stroke-dasharray','4 3');
+    r.setAttribute('stroke-width','1');
+    r.style.mixBlendMode='normal';
+  }
+  return r;
+}
+
+// Use DOM Range to get exact rectangles for the dragged text.
+// Fallback: rough line-height based boxes if caret APIs aren't available.
+function caretFromPoint(cx,cy){
+  if(document.caretPositionFromPoint){
+    const p=document.caretPositionFromPoint(cx,cy);
+    if(p)return {node:p.offsetNode,offset:p.offset};
+  }
+  if(document.caretRangeFromPoint){
+    const r=document.caretRangeFromPoint(cx,cy);
+    if(r)return {node:r.startContainer,offset:r.startOffset};
+  }
+  return null;
+}
+
+function updateStripe(x1,y1,x2,y2){
+  while(currentStripe.firstChild)currentStripe.removeChild(currentStripe.firstChild);
+
+  const wrapRect=wrap.getBoundingClientRect();
+  // Convert local wrap coords to viewport coords
+  const v1={x:x1+wrapRect.left,y:y1+wrapRect.top};
+  const v2={x:x2+wrapRect.left,y:y2+wrapRect.top};
+
+  const a=caretFromPoint(v1.x,v1.y);
+  const b=caretFromPoint(v2.x,v2.y);
+
+  // If we can't hit any text node (e.g., dragging empty margin), fall back.
+  if(!a||!b||!isInsideContent(a.node)||!isInsideContent(b.node)){
+    drawFallbackRects(x1,y1,x2,y2,wrapRect);
+    return;
+  }
+
+  // Order start/end by document position
+  const range=document.createRange();
+  try{
+    const cmp=compareBoundary(a.node,a.offset,b.node,b.offset);
+    if(cmp<=0){
+      range.setStart(a.node,a.offset);
+      range.setEnd(b.node,b.offset);
+    }else{
+      range.setStart(b.node,b.offset);
+      range.setEnd(a.node,a.offset);
+    }
+  }catch(err){
+    drawFallbackRects(x1,y1,x2,y2,wrapRect);
+    return;
+  }
+
+  // Keep the text in a module variable so we can commit on mouseup
+  lastRangeText=range.toString();
+
+  // getClientRects() gives one rect per line fragment — exactly what we want
+  const rects=range.getClientRects();
+  if(!rects.length){
+    drawFallbackRects(x1,y1,x2,y2,wrapRect);
+    return;
+  }
+
+  for(const cr of rects){
+    if(cr.width<1||cr.height<1)continue;
+    const x=cr.left-wrapRect.left;
+    const y=cr.top-wrapRect.top;
+    // Shrink vertically a touch so the highlight feels like a marker stripe, not a full block
+    const padY=Math.max(1,cr.height*0.08);
+    currentStripe.appendChild(createRect(x,y+padY,cr.width,cr.height-padY*2));
+  }
+}
+
+function isInsideContent(node){
+  if(!node)return false;
+  const el=node.nodeType===3?node.parentElement:node;
+  return !!(el&&(el.closest('article')||el.closest('h1.head')));
+}
+
+function compareBoundary(n1,o1,n2,o2){
+  // -1 if (n1,o1) < (n2,o2), 0 equal, 1 if greater
+  if(n1===n2)return o1-o2;
+  const pos=n1.compareDocumentPosition(n2);
+  if(pos&Node.DOCUMENT_POSITION_FOLLOWING)return -1;
+  if(pos&Node.DOCUMENT_POSITION_PRECEDING)return 1;
+  return 0;
+}
+
+function drawFallbackRects(x1,y1,x2,y2,wrapRect){
+  // Minimal fallback: a single thin rect between drag points
+  const left=Math.min(x1,x2);
+  const top=Math.min(y1,y2);
+  const w=Math.abs(x2-x1);
+  const h=Math.max(12,Math.abs(y2-y1));
+  currentStripe.appendChild(createRect(left,top,w,h));
+}
+
+// Events
+wrap.addEventListener('mousedown',onDown);
+window.addEventListener('mousemove',onMove);
+window.addEventListener('mouseup',onUp);
+
+wrap.addEventListener('touchstart',onDown,{passive:false});
+window.addEventListener('touchmove',onMove,{passive:false});
+window.addEventListener('touchend',onUp);
+
+// Prevent default text selection while we draw
+wrap.addEventListener('selectstart',(e)=>{
+  if(shouldSkip(e.target))return;
+  e.preventDefault();
+});
+</script>
+
+</body>
+</html>
