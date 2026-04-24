@@ -14,7 +14,10 @@ body{
   -webkit-font-smoothing:antialiased;
   display:flex;align-items:center;justify-content:center;
   user-select:none;-webkit-user-select:none;
+  transition:background-color .8s ease;
 }
+body.danger-bg{background:#f5ebe8}
+body.happy-bg{background:#f0f7f0}
 
 /* HUD */
 .hud{position:fixed;top:0;left:0;right:0;display:flex;justify-content:space-between;align-items:flex-start;padding:20px 24px;z-index:50}
@@ -45,8 +48,8 @@ body{
 }
 .cat-wrap.petting{cursor:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'><text y='24' font-size='24'>✋</text></svg>") 16 16, grab}
 .cat-img{max-width:100%;max-height:100%;object-fit:contain;pointer-events:none;position:absolute;
-  transition:opacity .15s,transform .15s}
-.cat-img.hidden{opacity:0;transform:scale(0.92)}
+  transition:opacity .3s ease,transform .3s ease}
+.cat-img.hidden{opacity:0;transform:scale(0.95)}
 .cat-img.active{opacity:1;transform:scale(1)}
 
 /* Danger state — cat shakes subtly */
@@ -71,6 +74,27 @@ body{
 .flash{position:fixed;inset:0;pointer-events:none;z-index:150;opacity:0;transition:opacity .05s}
 .flash.red{background:#ff0000;opacity:0.3}
 .flash.green{background:#00ff00;opacity:0.15}
+
+/* Vignette for danger */
+.vignette{position:fixed;inset:0;pointer-events:none;z-index:5;opacity:0;
+  transition:opacity .6s ease;
+  background:radial-gradient(ellipse at center,transparent 40%,rgba(0,0,0,0.4) 100%)}
+.vignette.active{opacity:1}
+
+/* Timer */
+.timer{position:fixed;bottom:40px;left:0;right:0;text-align:center;
+  font-size:20px;font-weight:800;color:rgba(0,0,0,0.15);
+  font-variant-numeric:tabular-nums;font-family:'Pretendard',sans-serif;
+  letter-spacing:0.05em;z-index:10;transition:color .3s}
+.timer.danger{color:rgba(220,38,38,0.3)}
+
+/* NEW BEST */
+.new-best{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) scale(0);
+  font-size:clamp(40px,8vw,64px);font-weight:900;color:#f59e0b;
+  text-shadow:0 0 30px rgba(245,158,11,0.4);
+  pointer-events:none;z-index:180;opacity:0;
+  transition:transform .4s cubic-bezier(.2,1,.3,1),opacity .4s}
+.new-best.show{transform:translate(-50%,-50%) scale(1);opacity:1}
 
 /* Screen shake */
 body.screen-shake{animation:screenShake .3s ease}
@@ -146,7 +170,10 @@ body.screen-shake{animation:screenShake .3s ease}
   <img class="cat-img hidden" id="imgAngry2" src="도동이_분노2단계.png" alt="" draggable="false">
 </div>
 <div class="status" id="statusEl">도동이를 쓰다듬어주세요</div>
+<div class="timer" id="timerEl">0.0s</div>
 <div class="flash" id="flash"></div>
+<div class="vignette" id="vignette"></div>
+<div class="new-best" id="newBest">NEW BEST!</div>
 
 <div class="overlay start-screen" id="startOverlay">
   <h1>도동이<br>복복복<br>쓰다듬기</h1>
@@ -159,6 +186,7 @@ body.screen-shake{animation:screenShake .3s ease}
   <p class="sub" id="resultSub">도동이가 화났어요!</p>
   <div class="final-score" id="finalScore">0</div>
   <div class="best-score" id="bestScoreEnd">BEST: 0</div>
+  <div class="best-score" id="survivalTime" style="margin-top:-20px;margin-bottom:20px">생존: 0.0초</div>
   <button class="btn" id="retryBtn">다시 하기</button>
 </div>
 <div class="day-tag">day 08 / typo-vibe</div>
@@ -184,6 +212,9 @@ const bestEl=document.getElementById('bestEl');
 const stateInd=document.getElementById('stateInd');
 const statusEl=document.getElementById('statusEl');
 const flash=document.getElementById('flash');
+const vignette=document.getElementById('vignette');
+const timerEl=document.getElementById('timerEl');
+const newBestEl=document.getElementById('newBest');
 const startOverlay=document.getElementById('startOverlay');
 const endOverlay=document.getElementById('endOverlay');
 
@@ -201,6 +232,7 @@ let multiplier=1, comboStrokes=0, gameStartTime=0;
 let stateTimer=null, dangerGraceTimer=null;
 let lastX=0, lastY=0, lastMoveTime=0;
 let loopAudio=null;
+let timerInterval=null;
 
 bestEl.textContent='BEST: '+bestScore;
 
@@ -255,11 +287,6 @@ function spawnFur(x,y){
     document.body.appendChild(el);setTimeout(()=>el.remove(),1000);
   }
 }
-function spawnEmoji(x,y,e){
-  const el=document.createElement('div');el.className='particle';el.textContent=e;
-  el.style.left=x+'px';el.style.top=y+'px';
-  document.body.appendChild(el);setTimeout(()=>el.remove(),700);
-}
 function spawnScorePop(x,y,n){
   const el=document.createElement('div');el.className='score-pop';
   el.textContent=(n>0?'+':'')+n;
@@ -295,12 +322,17 @@ function enterState(s){
     stateInd.className='state-indicator safe';stateInd.textContent='안전';
     statusEl.textContent='쓰다듬어주세요!';statusEl.style.color='rgba(0,0,0,0.4)';
     catWrap.classList.remove('danger-mode');
+    document.body.classList.remove('danger-bg');
+    document.body.classList.remove('happy-bg');
+    vignette.classList.remove('active');
+    timerEl.classList.remove('danger');
     if(prev==='angry1'){playLoop('purr.mp3',0.3)}
     scheduleNextDanger();
   }else if(s==='happy1'){
     stateInd.className='state-indicator happy';stateInd.textContent='기분 좋음 x2';
     statusEl.textContent='도동이가 골골거려요~';statusEl.style.color='#22c55e';
     multiplier=2;multEl.textContent='x2';multEl.className='mult x2';
+    document.body.classList.add('happy-bg');
     playLoop('purr.mp3',0.5);
     screenFlash('green');
   }else if(s==='happy2'){
@@ -310,10 +342,13 @@ function enterState(s){
     playLoop('snore.mp3',0.4);
     screenFlash('green');
   }else if(s==='angry1'){
-    // 위험! 째려보기 시작
     stateInd.className='state-indicator danger';stateInd.textContent='⚠ 째려보는 중';
     statusEl.textContent='멈춰!! 도동이가 째려봐요!';statusEl.style.color='#dc2626';
     catWrap.classList.add('danger-mode');
+    document.body.classList.add('danger-bg');
+    document.body.classList.remove('happy-bg');
+    vignette.classList.add('active');
+    timerEl.classList.add('danger');
     stopLoop();playGroom();
     multiplier=1;multEl.textContent='x1';multEl.className='mult';
     comboStrokes=0;
@@ -410,9 +445,8 @@ function onPetMove(x,y){
   scoreEl.classList.add('hot');
 
   // 점수 팝업 (가끔)
-  if(comboStrokes%12===0){
-    spawnScorePop(x-20+Math.random()*40, y-30, pts*12);
-    spawnEmoji(x,y,multiplier>=2?'💕':'❤️');
+  if(comboStrokes%15===0){
+    spawnScorePop(x-20+Math.random()*40, y-30, pts*15);
   }
 
   // 긍정 단계 전이 — 충분히 쓰다듬어야 올라감
@@ -436,7 +470,10 @@ function gameOver(){
   catWrap.classList.remove('petting','danger-mode');
   catWrap.style.transform='';
   clearTimeout(stateTimer);clearTimeout(dangerGraceTimer);clearTimeout(warningTimer);
+  clearInterval(timerInterval);
   stopLoop();
+  document.body.classList.remove('danger-bg','happy-bg');
+  vignette.classList.remove('active');
 
   // 임팩트!
   playHiss();
@@ -444,8 +481,11 @@ function gameOver(){
   screenFlash('red');
   showImg('angry2');
 
+  const survived=((Date.now()-gameStartTime)/1000).toFixed(1);
+
   // 최고 점수
-  if(score>bestScore){
+  const isNewBest=score>bestScore;
+  if(isNewBest){
     bestScore=score;
     localStorage.setItem('dodong_best',bestScore);
   }
@@ -453,8 +493,13 @@ function gameOver(){
   setTimeout(()=>{
     document.getElementById('finalScore').textContent=score;
     document.getElementById('bestScoreEnd').textContent='BEST: '+bestScore;
+    document.getElementById('survivalTime').textContent='생존: '+survived+'초';
     bestEl.textContent='BEST: '+bestScore;
     endOverlay.classList.remove('hidden');
+    if(isNewBest&&score>0){
+      newBestEl.classList.add('show');
+      setTimeout(()=>newBestEl.classList.remove('show'),2000);
+    }
   },600);
 }
 
@@ -467,6 +512,16 @@ function startGame(){
   multEl.textContent='x1';multEl.className='mult';
   startOverlay.classList.add('hidden');
   endOverlay.classList.add('hidden');
+  document.body.classList.remove('danger-bg','happy-bg');
+  vignette.classList.remove('active');
+  timerEl.classList.remove('danger');
+  timerEl.textContent='0.0s';
+  clearInterval(timerInterval);
+  timerInterval=setInterval(()=>{
+    if(!gameActive)return;
+    const t=((Date.now()-gameStartTime)/1000).toFixed(1);
+    timerEl.textContent=t+'s';
+  },100);
   enterState('default');
 }
 
