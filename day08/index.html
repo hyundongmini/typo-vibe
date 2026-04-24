@@ -43,10 +43,10 @@ body.happy-bg{background:#f0f7f0}
 .cat-wrap{
   position:relative;width:340px;height:340px;
   display:flex;align-items:center;justify-content:center;
-  cursor:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'><text y='24' font-size='24'>🤚</text></svg>") 16 16, pointer;
+  cursor:url("cursor_hand.png") 16 16, pointer;
   transition:transform .1s;
 }
-.cat-wrap.petting{cursor:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'><text y='24' font-size='24'>✋</text></svg>") 16 16, grab}
+.cat-wrap.petting{cursor:url("cursor_hand.png") 16 16, grab}
 .cat-img{max-width:100%;max-height:100%;object-fit:contain;pointer-events:none;position:absolute;
   transition:opacity .3s ease,transform .3s ease}
 .cat-img.hidden{opacity:0;transform:scale(0.95)}
@@ -135,7 +135,10 @@ body.screen-shake{animation:screenShake .3s ease}
 /* Status */
 .status{position:fixed;bottom:80px;left:0;right:0;text-align:center;
   font-size:14px;font-weight:600;color:rgba(0,0,0,0.4);font-family:'Pretendard',sans-serif;
-  transition:color .15s;z-index:10}
+  transition:all .2s;z-index:10}
+.status.danger-text{font-size:22px;font-weight:900;color:#dc2626;
+  font-family:'BMEuljiro',sans-serif;animation:dangerBlink .5s ease infinite alternate}
+@keyframes dangerBlink{0%{opacity:1}100%{opacity:0.5}}
 
 /* Back */
 .back-to-archive{position:fixed;top:16px;left:16px;z-index:9999;display:inline-flex;align-items:center;gap:6px;
@@ -177,7 +180,7 @@ body.screen-shake{animation:screenShake .3s ease}
 
 <div class="overlay start-screen" id="startOverlay">
   <h1>도동이<br>복복복<br>쓰다듬기</h1>
-  <p class="sub">도동이가 째려볼 때 쓰다듬으면 끝이에요<br>눈치껏 쓰다듬고, 째려보면 멈추세요 🐱</p>
+  <p class="sub">🟢 안전할 때 → 쓰다듬기 (점수 UP)<br>🔴 째려볼 때 → 손 떼기! (만지면 게임오버)<br>오래 버틸수록 난이도 UP 🐱</p>
   <button class="btn" id="startBtn">시작하기</button>
 </div>
 <div class="overlay hidden" id="endOverlay">
@@ -321,6 +324,7 @@ function enterState(s){
   if(s==='default'){
     stateInd.className='state-indicator safe';stateInd.textContent='안전';
     statusEl.textContent='쓰다듬어주세요!';statusEl.style.color='rgba(0,0,0,0.4)';
+    statusEl.classList.remove('danger-text');
     catWrap.classList.remove('danger-mode');
     document.body.classList.remove('danger-bg');
     document.body.classList.remove('happy-bg');
@@ -343,7 +347,8 @@ function enterState(s){
     screenFlash('green');
   }else if(s==='angry1'){
     stateInd.className='state-indicator danger';stateInd.textContent='⚠ 째려보는 중';
-    statusEl.textContent='멈춰!! 도동이가 째려봐요!';statusEl.style.color='#dc2626';
+    statusEl.textContent='손 떼!!';statusEl.style.color='#dc2626';
+    statusEl.classList.add('danger-text');
     catWrap.classList.add('danger-mode');
     document.body.classList.add('danger-bg');
     document.body.classList.remove('happy-bg');
