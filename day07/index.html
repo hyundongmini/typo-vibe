@@ -338,7 +338,7 @@ function clickTick(){
 }
 
 /* Matter.js */
-const {Engine,World,Bodies,Body,Mouse,MouseConstraint,Events}=Matter;
+const {Engine,World,Bodies,Body}=Matter;
 const engine=Engine.create();
 engine.gravity.y=1.1;
 const world=engine.world;
@@ -403,23 +403,32 @@ function addDropBox(text,color,originRect){
   }
 }
 
-/* 박스 "짧은 탭"이면 원문으로 스크롤, 드래그면 MouseConstraint가 처리 */
+/* 박스 인터랙션: 짧은 탭=원문 스크롤, 드래그=집어 던지기 */
 function bindBoxTap(entry){
   const {el}=entry;
-  let pressed=false,downX=0,downY=0,downT=0,moved=false;
-  const down=(x,y)=>{pressed=true;moved=false;downX=x;downY=y;downT=Date.now();el.classList.add('dragging')};
-  const moveCheck=(x,y)=>{if(pressed&&Math.hypot(x-downX,y-downY)>6)moved=true};
-  const upCheck=(x,y)=>{
-    if(!pressed)return;pressed=false;el.classList.remove('dragging');
-    const dt=Date.now()-downT,dist=Math.hypot(x-downX,y-downY);
-    if(!moved&&dist<6&&dt<260)scrollToSource(entry);
+  let downX=0,downY=0,downT=0;
+  const down=(x,y)=>{
+    downX=x;downY=y;downT=Date.now();
+    onBoxDown(entry,x,y);
   };
-  el.addEventListener('mousedown',(e)=>down(e.clientX,e.clientY));
-  el.addEventListener('touchstart',(e)=>{const t=e.touches[0];if(t)down(t.clientX,t.clientY)},{passive:true});
-  window.addEventListener('mousemove',(e)=>moveCheck(e.clientX,e.clientY),{passive:true});
-  window.addEventListener('touchmove',(e)=>{const t=e.touches[0];if(t)moveCheck(t.clientX,t.clientY)},{passive:true});
-  window.addEventListener('mouseup',(e)=>upCheck(e.clientX,e.clientY),{passive:true});
-  window.addEventListener('touchend',(e)=>{const t=e.changedTouches[0];if(t)upCheck(t.clientX,t.clientY)},{passive:true});
+  el.addEventListener('mousedown',(e)=>{e.stopPropagation();down(e.clientX,e.clientY)});
+  el.addEventListener('touchstart',(e)=>{
+    const t=e.touches[0];if(t){e.stopPropagation();down(t.clientX,t.clientY)}
+  },{passive:true});
+  // 탭 판별은 전역 mouseup/touchend에서
+  const checkTap=(x,y)=>{
+    if(dragEntry!==entry&&dragEntry!==null)return; // 다른 박스 드래그 중
+    const dt=Date.now()-downT, dist=Math.hypot(x-downX,y-downY);
+    if(dist<8&&dt<280){
+      // 짧은 탭 → 원문으로 스크롤
+      scrollToSource(entry);
+    }
+  };
+  window.addEventListener('mouseup',(e)=>{if(dragEntry===entry||dragEntry===null)checkTap(e.clientX,e.clientY)},{passive:true});
+  window.addEventListener('touchend',(e)=>{
+    const t=e.changedTouches[0];
+    if(t&&(dragEntry===entry||dragEntry===null))checkTap(t.clientX,t.clientY);
+  },{passive:true});
 }
 
 function scrollToSource(entry){
@@ -445,25 +454,41 @@ function scrollToSource(entry){
   setTimeout(()=>g.remove(),1400);
 }
 
-/* ======= MouseConstraint — 박스 집어 던지기 ======= */
-const mouse=Mouse.create(document.body);
-if(mouse.mousewheel){
-  document.body.removeEventListener('wheel',mouse.mousewheel);
-  document.body.removeEventListener('DOMMouseScroll',mouse.mousewheel);
+/* ======= DOM 기반 박스 드래그 & 던지기 ======= */
+let dragEntry=null, dragOffX=0, dragOffY=0;
+let dragVelX=0, dragVelY=0, dragPrevX=0, dragPrevY=0, dragPrevT=0;
+
+function onBoxDown(entry,cx,cy){
+  dragEntry=entry;
+  const {x,y}=entry.body.position;
+  dragOffX=cx-x; dragOffY=cy-y;
+  dragPrevX=cx; dragPrevY=cy; dragPrevT=performance.now();
+  dragVelX=0; dragVelY=0;
+  Body.setStatic(entry.body,true);
+  entry.el.classList.add('dragging');
 }
-const mouseConstraint=MouseConstraint.create(engine,{
-  mouse,
-  constraint:{stiffness:0.2,damping:0.1,render:{visible:false}}
-});
-World.add(world,mouseConstraint);
-Events.on(mouseConstraint,'startdrag',(e)=>{
-  const b=e.body;if(!b)return;
-  const entry=byBodyId.get(b.id);if(entry)entry.el.classList.add('dragging');
-});
-Events.on(mouseConstraint,'enddrag',(e)=>{
-  const b=e.body;if(!b)return;
-  const entry=byBodyId.get(b.id);if(entry)entry.el.classList.remove('dragging');
-});
+function onBoxMove(cx,cy){
+  if(!dragEntry)return;
+  const now=performance.now();
+  const dt=Math.max(1,now-dragPrevT);
+  dragVelX=(cx-dragPrevX)/dt*16; // 프레임당 속도로 환산
+  dragVelY=(cy-dragPrevY)/dt*16;
+  dragPrevX=cx; dragPrevY=cy; dragPrevT=now;
+  Body.setPosition(dragEntry.body,{x:cx-dragOffX,y:cy-dragOffY});
+  Body.setAngle(dragEntry.body,0);
+}
+function onBoxUp(){
+  if(!dragEntry)return;
+  Body.setStatic(dragEntry.body,false);
+  Body.setVelocity(dragEntry.body,{x:dragVelX,y:dragVelY});
+  Body.setAngularVelocity(dragEntry.body,dragVelX*0.01);
+  dragEntry.el.classList.remove('dragging');
+  dragEntry=null;
+}
+
+window.addEventListener('mouseup',()=>onBoxUp());
+window.addEventListener('touchmove',(e)=>{if(dragEntry&&e.touches[0])onBoxMove(e.touches[0].clientX,e.touches[0].clientY)});
+window.addEventListener('touchend',()=>onBoxUp());
 
 (function loop(){
   Engine.update(engine,1000/60);
@@ -527,6 +552,7 @@ function mousePos(e){
 function shouldSkip(t){return t.closest('.palette')||t.closest('.back-to-archive')||t.closest('.drop-box')}
 
 function onDown(e){
+  if(dragEntry)return; // 박스 드래그 중이면 하이라이트 시작 안 함
   if(shouldSkip(e.target))return;
   if(e.button!==undefined&&e.button!==0)return;
   ensureAudio();
@@ -543,6 +569,7 @@ function onDown(e){
   e.preventDefault();
 }
 function onMove(e){
+  if(dragEntry){onBoxMove(e.touches?e.touches[0].clientX:e.clientX, e.touches?e.touches[0].clientY:e.clientY);return}
   if(!dragging)return;
   const {x,y}=mousePos(e);
   updateStripe(startX,startY,x,y);
@@ -555,7 +582,8 @@ function onMove(e){
   // 마우스 이벤트에서만 기본동작 막음 (터치는 passive 경합 방지)
   if(!e.touches)e.preventDefault();
 }
-function onUp(){
+function onUp(e){
+  if(dragEntry){onBoxUp();return}
   if(!dragging)return;
   dragging=false;
   document.body.classList.remove('drawing');
