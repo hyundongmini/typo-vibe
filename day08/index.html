@@ -3,218 +3,92 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Day 08 - 도동이 쓰다듬기</title>
+<title>Day 08 - 도동이 복복복 쓰다듬기</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/fonts-archive/BMEuljiro@1.0/BMEuljiro.css">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{height:100%;overflow:hidden}
 body{
   background:#faf9f6;
-  font-family:'Pretendard',-apple-system,sans-serif;
+  font-family:'BMEuljiro','Pretendard',-apple-system,sans-serif;
   color:#111;
   -webkit-font-smoothing:antialiased;
   display:flex;flex-direction:column;align-items:center;justify-content:center;
   user-select:none;-webkit-user-select:none;
 }
-
-/* Game area */
-.game{
-  position:relative;
-  width:100%;max-width:480px;
-  height:100vh;
-  display:flex;flex-direction:column;align-items:center;justify-content:center;
-}
-
-/* HUD */
-.hud{
-  position:fixed;top:0;left:0;right:0;
-  display:flex;justify-content:space-between;align-items:center;
-  padding:16px 20px;
-  z-index:50;
-}
-.score-display{
-  font-weight:900;font-size:32px;
-  letter-spacing:-0.03em;
-  color:#111;
-  font-variant-numeric:tabular-nums;
-  transition:transform .15s cubic-bezier(.2,.8,.2,1),color .2s;
-}
+.game{position:relative;width:100%;max-width:480px;height:100vh;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;}
+.hud{position:fixed;top:0;left:0;right:0;display:flex;justify-content:space-between;align-items:center;padding:16px 20px;z-index:50}
+.score-display{font-weight:900;font-size:36px;letter-spacing:-0.02em;color:#111;font-variant-numeric:tabular-nums;
+  transition:transform .15s cubic-bezier(.2,.8,.2,1),color .2s}
 .score-display.bump-up{color:#22c55e;transform:scale(1.15)}
 .score-display.bump-down{color:#ef4444;transform:scale(1.15)}
-.mood-bar-wrap{
-  width:160px;height:8px;
-  background:rgba(0,0,0,0.06);
-  border-radius:100px;
-  overflow:hidden;
-  position:relative;
-}
-.mood-bar{
-  height:100%;
-  border-radius:100px;
-  transition:width .4s cubic-bezier(.16,1,.3,1),background .3s;
-  width:50%;
-  background:#facc15;
-}
-.mood-label{
-  font-size:10px;font-weight:600;
-  letter-spacing:1px;
-  color:rgba(0,0,0,0.4);
-  text-transform:uppercase;
-  margin-top:4px;
-  text-align:right;
-}
-
-/* Cat */
-.cat-wrap{
-  position:relative;
-  width:320px;height:320px;
-  display:flex;align-items:center;justify-content:center;
-  cursor:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'><text y='24' font-size='24'>🤚</text></svg>") 16 16, pointer;
-}
-.cat-wrap.petting{
-  cursor:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'><text y='24' font-size='24'>✋</text></svg>") 16 16, grab;
-}
-.cat-img{
-  max-width:100%;max-height:100%;
-  object-fit:contain;
-  transition:opacity .25s ease,transform .25s ease;
-  pointer-events:none;
-  position:absolute;
-}
+.multiplier{font-size:14px;font-weight:700;color:#f59e0b;margin-left:6px;vertical-align:super;transition:color .2s}
+.multiplier.x2{color:#22c55e}
+.multiplier.x3{color:#3b82f6}
+.mood-bar-wrap{width:160px;height:8px;background:rgba(0,0,0,0.06);border-radius:100px;overflow:hidden}
+.mood-bar{height:100%;border-radius:100px;transition:width .4s cubic-bezier(.16,1,.3,1),background .3s;width:50%;background:#facc15}
+.mood-label{font-size:10px;font-weight:600;letter-spacing:1px;color:rgba(0,0,0,0.4);margin-top:4px;text-align:right;
+  font-family:'Pretendard',sans-serif}
+.cat-wrap{position:relative;width:320px;height:320px;display:flex;align-items:center;justify-content:center;
+  cursor:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'><text y='24' font-size='24'>🤚</text></svg>") 16 16, pointer}
+.cat-wrap.petting{cursor:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'><text y='24' font-size='24'>✋</text></svg>") 16 16, grab}
+.cat-img{max-width:100%;max-height:100%;object-fit:contain;transition:opacity .25s ease,transform .25s ease;
+  pointer-events:none;position:absolute}
 .cat-img.hidden{opacity:0;transform:scale(0.95)}
 .cat-img.active{opacity:1;transform:scale(1)}
-
-/* Particles (하트/별) */
-.particle{
-  position:fixed;
-  font-size:20px;
-  pointer-events:none;
-  z-index:60;
-  animation:particleUp .8s ease-out forwards;
-}
-@keyframes particleUp{
-  0%{opacity:1;transform:translateY(0) scale(1)}
-  100%{opacity:0;transform:translateY(-60px) scale(0.5)}
-}
+/* Particles */
+.particle{position:fixed;font-size:20px;pointer-events:none;z-index:60;animation:particleUp .8s ease-out forwards}
+@keyframes particleUp{0%{opacity:1;transform:translateY(0) scale(1)}100%{opacity:0;transform:translateY(-60px) scale(0.5)}}
 .particle.bad{animation-name:particleShake}
-@keyframes particleShake{
-  0%{opacity:1;transform:translateY(0) rotate(0deg)}
-  25%{transform:translateY(-10px) rotate(-15deg)}
-  50%{transform:translateY(-5px) rotate(10deg)}
-  75%{transform:translateY(-20px) rotate(-5deg)}
-  100%{opacity:0;transform:translateY(-40px) rotate(0deg)}
-}
-
-/* Status text */
-.status{
-  margin-top:24px;
-  font-size:13px;font-weight:500;
-  color:rgba(0,0,0,0.45);
-  letter-spacing:-0.01em;
-  height:20px;
-  transition:color .2s;
-  text-align:center;
-}
-
-/* Overlay (start / end) */
-.overlay{
-  position:fixed;inset:0;
-  background:rgba(250,249,246,0.95);
-  display:flex;flex-direction:column;align-items:center;justify-content:center;
-  z-index:200;
-  transition:opacity .4s;
-  padding:24px;
-  text-align:center;
-}
+@keyframes particleShake{0%{opacity:1;transform:translateY(0) rotate(0deg)}25%{transform:translateY(-10px) rotate(-15deg)}
+  50%{transform:translateY(-5px) rotate(10deg)}75%{transform:translateY(-20px) rotate(-5deg)}100%{opacity:0;transform:translateY(-40px) rotate(0deg)}}
+/* Fur particles */
+.fur{position:fixed;pointer-events:none;z-index:55;border-radius:50%;animation:furFall 1.2s ease-out forwards}
+@keyframes furFall{0%{opacity:0.8;transform:translate(0,0) rotate(0deg) scale(1)}
+  100%{opacity:0;transform:translate(var(--fx),var(--fy)) rotate(var(--fr)) scale(0.3)}}
+.status{margin-top:24px;font-size:14px;font-weight:500;color:rgba(0,0,0,0.45);letter-spacing:-0.01em;height:20px;
+  transition:color .2s;text-align:center;font-family:'Pretendard',sans-serif}
+/* Overlay */
+.overlay{position:fixed;inset:0;background:rgba(250,249,246,0.95);display:flex;flex-direction:column;
+  align-items:center;justify-content:center;z-index:200;transition:opacity .4s;padding:24px;text-align:center}
 .overlay.hidden{opacity:0;pointer-events:none}
-.overlay h1{
-  font-size:clamp(28px,6vw,48px);font-weight:900;
-  letter-spacing:-0.03em;line-height:1.2;
-  margin-bottom:8px;
-}
-.overlay .sub{
-  font-size:15px;color:rgba(0,0,0,0.5);
-  font-weight:400;margin-bottom:32px;
-  line-height:1.5;
-}
-.overlay .final-score{
-  font-size:64px;font-weight:900;
-  letter-spacing:-0.04em;
-  margin-bottom:8px;
-}
-.overlay .final-score.success{color:#22c55e}
+.overlay h1{font-size:clamp(28px,6vw,48px);font-weight:900;letter-spacing:-0.02em;line-height:1.2;margin-bottom:8px}
+.overlay .sub{font-size:15px;color:rgba(0,0,0,0.5);font-weight:400;margin-bottom:32px;line-height:1.5;
+  font-family:'Pretendard',sans-serif}
+.overlay .final-score{font-size:64px;font-weight:900;letter-spacing:-0.04em;margin-bottom:8px}
 .overlay .final-score.fail{color:#ef4444}
-.overlay .btn{
-  padding:14px 36px;
-  background:#111;color:#fff;
-  font:700 15px/1 'Pretendard',sans-serif;
-  border:none;border-radius:100px;
-  cursor:pointer;
-  letter-spacing:-0.01em;
-  transition:transform .15s,box-shadow .15s;
-}
+.overlay .btn{padding:14px 36px;background:#111;color:#fff;font:700 15px/1 'BMEuljiro',sans-serif;
+  border:none;border-radius:100px;cursor:pointer;transition:transform .15s,box-shadow .15s}
 .overlay .btn:hover{transform:scale(1.04);box-shadow:0 4px 16px rgba(0,0,0,0.15)}
-.overlay .result-img{
-  width:180px;height:180px;
-  object-fit:contain;
-  margin-bottom:20px;
-}
-
-/* Back */
-.back-to-archive{
-  position:fixed;top:16px;left:16px;z-index:9999;
-  display:inline-flex;align-items:center;gap:6px;
-  padding:8px 14px 8px 12px;
-  background:rgba(255,255,255,0.9);color:#111;
-  font:500 12px/1 -apple-system,'Pretendard',sans-serif;
-  letter-spacing:-0.01em;text-decoration:none;
-  border:1px solid rgba(0,0,0,0.08);border-radius:100px;
-  box-shadow:0 2px 8px rgba(0,0,0,0.12);
-  backdrop-filter:blur(10px);
-  transition:background .2s,transform .2s;
-}
+.overlay .result-img{width:180px;height:180px;object-fit:contain;margin-bottom:20px}
+.back-to-archive{position:fixed;top:16px;left:16px;z-index:9999;display:inline-flex;align-items:center;gap:6px;
+  padding:8px 14px 8px 12px;background:rgba(255,255,255,0.9);color:#111;
+  font:500 12px/1 -apple-system,'Pretendard',sans-serif;letter-spacing:-0.01em;text-decoration:none;
+  border:1px solid rgba(0,0,0,0.08);border-radius:100px;box-shadow:0 2px 8px rgba(0,0,0,0.12);
+  backdrop-filter:blur(10px);transition:background .2s,transform .2s}
 .back-to-archive:hover{background:#fff;transform:translateX(-2px)}
 .back-to-archive svg{flex:none;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-
-.day-tag{
-  position:fixed;bottom:14px;right:18px;
-  font:11px/1 monospace;color:rgba(0,0,0,0.25);
-  letter-spacing:1px;pointer-events:none;z-index:99;
-}
-
-/* Shake animation for anger */
-@keyframes shake{
-  0%,100%{transform:translateX(0)}
-  20%{transform:translateX(-8px) rotate(-2deg)}
-  40%{transform:translateX(8px) rotate(2deg)}
-  60%{transform:translateX(-6px) rotate(-1deg)}
-  80%{transform:translateX(6px) rotate(1deg)}
-}
+.day-tag{position:fixed;bottom:14px;right:18px;font:11px/1 monospace;color:rgba(0,0,0,0.25);letter-spacing:1px;pointer-events:none;z-index:99}
+@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-8px) rotate(-2deg)}
+  40%{transform:translateX(8px) rotate(2deg)}60%{transform:translateX(-6px) rotate(-1deg)}80%{transform:translateX(6px) rotate(1deg)}}
 .cat-wrap.shake{animation:shake .4s ease}
-
-@media(max-width:480px){
-  .cat-wrap{width:260px;height:260px}
-  .score-display{font-size:26px}
-}
+@media(max-width:480px){.cat-wrap{width:260px;height:260px}.score-display{font-size:28px}}
 </style>
 </head>
 <body>
-
 <a href="../" class="back-to-archive">
   <svg viewBox="0 0 24 24" width="14" height="14"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
   <span>뒤로가기</span>
 </a>
-
-<!-- HUD -->
 <div class="hud">
-  <div class="score-display" id="scoreEl">0</div>
+  <div><span class="score-display" id="scoreEl">0</span><span class="multiplier" id="multEl">x1</span></div>
   <div>
     <div class="mood-bar-wrap"><div class="mood-bar" id="moodBar"></div></div>
     <div class="mood-label" id="moodLabel">기분: 보통</div>
   </div>
 </div>
-
-<!-- Game -->
 <div class="game" id="game">
   <div class="cat-wrap" id="catWrap">
     <img class="cat-img active" id="imgDefault" src="도동이_기본.png" alt="도동이 기본" draggable="false">
@@ -225,34 +99,29 @@ body{
   </div>
   <div class="status" id="statusEl">도동이를 쓰다듬어주세요</div>
 </div>
-
-<!-- Start overlay -->
 <div class="overlay" id="startOverlay">
-  <h1>도동이<br>쓰다듬기</h1>
-  <p class="sub">도동이를 부드럽게 쓰다듬어서<br>잠들게 해주세요 🐱</p>
+  <h1>도동이<br>복복복 쓰다듬기</h1>
+  <p class="sub">도동이를 부드럽게 쓰다듬어주세요<br>화나면 끝이에요 🐱</p>
   <button class="btn" id="startBtn">시작하기</button>
 </div>
-
-<!-- End overlay -->
 <div class="overlay hidden" id="endOverlay">
   <img class="result-img" id="resultImg" src="" alt="">
   <h1 id="resultTitle"></h1>
   <p class="sub" id="resultSub"></p>
-  <div class="final-score" id="finalScore"></div>
+  <div class="final-score fail" id="finalScore"></div>
   <button class="btn" id="retryBtn">다시 하기</button>
 </div>
-
 <div class="day-tag">day 08 / typo-vibe</div>
+</body>
+</html>
 
 <script>
-/* ==========================================================
-   day 08 — 도동이 쓰다듬기 게임
-   상태: 기본 → 긍정1 → 긍정2(성공)
-         기본 → 분노1(마이너스, 복귀 가능) → 분노2(실패)
-   ========================================================== */
+/* day 08 — 도동이 복복복 쓰다듬기
+   실패만 있는 무한 모드. 긍정 단계에서 점수 배율 증가. */
 
 const catWrap=document.getElementById('catWrap');
 const scoreEl=document.getElementById('scoreEl');
+const multEl=document.getElementById('multEl');
 const moodBar=document.getElementById('moodBar');
 const moodLabel=document.getElementById('moodLabel');
 const statusEl=document.getElementById('statusEl');
@@ -273,66 +142,132 @@ const imgs={
   angry2:document.getElementById('imgAngry2'),
 };
 
-/* ======= State ======= */
-// mood: 0~100. 50=기본, 75+=긍정1, 90+=긍정2(성공), 25-=분노1, 10-=분노2(실패)
-let mood=50;
-let score=0;
-let gameActive=false;
-let petting=false;
-let lastPetTime=0;
-let petSpeed=0; // 쓰다듬기 속도 (px/frame)
-let lastX=0,lastY=0;
-let petStrokes=0; // 연속 쓰다듬기 횟수
-let idleTimer=null;
-let moodDecayTimer=null;
-let currentState='default';
+let mood=50,score=0,gameActive=false,petting=false;
+let lastPetTime=0,petSpeed=0,lastX=0,lastY=0,petStrokes=0;
+let idleTimer=null,moodDecayTimer=null,moodEventTimer=null;
+let currentState='default',multiplier=1;
+let loopSrc=null; // 상태별 루프 사운드
 
-const MOOD_THRESHOLDS={
-  angry2:12,
-  angry1:28,
-  default_low:40,
-  default_high:60,
-  happy1:72,
-  happy2:88,
-};
+const TH={angry2:12,angry1:28,happy1:72,happy2:88};
 
-/* ======= Sound ======= */
+/* ======= Audio ======= */
 let audioCtx=null;
 function ensureAudio(){
   if(audioCtx)return;
-  const AC=window.AudioContext||window.webkitAudioContext;
-  if(!AC)return;
+  const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return;
   audioCtx=new AC();
 }
-function playPurr(){
+
+// 골골 소리 (긍정1) — 저주파 진동
+function startPurr(){
+  stopLoop();
   if(!audioCtx)return;
   const o=audioCtx.createOscillator();
   const g=audioCtx.createGain();
-  o.type='sine';o.frequency.value=80+Math.random()*20;
-  g.gain.value=0;
+  const lfo=audioCtx.createOscillator();
+  const lfoG=audioCtx.createGain();
+  o.type='sine';o.frequency.value=28;
+  lfo.type='sine';lfo.frequency.value=22;
+  lfoG.gain.value=15;
+  lfo.connect(lfoG).connect(o.frequency);
+  g.gain.value=0.07;
   o.connect(g).connect(audioCtx.destination);
-  const t=audioCtx.currentTime;
-  g.gain.linearRampToValueAtTime(0.06,t+0.02);
-  g.gain.linearRampToValueAtTime(0,t+0.15);
-  o.start(t);o.stop(t+0.15);
-}
-function playHiss(){
-  if(!audioCtx)return;
-  const bufSize=audioCtx.sampleRate*0.3;
-  const buf=audioCtx.createBuffer(1,bufSize,audioCtx.sampleRate);
-  const d=buf.getChannelData(0);
-  for(let i=0;i<bufSize;i++)d[i]=(Math.random()*2-1)*0.3;
-  const src=audioCtx.createBufferSource();
-  src.buffer=buf;
-  const g=audioCtx.createGain();
-  g.gain.value=0.15;
-  const t=audioCtx.currentTime;
-  g.gain.linearRampToValueAtTime(0,t+0.3);
-  src.connect(g).connect(audioCtx.destination);
-  src.start(t);
+  o.start();lfo.start();
+  loopSrc={stop:()=>{try{o.stop();lfo.stop()}catch(e){}}};
 }
 
-/* ======= Particles ======= */
+// 코자는 소리 (긍정2) — 느린 호흡 노이즈
+function startSnore(){
+  stopLoop();
+  if(!audioCtx)return;
+  const bufSize=audioCtx.sampleRate*2;
+  const buf=audioCtx.createBuffer(1,bufSize,audioCtx.sampleRate);
+  const d=buf.getChannelData(0);
+  let last=0;
+  for(let i=0;i<bufSize;i++){last=(last+0.01*(Math.random()*2-1))/1.01;d[i]=last*2}
+  const src=audioCtx.createBufferSource();
+  src.buffer=buf;src.loop=true;
+  const lfo=audioCtx.createOscillator();
+  const lfoG=audioCtx.createGain();
+  lfo.type='sine';lfo.frequency.value=0.5;
+  lfoG.gain.value=0.06;
+  const g=audioCtx.createGain();g.gain.value=0;
+  lfo.connect(lfoG).connect(g.gain);
+  const bp=audioCtx.createBiquadFilter();
+  bp.type='bandpass';bp.frequency.value=200;bp.Q.value=2;
+  src.connect(bp).connect(g).connect(audioCtx.destination);
+  src.start();lfo.start();
+  loopSrc={stop:()=>{try{src.stop();lfo.stop()}catch(e){}}};
+}
+
+// 그루밍 소리 (분노1) — 츄웁츕 반복
+function startGroom(){
+  stopLoop();
+  if(!audioCtx)return;
+  let running=true;
+  function tick(){
+    if(!running)return;
+    const o=audioCtx.createOscillator();
+    const g=audioCtx.createGain();
+    o.type='sawtooth';o.frequency.value=800+Math.random()*400;
+    g.gain.value=0;
+    o.connect(g).connect(audioCtx.destination);
+    const t=audioCtx.currentTime;
+    g.gain.linearRampToValueAtTime(0.06,t+0.02);
+    g.gain.linearRampToValueAtTime(0,t+0.08);
+    o.start(t);o.stop(t+0.1);
+    setTimeout(tick,200+Math.random()*300);
+  }
+  tick();
+  loopSrc={stop:()=>{running=false}};
+}
+
+// 하악 소리 (분노2) — 한 번
+function playHiss(){
+  if(!audioCtx)return;
+  const bufSize=audioCtx.sampleRate*0.5;
+  const buf=audioCtx.createBuffer(1,bufSize,audioCtx.sampleRate);
+  const d=buf.getChannelData(0);
+  for(let i=0;i<bufSize;i++){
+    const env=1-i/bufSize;
+    d[i]=(Math.random()*2-1)*0.4*env;
+  }
+  const src=audioCtx.createBufferSource();src.buffer=buf;
+  const hp=audioCtx.createBiquadFilter();hp.type='highpass';hp.frequency.value=2000;
+  const g=audioCtx.createGain();g.gain.value=0.25;
+  src.connect(hp).connect(g).connect(audioCtx.destination);
+  src.start();
+}
+
+function stopLoop(){
+  if(loopSrc){loopSrc.stop();loopSrc=null}
+}
+
+/* ======= Fur particles ======= */
+const furColors=['#e8ddd4','#d4c8bb','#c9baa8','#f0e8df','#bfb0a0','#3a3530','#555049'];
+function spawnFur(x,y){
+  const count=2+Math.floor(Math.random()*3);
+  for(let i=0;i<count;i++){
+    const el=document.createElement('div');
+    el.className='fur';
+    const size=3+Math.random()*5;
+    const isClump=Math.random()<0.25;
+    const w=isClump?size*2.5:size*0.4;
+    const h=isClump?size*2:size*2.5;
+    el.style.width=w+'px';el.style.height=h+'px';
+    el.style.background=furColors[Math.floor(Math.random()*furColors.length)];
+    el.style.left=(x+Math.random()*30-15)+'px';
+    el.style.top=(y+Math.random()*20-10)+'px';
+    el.style.setProperty('--fx',(Math.random()-0.5)*60+'px');
+    el.style.setProperty('--fy',(20+Math.random()*40)+'px');
+    el.style.setProperty('--fr',(Math.random()*360)+'deg');
+    if(isClump)el.style.borderRadius='40%';
+    document.body.appendChild(el);
+    setTimeout(()=>el.remove(),1200);
+  }
+}
+
+/* ======= Emoji particles ======= */
 function spawnParticle(x,y,emoji,bad){
   const el=document.createElement('div');
   el.className='particle'+(bad?' bad':'');
@@ -342,293 +277,178 @@ function spawnParticle(x,y,emoji,bad){
   setTimeout(()=>el.remove(),800);
 }
 
-/* ======= Score ======= */
+/* ======= Score & Multiplier ======= */
 function addScore(n){
-  score+=n;
+  const actual=n>0?n*multiplier:n;
+  score+=actual;
+  if(score<0)score=0;
   scoreEl.textContent=score;
   scoreEl.classList.remove('bump-up','bump-down');
   void scoreEl.offsetWidth;
-  scoreEl.classList.add(n>0?'bump-up':'bump-down');
+  scoreEl.classList.add(actual>0?'bump-up':'bump-down');
   setTimeout(()=>scoreEl.classList.remove('bump-up','bump-down'),200);
+}
+function updateMultiplier(){
+  const prev=multiplier;
+  if(mood>=TH.happy2)multiplier=3;
+  else if(mood>=TH.happy1)multiplier=2;
+  else multiplier=1;
+  multEl.textContent='x'+multiplier;
+  multEl.className='multiplier'+(multiplier===2?' x2':multiplier===3?' x3':'');
 }
 
 /* ======= Mood & State ======= */
 function getStateFromMood(m){
-  if(m<=MOOD_THRESHOLDS.angry2)return 'angry2';
-  if(m<=MOOD_THRESHOLDS.angry1)return 'angry1';
-  if(m>=MOOD_THRESHOLDS.happy2)return 'happy2';
-  if(m>=MOOD_THRESHOLDS.happy1)return 'happy1';
+  if(m<=TH.angry2)return 'angry2';
+  if(m<=TH.angry1)return 'angry1';
+  if(m>=TH.happy2)return 'happy2';
+  if(m>=TH.happy1)return 'happy1';
   return 'default';
 }
-
 function updateMoodUI(){
   const pct=Math.max(0,Math.min(100,mood));
   moodBar.style.width=pct+'%';
-  if(mood>=MOOD_THRESHOLDS.happy1){
-    moodBar.style.background='#22c55e';
-    moodLabel.textContent='기분: 좋음 ♥';
-  }else if(mood<=MOOD_THRESHOLDS.angry1){
-    moodBar.style.background='#ef4444';
-    moodLabel.textContent='기분: 나쁨 💢';
-  }else{
-    moodBar.style.background='#facc15';
-    moodLabel.textContent='기분: 보통';
-  }
+  if(mood>=TH.happy1){moodBar.style.background='#22c55e';moodLabel.textContent='기분: 좋음 ♥'}
+  else if(mood<=TH.angry1){moodBar.style.background='#ef4444';moodLabel.textContent='기분: 나쁨 💢'}
+  else{moodBar.style.background='#facc15';moodLabel.textContent='기분: 보통'}
+  updateMultiplier();
 }
-
 function showImage(state){
   Object.values(imgs).forEach(img=>{img.classList.remove('active');img.classList.add('hidden')});
   const map={default:imgs.default,happy1:imgs.happy1,happy2:imgs.happy2,angry1:imgs.angry1,angry2:imgs.angry2};
   if(map[state]){map[state].classList.remove('hidden');map[state].classList.add('active')}
 }
-
 function setState(newState){
   if(newState===currentState)return;
-  const prev=currentState;
   currentState=newState;
   showImage(newState);
-
-  if(newState==='angry1'){
-    statusEl.textContent='도동이가 짜증나 해요...';
-    statusEl.style.color='#ef4444';
-    addScore(-5);
-    catWrap.classList.add('shake');
-    setTimeout(()=>catWrap.classList.remove('shake'),400);
-  }else if(newState==='angry2'){
-    endGame(false);
-    return;
-  }else if(newState==='happy1'){
-    statusEl.textContent='도동이가 좋아해요~';
-    statusEl.style.color='#22c55e';
-    addScore(3);
-    playPurr();
+  // 상태별 사운드
+  if(newState==='happy1'){
+    statusEl.textContent='도동이가 골골거려요~';statusEl.style.color='#22c55e';
+    startPurr();
   }else if(newState==='happy2'){
-    endGame(true);
-    return;
+    statusEl.textContent='도동이가 코~ 자고 있어요 zzZ';statusEl.style.color='#3b82f6';
+    startSnore();
+  }else if(newState==='angry1'){
+    statusEl.textContent='도동이가 그루밍 중... 츄웁츕';statusEl.style.color='#ef4444';
+    addScore(-3);
+    catWrap.classList.add('shake');setTimeout(()=>catWrap.classList.remove('shake'),400);
+    startGroom();
+  }else if(newState==='angry2'){
+    endGame();return;
   }else{
-    statusEl.textContent='도동이를 쓰다듬어주세요';
-    statusEl.style.color='rgba(0,0,0,0.45)';
+    statusEl.textContent='도동이를 쓰다듬어주세요';statusEl.style.color='rgba(0,0,0,0.45)';
+    stopLoop();
   }
 }
 
-/* ======= Petting logic ======= */
+/* ======= Petting ======= */
 function onPetStart(x,y){
   if(!gameActive)return;
-  ensureAudio();
-  if(audioCtx&&audioCtx.state==='suspended')audioCtx.resume();
-  petting=true;
-  lastX=x;lastY=y;
-  lastPetTime=performance.now();
+  ensureAudio();if(audioCtx&&audioCtx.state==='suspended')audioCtx.resume();
+  petting=true;lastX=x;lastY=y;lastPetTime=performance.now();
   catWrap.classList.add('petting');
 }
-
 function onPetMove(x,y){
   if(!petting||!gameActive)return;
-  const dx=x-lastX,dy=y-lastY;
-  const dist=Math.hypot(dx,dy);
+  const dist=Math.hypot(x-lastX,y-lastY);
   lastX=x;lastY=y;
-
-  if(dist<2)return; // 너무 작은 움직임 무시
-
+  if(dist<2)return;
   const now=performance.now();
   const dt=Math.max(1,now-lastPetTime);
-  petSpeed=dist/dt; // px/ms
-  lastPetTime=now;
-  petStrokes++;
+  petSpeed=dist/dt;lastPetTime=now;petStrokes++;
 
-  // 쓰다듬기 속도에 따른 기분 변화
-  // 적당한 속도(0.3~1.5 px/ms): 기분 좋아짐
-  // 너무 빠름(>2.5): 짜증남
-  // 너무 느림(<0.1): 효과 없음
+  // 털 이펙트
+  if(petStrokes%4===0)spawnFur(x,y);
 
   if(petSpeed>2.5){
-    // 너무 거칠게 — 기분 나빠짐
     mood=Math.max(0,mood-0.8);
     if(petStrokes%8===0)spawnParticle(x,y,'💢',true);
-  }else if(petSpeed>=0.15&&petSpeed<=2.5){
-    // 적당한 쓰다듬기 — 기분 좋아짐
-    const bonus=(petSpeed>=0.3&&petSpeed<=1.8)?1.3:0.6;
+  }else if(petSpeed>=0.15){
+    const bonus=(petSpeed>=0.3&&petSpeed<=1.8)?1.3:0.5;
     mood=Math.min(100,mood+bonus);
-    if(petStrokes%10===0){
-      spawnParticle(x,y,mood>=MOOD_THRESHOLDS.happy1?'💕':'❤️',false);
-      playPurr();
-    }
-    // 점수
+    if(petStrokes%10===0)spawnParticle(x,y,mood>=TH.happy1?'💕':'❤️',false);
     if(petStrokes%8===0)addScore(1);
   }
+  const ns=getStateFromMood(mood);setState(ns);updateMoodUI();
 
-  // 상태 전이
-  const newState=getStateFromMood(mood);
-  setState(newState);
-  updateMoodUI();
-
-  // idle 타이머 리셋
   clearTimeout(idleTimer);
-  idleTimer=setTimeout(()=>{
-    if(gameActive&&petting){
-      petting=false;
-      catWrap.classList.remove('petting');
-    }
-  },800);
+  idleTimer=setTimeout(()=>{if(gameActive&&petting){petting=false;catWrap.classList.remove('petting')}},800);
 }
+function onPetEnd(){if(!petting)return;petting=false;catWrap.classList.remove('petting')}
 
-function onPetEnd(){
-  if(!petting)return;
-  petting=false;
-  catWrap.classList.remove('petting');
-}
-
-/* ======= Mood decay + 랜덤 기분 이벤트 ======= */
-let moodEventTimer=null;
-
+/* ======= Random mood events ======= */
 function startMoodDecay(){
   moodDecayTimer=setInterval(()=>{
     if(!gameActive)return;
-    if(!petting){
-      mood=Math.max(0,mood-0.15);
-      const newState=getStateFromMood(mood);
-      setState(newState);
-      updateMoodUI();
-    }
+    if(!petting){mood=Math.max(0,mood-0.15);const ns=getStateFromMood(mood);setState(ns);updateMoodUI()}
   },200);
   scheduleRandomEvent();
 }
-
-/* 고양이는 예측 불가능 — 3~7초마다 랜덤 기분 변동 */
 function scheduleRandomEvent(){
   if(!gameActive)return;
-  const delay=3000+Math.random()*4000;
-  moodEventTimer=setTimeout(()=>{
-    if(!gameActive)return;
-    triggerRandomEvent();
-    scheduleRandomEvent();
-  },delay);
+  moodEventTimer=setTimeout(()=>{if(!gameActive)return;triggerRandomEvent();scheduleRandomEvent()},3000+Math.random()*4000);
 }
-
 function triggerRandomEvent(){
   const roll=Math.random();
-  const catRect=catWrap.getBoundingClientRect();
-  const px=catRect.left+catRect.width/2+(Math.random()-0.5)*60;
-  const py=catRect.top+catRect.height*0.3;
-
+  const r=catWrap.getBoundingClientRect();
+  const px=r.left+r.width/2+(Math.random()-0.5)*60;
+  const py=r.top+r.height*0.3;
   if(roll<0.35){
-    // 갑자기 짜증 (35%) — 기분 확 떨어짐
-    const drop=12+Math.random()*10;
-    mood=Math.max(0,mood-drop);
+    mood=Math.max(0,mood-(12+Math.random()*10));
     spawnParticle(px,py,'😾',true);
-    statusEl.textContent='도동이가 갑자기 짜증나 해요!';
-    statusEl.style.color='#ef4444';
-    catWrap.classList.add('shake');
-    setTimeout(()=>catWrap.classList.remove('shake'),400);
+    statusEl.textContent='도동이가 갑자기 짜증!';statusEl.style.color='#ef4444';
+    catWrap.classList.add('shake');setTimeout(()=>catWrap.classList.remove('shake'),400);
   }else if(roll<0.55){
-    // 갑자기 기분 좋아짐 (20%) — 보너스 찬스
-    const boost=10+Math.random()*8;
-    mood=Math.min(100,mood+boost);
-    spawnParticle(px,py,'😻',false);
-    addScore(3);
-    statusEl.textContent='도동이가 갑자기 기분이 좋아요!';
-    statusEl.style.color='#22c55e';
-    playPurr();
+    mood=Math.min(100,mood+(10+Math.random()*8));
+    spawnParticle(px,py,'😻',false);addScore(3);
+    statusEl.textContent='도동이가 갑자기 기분 좋아!';statusEl.style.color='#22c55e';
   }else if(roll<0.7){
-    // 그루밍 시작 (15%) — 쓰다듬기 멈춰야 함, 안 멈추면 짜증
-    const drop=8+Math.random()*6;
-    mood=Math.max(0,mood-drop);
-    spawnParticle(px,py,'🐾',true);
-    addScore(-3);
-    statusEl.textContent='도동이가 그루밍 중... 잠깐 멈춰!';
-    statusEl.style.color='#f59e0b';
+    mood=Math.max(0,mood-(8+Math.random()*6));
+    spawnParticle(px,py,'🐾',true);addScore(-2);
+    statusEl.textContent='도동이가 그루밍 시작...';statusEl.style.color='#f59e0b';
   }else if(roll<0.85){
-    // 살짝 불안 (15%) — 소폭 하락
     mood=Math.max(0,mood-5);
-    statusEl.textContent='도동이가 뭔가 불안해해요';
-    statusEl.style.color='#f59e0b';
+    statusEl.textContent='도동이가 뭔가 불안해해요';statusEl.style.color='#f59e0b';
   }else{
-    // 아무 일도 안 일어남 (15%) — 평화
     spawnParticle(px,py,'💤',false);
   }
-
-  const newState=getStateFromMood(mood);
-  setState(newState);
-  updateMoodUI();
+  const ns=getStateFromMood(mood);setState(ns);updateMoodUI();
 }
 
 /* ======= Game flow ======= */
 function startGame(){
-  score=0;mood=50;petStrokes=0;
-  currentState='default';
-  gameActive=true;
-  clearInterval(moodDecayTimer);
-  clearTimeout(moodEventTimer);
-  scoreEl.textContent='0';
-  showImage('default');
-  updateMoodUI();
-  statusEl.textContent='도동이를 쓰다듬어주세요';
-  statusEl.style.color='rgba(0,0,0,0.45)';
-  startOverlay.classList.add('hidden');
-  endOverlay.classList.add('hidden');
+  score=0;mood=50;petStrokes=0;multiplier=1;currentState='default';gameActive=true;
+  clearInterval(moodDecayTimer);clearTimeout(moodEventTimer);stopLoop();
+  scoreEl.textContent='0';multEl.textContent='x1';multEl.className='multiplier';
+  showImage('default');updateMoodUI();
+  statusEl.textContent='도동이를 쓰다듬어주세요';statusEl.style.color='rgba(0,0,0,0.45)';
+  startOverlay.classList.add('hidden');endOverlay.classList.add('hidden');
   startMoodDecay();
 }
-
-function endGame(success){
-  gameActive=false;
-  petting=false;
-  catWrap.classList.remove('petting');
-  clearInterval(moodDecayTimer);
-  clearTimeout(idleTimer);
-  clearTimeout(moodEventTimer);
-
-  if(success){
-    addScore(50); // 보너스
-    showImage('happy2');
-    resultImg.src='도동이_긍정2단계.png';
-    resultTitle.textContent='성공! 🎉';
-    resultSub.textContent='도동이가 행복하게 잠들었어요';
-    finalScore.textContent=score;
-    finalScore.className='final-score success';
-  }else{
-    playHiss();
-    showImage('angry2');
-    catWrap.classList.add('shake');
-    setTimeout(()=>{
-      catWrap.classList.remove('shake');
-      resultImg.src='도동이_분노2단계.png';
-      resultTitle.textContent='실패... 😿';
-      resultSub.textContent='도동이가 화났어요!';
-      finalScore.textContent=score;
-      finalScore.className='final-score fail';
-      endOverlay.classList.remove('hidden');
-    },800);
-    return;
-  }
-
+function endGame(){
+  gameActive=false;petting=false;catWrap.classList.remove('petting');
+  clearInterval(moodDecayTimer);clearTimeout(idleTimer);clearTimeout(moodEventTimer);
+  stopLoop();playHiss();
+  showImage('angry2');
+  catWrap.classList.add('shake');
   setTimeout(()=>{
+    catWrap.classList.remove('shake');
+    resultImg.src='도동이_분노2단계.png';
+    resultTitle.textContent='하악!! 😾';
+    resultSub.textContent='도동이가 화났어요! 최종 점수:';
+    finalScore.textContent=score;
     endOverlay.classList.remove('hidden');
-  },600);
+  },800);
 }
 
 /* ======= Events ======= */
-catWrap.addEventListener('mousedown',(e)=>{
-  e.preventDefault();
-  onPetStart(e.clientX,e.clientY);
-});
-window.addEventListener('mousemove',(e)=>{
-  onPetMove(e.clientX,e.clientY);
-});
+catWrap.addEventListener('mousedown',(e)=>{e.preventDefault();onPetStart(e.clientX,e.clientY)});
+window.addEventListener('mousemove',(e)=>onPetMove(e.clientX,e.clientY));
 window.addEventListener('mouseup',()=>onPetEnd());
-
-catWrap.addEventListener('touchstart',(e)=>{
-  e.preventDefault();
-  const t=e.touches[0];
-  if(t)onPetStart(t.clientX,t.clientY);
-},{passive:false});
-window.addEventListener('touchmove',(e)=>{
-  const t=e.touches[0];
-  if(t)onPetMove(t.clientX,t.clientY);
-},{passive:true});
+catWrap.addEventListener('touchstart',(e)=>{e.preventDefault();const t=e.touches[0];if(t)onPetStart(t.clientX,t.clientY)},{passive:false});
+window.addEventListener('touchmove',(e)=>{const t=e.touches[0];if(t)onPetMove(t.clientX,t.clientY)},{passive:true});
 window.addEventListener('touchend',()=>onPetEnd());
-
 startBtn.addEventListener('click',startGame);
 retryBtn.addEventListener('click',startGame);
 </script>
-</body>
-</html>
