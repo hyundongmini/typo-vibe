@@ -10,71 +10,120 @@
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{height:100%;overflow:hidden}
 body{
-  background:#faf9f6;
-  font-family:'BMEuljiro','Pretendard',-apple-system,sans-serif;
-  color:#111;
+  background:#faf9f6;font-family:'BMEuljiro','Pretendard',sans-serif;color:#111;
   -webkit-font-smoothing:antialiased;
-  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  display:flex;align-items:center;justify-content:center;
   user-select:none;-webkit-user-select:none;
 }
-.game{position:relative;width:100%;max-width:480px;height:100vh;
-  display:flex;flex-direction:column;align-items:center;justify-content:center;}
-.hud{position:fixed;top:0;left:0;right:0;display:flex;justify-content:space-between;align-items:center;padding:16px 20px;z-index:50}
-.score-display{font-weight:900;font-size:36px;letter-spacing:-0.02em;color:#111;font-variant-numeric:tabular-nums;
-  transition:transform .15s cubic-bezier(.2,.8,.2,1),color .2s}
-.score-display.bump-up{color:#22c55e;transform:scale(1.15)}
-.score-display.bump-down{color:#ef4444;transform:scale(1.15)}
-.multiplier{font-size:14px;font-weight:700;color:#f59e0b;margin-left:6px;vertical-align:super;transition:color .2s}
-.multiplier.x2{color:#22c55e}
-.multiplier.x3{color:#3b82f6}
-.mood-bar-wrap{width:160px;height:8px;background:rgba(0,0,0,0.06);border-radius:100px;overflow:hidden}
-.mood-bar{height:100%;border-radius:100px;transition:width .4s cubic-bezier(.16,1,.3,1),background .3s;width:50%;background:#facc15}
-.mood-label{font-size:10px;font-weight:600;letter-spacing:1px;color:rgba(0,0,0,0.4);margin-top:4px;text-align:right;
-  font-family:'Pretendard',sans-serif}
-.cat-wrap{position:relative;width:320px;height:320px;display:flex;align-items:center;justify-content:center;
-  cursor:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'><text y='24' font-size='24'>🤚</text></svg>") 16 16, pointer}
+
+/* HUD */
+.hud{position:fixed;top:0;left:0;right:0;display:flex;justify-content:space-between;align-items:flex-start;padding:20px 24px;z-index:50}
+.score-wrap{display:flex;align-items:baseline;gap:4px}
+.score{font-size:48px;font-weight:900;letter-spacing:-0.03em;color:#111;font-variant-numeric:tabular-nums;
+  transition:color .15s}
+.score.hot{color:#22c55e}
+.mult{font-size:18px;font-weight:800;color:#f59e0b;transition:color .2s,transform .2s}
+.mult.x2{color:#22c55e;transform:scale(1.2)}
+.mult.x3{color:#3b82f6;transform:scale(1.3)}
+.best{font-size:12px;color:rgba(0,0,0,0.3);font-family:'Pretendard',sans-serif;font-weight:500;margin-top:2px}
+.state-indicator{
+  padding:6px 16px;border-radius:100px;font-size:13px;font-weight:700;
+  font-family:'Pretendard',sans-serif;letter-spacing:-0.01em;
+  transition:all .2s;
+}
+.state-indicator.safe{background:#dcfce7;color:#16a34a}
+.state-indicator.danger{background:#fef2f2;color:#dc2626;animation:dangerPulse .4s ease infinite alternate}
+.state-indicator.happy{background:#dbeafe;color:#2563eb}
+@keyframes dangerPulse{0%{transform:scale(1)}100%{transform:scale(1.05);box-shadow:0 0 12px rgba(220,38,38,0.3)}}
+
+/* Cat */
+.cat-wrap{
+  position:relative;width:340px;height:340px;
+  display:flex;align-items:center;justify-content:center;
+  cursor:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'><text y='24' font-size='24'>🤚</text></svg>") 16 16, pointer;
+  transition:transform .1s;
+}
 .cat-wrap.petting{cursor:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'><text y='24' font-size='24'>✋</text></svg>") 16 16, grab}
-.cat-img{max-width:100%;max-height:100%;object-fit:contain;transition:opacity .25s ease,transform .25s ease;
-  pointer-events:none;position:absolute}
-.cat-img.hidden{opacity:0;transform:scale(0.95)}
+.cat-img{max-width:100%;max-height:100%;object-fit:contain;pointer-events:none;position:absolute;
+  transition:opacity .15s,transform .15s}
+.cat-img.hidden{opacity:0;transform:scale(0.92)}
 .cat-img.active{opacity:1;transform:scale(1)}
+
+/* Danger state — cat shakes subtly */
+.cat-wrap.danger-mode{animation:catTwitch .15s ease infinite alternate}
+@keyframes catTwitch{0%{transform:rotate(-0.5deg)}100%{transform:rotate(0.5deg)}}
+
+/* Fur */
+.fur{position:fixed;pointer-events:none;z-index:55;border-radius:50%;animation:furFall 1s ease-out forwards}
+@keyframes furFall{0%{opacity:0.8;transform:translate(0,0) rotate(0deg)}
+  100%{opacity:0;transform:translate(var(--fx),var(--fy)) rotate(var(--fr))}}
+
 /* Particles */
-.particle{position:fixed;font-size:20px;pointer-events:none;z-index:60;animation:particleUp .8s ease-out forwards}
-@keyframes particleUp{0%{opacity:1;transform:translateY(0) scale(1)}100%{opacity:0;transform:translateY(-60px) scale(0.5)}}
-.particle.bad{animation-name:particleShake}
-@keyframes particleShake{0%{opacity:1;transform:translateY(0) rotate(0deg)}25%{transform:translateY(-10px) rotate(-15deg)}
-  50%{transform:translateY(-5px) rotate(10deg)}75%{transform:translateY(-20px) rotate(-5deg)}100%{opacity:0;transform:translateY(-40px) rotate(0deg)}}
-/* Fur particles */
-.fur{position:fixed;pointer-events:none;z-index:55;border-radius:50%;animation:furFall 1.2s ease-out forwards}
-@keyframes furFall{0%{opacity:0.8;transform:translate(0,0) rotate(0deg) scale(1)}
-  100%{opacity:0;transform:translate(var(--fx),var(--fy)) rotate(var(--fr)) scale(0.3)}}
-.status{margin-top:24px;font-size:14px;font-weight:500;color:rgba(0,0,0,0.45);letter-spacing:-0.01em;height:20px;
-  transition:color .2s;text-align:center;font-family:'Pretendard',sans-serif}
-/* Overlay */
-.overlay{position:fixed;inset:0;background:rgba(250,249,246,0.95);display:flex;flex-direction:column;
-  align-items:center;justify-content:center;z-index:200;transition:opacity .4s;padding:24px;text-align:center}
+.particle{position:fixed;font-size:24px;pointer-events:none;z-index:60;animation:pUp .7s ease-out forwards}
+@keyframes pUp{0%{opacity:1;transform:translateY(0) scale(1)}100%{opacity:0;transform:translateY(-50px) scale(0.4)}}
+
+/* Score popup */
+.score-pop{position:fixed;font-size:16px;font-weight:800;pointer-events:none;z-index:60;
+  font-family:'Pretendard',sans-serif;animation:scorePop .6s ease-out forwards}
+@keyframes scorePop{0%{opacity:1;transform:translateY(0)}100%{opacity:0;transform:translateY(-40px)}}
+
+/* Screen flash */
+.flash{position:fixed;inset:0;pointer-events:none;z-index:150;opacity:0;transition:opacity .05s}
+.flash.red{background:#ff0000;opacity:0.3}
+.flash.green{background:#00ff00;opacity:0.15}
+
+/* Screen shake */
+body.screen-shake{animation:screenShake .3s ease}
+@keyframes screenShake{
+  0%,100%{transform:translate(0)}
+  10%{transform:translate(-6px,4px)}
+  20%{transform:translate(6px,-4px)}
+  30%{transform:translate(-4px,6px)}
+  40%{transform:translate(4px,-2px)}
+  50%{transform:translate(-2px,4px)}
+  60%{transform:translate(4px,-4px)}
+  70%{transform:translate(-6px,2px)}
+  80%{transform:translate(2px,-6px)}
+  90%{transform:translate(-2px,2px)}
+}
+
+/* Game over */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,0.92);display:flex;flex-direction:column;
+  align-items:center;justify-content:center;z-index:200;transition:opacity .3s;padding:24px;text-align:center}
 .overlay.hidden{opacity:0;pointer-events:none}
-.overlay h1{font-size:clamp(28px,6vw,48px);font-weight:900;letter-spacing:-0.02em;line-height:1.2;margin-bottom:8px}
-.overlay .sub{font-size:15px;color:rgba(0,0,0,0.5);font-weight:400;margin-bottom:32px;line-height:1.5;
+.overlay.start-screen{background:rgba(250,249,246,0.96)}
+.overlay h1{font-size:clamp(32px,7vw,56px);font-weight:900;letter-spacing:-0.02em;line-height:1.15;margin-bottom:12px}
+.overlay .sub{font-size:15px;color:rgba(255,255,255,0.5);font-weight:400;margin-bottom:36px;line-height:1.5;
   font-family:'Pretendard',sans-serif}
-.overlay .final-score{font-size:64px;font-weight:900;letter-spacing:-0.04em;margin-bottom:8px}
-.overlay .final-score.fail{color:#ef4444}
-.overlay .btn{padding:14px 36px;background:#111;color:#fff;font:700 15px/1 'BMEuljiro',sans-serif;
+.overlay.start-screen .sub{color:rgba(0,0,0,0.5)}
+.overlay .final-score{font-size:80px;font-weight:900;letter-spacing:-0.04em;margin-bottom:4px;color:#ef4444}
+.overlay .best-score{font-size:14px;color:rgba(255,255,255,0.4);margin-bottom:28px;font-family:'Pretendard',sans-serif}
+.overlay .btn{padding:16px 40px;background:#fff;color:#111;font:700 16px/1 'BMEuljiro',sans-serif;
   border:none;border-radius:100px;cursor:pointer;transition:transform .15s,box-shadow .15s}
-.overlay .btn:hover{transform:scale(1.04);box-shadow:0 4px 16px rgba(0,0,0,0.15)}
-.overlay .result-img{width:180px;height:180px;object-fit:contain;margin-bottom:20px}
+.overlay .btn:hover{transform:scale(1.05);box-shadow:0 4px 20px rgba(255,255,255,0.2)}
+.overlay.start-screen .btn{background:#111;color:#fff}
+.overlay .result-img{width:200px;height:200px;object-fit:contain;margin-bottom:16px;
+  animation:resultBounce .5s ease-out}
+@keyframes resultBounce{0%{transform:scale(0.3) rotate(-10deg);opacity:0}
+  60%{transform:scale(1.1) rotate(3deg);opacity:1}100%{transform:scale(1) rotate(0deg)}}
+.overlay h1.fail-title{color:#ef4444;text-shadow:0 0 40px rgba(239,68,68,0.5)}
+
+/* Status */
+.status{position:fixed;bottom:80px;left:0;right:0;text-align:center;
+  font-size:14px;font-weight:600;color:rgba(0,0,0,0.4);font-family:'Pretendard',sans-serif;
+  transition:color .15s;z-index:10}
+
+/* Back */
 .back-to-archive{position:fixed;top:16px;left:16px;z-index:9999;display:inline-flex;align-items:center;gap:6px;
   padding:8px 14px 8px 12px;background:rgba(255,255,255,0.9);color:#111;
-  font:500 12px/1 -apple-system,'Pretendard',sans-serif;letter-spacing:-0.01em;text-decoration:none;
+  font:500 12px/1 'Pretendard',sans-serif;text-decoration:none;
   border:1px solid rgba(0,0,0,0.08);border-radius:100px;box-shadow:0 2px 8px rgba(0,0,0,0.12);
   backdrop-filter:blur(10px);transition:background .2s,transform .2s}
 .back-to-archive:hover{background:#fff;transform:translateX(-2px)}
 .back-to-archive svg{flex:none;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-.day-tag{position:fixed;bottom:14px;right:18px;font:11px/1 monospace;color:rgba(0,0,0,0.25);letter-spacing:1px;pointer-events:none;z-index:99}
-@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-8px) rotate(-2deg)}
-  40%{transform:translateX(8px) rotate(2deg)}60%{transform:translateX(-6px) rotate(-1deg)}80%{transform:translateX(6px) rotate(1deg)}}
-.cat-wrap.shake{animation:shake .4s ease}
-@media(max-width:480px){.cat-wrap{width:260px;height:260px}.score-display{font-size:28px}}
+.day-tag{position:fixed;bottom:14px;right:18px;font:11px/1 monospace;color:rgba(0,0,0,0.2);pointer-events:none;z-index:99}
+
+@media(max-width:480px){.cat-wrap{width:280px;height:280px}.score{font-size:36px}}
 </style>
 </head>
 <body>
@@ -83,32 +132,33 @@ body{
   <span>뒤로가기</span>
 </a>
 <div class="hud">
-  <div><span class="score-display" id="scoreEl">0</span><span class="multiplier" id="multEl">x1</span></div>
   <div>
-    <div class="mood-bar-wrap"><div class="mood-bar" id="moodBar"></div></div>
-    <div class="mood-label" id="moodLabel">기분: 보통</div>
+    <div class="score-wrap"><span class="score" id="scoreEl">0</span><span class="mult" id="multEl">x1</span></div>
+    <div class="best" id="bestEl">BEST: 0</div>
   </div>
+  <div class="state-indicator safe" id="stateInd">안전</div>
 </div>
-<div class="game" id="game">
-  <div class="cat-wrap" id="catWrap">
-    <img class="cat-img active" id="imgDefault" src="도동이_기본.png" alt="도동이 기본" draggable="false">
-    <img class="cat-img hidden" id="imgHappy1" src="도동이_긍정1단계.png" alt="도동이 긍정1" draggable="false">
-    <img class="cat-img hidden" id="imgHappy2" src="도동이_긍정2단계.png" alt="도동이 긍정2" draggable="false">
-    <img class="cat-img hidden" id="imgAngry1" src="도동이_분노1단계.png" alt="도동이 분노1" draggable="false">
-    <img class="cat-img hidden" id="imgAngry2" src="도동이_분노2단계.png" alt="도동이 분노2" draggable="false">
-  </div>
-  <div class="status" id="statusEl">도동이를 쓰다듬어주세요</div>
+<div class="cat-wrap" id="catWrap">
+  <img class="cat-img active" id="imgDefault" src="도동이_기본.png" alt="" draggable="false">
+  <img class="cat-img hidden" id="imgHappy1" src="도동이_긍정1단계.png" alt="" draggable="false">
+  <img class="cat-img hidden" id="imgHappy2" src="도동이_긍정2단계.png" alt="" draggable="false">
+  <img class="cat-img hidden" id="imgAngry1" src="도동이_분노1단계.png" alt="" draggable="false">
+  <img class="cat-img hidden" id="imgAngry2" src="도동이_분노2단계.png" alt="" draggable="false">
 </div>
-<div class="overlay" id="startOverlay">
-  <h1>도동이<br>복복복 쓰다듬기</h1>
-  <p class="sub">도동이를 부드럽게 쓰다듬어주세요<br>화나면 끝이에요 🐱</p>
+<div class="status" id="statusEl">도동이를 쓰다듬어주세요</div>
+<div class="flash" id="flash"></div>
+
+<div class="overlay start-screen" id="startOverlay">
+  <h1>도동이<br>복복복<br>쓰다듬기</h1>
+  <p class="sub">도동이가 째려볼 때 쓰다듬으면 끝이에요<br>눈치껏 쓰다듬고, 째려보면 멈추세요 🐱</p>
   <button class="btn" id="startBtn">시작하기</button>
 </div>
 <div class="overlay hidden" id="endOverlay">
-  <img class="result-img" id="resultImg" src="" alt="">
-  <h1 id="resultTitle"></h1>
-  <p class="sub" id="resultSub"></p>
-  <div class="final-score fail" id="finalScore"></div>
+  <img class="result-img" id="resultImg" src="도동이_분노2단계.png" alt="">
+  <h1 class="fail-title" id="resultTitle">하악!!</h1>
+  <p class="sub" id="resultSub">도동이가 화났어요!</p>
+  <div class="final-score" id="finalScore">0</div>
+  <div class="best-score" id="bestScoreEnd">BEST: 0</div>
   <button class="btn" id="retryBtn">다시 하기</button>
 </div>
 <div class="day-tag">day 08 / typo-vibe</div>
@@ -116,23 +166,26 @@ body{
 </html>
 
 <script>
-/* day 08 — 도동이 복복복 쓰다듬기
-   실패만 있는 무한 모드. 긍정 단계에서 점수 배율 증가. */
+/* ================================================================
+   도동이 복복복 쓰다듬기 — 째무 스타일 리디자인
+   
+   핵심 루프:
+   1. 기본(안전) → 쓰다듬으면 실시간 점수 증가
+   2. 랜덤으로 갑자기 분노1(째려봄) 전환 — 이때 쓰다듬으면 즉시 게임오버
+   3. 분노1에서 손 떼고 기다리면 → 기본으로 복귀
+   4. 오래 잘 쓰다듬으면 긍정1(x2)→긍정2(x3) 배율
+   5. 시간 지날수록 분노 전환 빈도 증가 (난이도 스케일링)
+   ================================================================ */
 
 const catWrap=document.getElementById('catWrap');
 const scoreEl=document.getElementById('scoreEl');
 const multEl=document.getElementById('multEl');
-const moodBar=document.getElementById('moodBar');
-const moodLabel=document.getElementById('moodLabel');
+const bestEl=document.getElementById('bestEl');
+const stateInd=document.getElementById('stateInd');
 const statusEl=document.getElementById('statusEl');
+const flash=document.getElementById('flash');
 const startOverlay=document.getElementById('startOverlay');
 const endOverlay=document.getElementById('endOverlay');
-const startBtn=document.getElementById('startBtn');
-const retryBtn=document.getElementById('retryBtn');
-const resultImg=document.getElementById('resultImg');
-const resultTitle=document.getElementById('resultTitle');
-const resultSub=document.getElementById('resultSub');
-const finalScore=document.getElementById('finalScore');
 
 const imgs={
   default:document.getElementById('imgDefault'),
@@ -142,13 +195,14 @@ const imgs={
   angry2:document.getElementById('imgAngry2'),
 };
 
-let mood=50,score=0,gameActive=false,petting=false;
-let lastPetTime=0,petSpeed=0,lastX=0,lastY=0,petStrokes=0;
-let idleTimer=null,moodDecayTimer=null,moodEventTimer=null;
-let currentState='default',multiplier=1;
-let loopSrc=null; // 상태별 루프 사운드
+let score=0, bestScore=parseInt(localStorage.getItem('dodong_best')||'0');
+let gameActive=false, petting=false, currentState='default';
+let multiplier=1, comboStrokes=0, gameStartTime=0;
+let stateTimer=null, dangerGraceTimer=null;
+let lastX=0, lastY=0, lastMoveTime=0;
+let loopAudio=null;
 
-const TH={angry2:12,angry1:28,happy1:72,happy2:88};
+bestEl.textContent='BEST: '+bestScore;
 
 /* ======= Audio ======= */
 let audioCtx=null;
@@ -157,253 +211,230 @@ function ensureAudio(){
   const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return;
   audioCtx=new AC();
 }
-
-// 골골 소리 (긍정1) — mp3
-function startPurr(){
+function stopLoop(){if(loopAudio){loopAudio.pause();loopAudio.currentTime=0;loopAudio=null}}
+function playLoop(file,vol){
   stopLoop();
-  const a=new Audio('purr.mp3');a.loop=true;a.volume=0.5;a.play().catch(()=>{});
-  loopSrc={stop:()=>{a.pause();a.currentTime=0}};
+  const a=new Audio(file);a.loop=true;a.volume=vol||0.4;a.play().catch(()=>{});
+  loopAudio=a;
 }
-
-// 코자는 소리 (긍정2) — mp3
-function startSnore(){
-  stopLoop();
-  const a=new Audio('snore.mp3');a.loop=true;a.volume=0.4;a.play().catch(()=>{});
-  loopSrc={stop:()=>{a.pause();a.currentTime=0}};
-}
-
-// 그루밍 소리 (분노1) — 합성 츄웁츕
-function startGroom(){
-  stopLoop();
-  if(!audioCtx)return;
-  let running=true;
-  function tick(){
-    if(!running)return;
-    // 짧은 "츕" 소리 — 입술 소리 시뮬레이션
-    const bufSize=Math.floor(audioCtx.sampleRate*0.06);
-    const buf=audioCtx.createBuffer(1,bufSize,audioCtx.sampleRate);
-    const d=buf.getChannelData(0);
-    for(let i=0;i<bufSize;i++){
-      const env=Math.exp(-i/(bufSize*0.15));
-      d[i]=(Math.random()*2-1)*0.3*env;
-    }
-    const src=audioCtx.createBufferSource();src.buffer=buf;
-    const bp=audioCtx.createBiquadFilter();bp.type='bandpass';bp.frequency.value=2500+Math.random()*1500;bp.Q.value=3;
-    const g=audioCtx.createGain();g.gain.value=0.12;
-    src.connect(bp).connect(g).connect(audioCtx.destination);
-    src.start();
-    setTimeout(tick,150+Math.random()*200);
+function playHiss(){const a=new Audio('hiss.mp3');a.volume=0.7;a.play().catch(()=>{})}
+function playGroom(){
+  ensureAudio();if(!audioCtx)return;
+  for(let i=0;i<3;i++){
+    setTimeout(()=>{
+      const buf=audioCtx.createBuffer(1,audioCtx.sampleRate*0.05,audioCtx.sampleRate);
+      const d=buf.getChannelData(0);
+      for(let j=0;j<d.length;j++)d[j]=(Math.random()*2-1)*Math.exp(-j/(d.length*0.12))*0.4;
+      const s=audioCtx.createBufferSource();s.buffer=buf;
+      const bp=audioCtx.createBiquadFilter();bp.type='bandpass';bp.frequency.value=2800;bp.Q.value=4;
+      const g=audioCtx.createGain();g.gain.value=0.15;
+      s.connect(bp).connect(g).connect(audioCtx.destination);s.start();
+    },i*120);
   }
-  tick();
-  loopSrc={stop:()=>{running=false}};
 }
 
-// 하악 소리 (분노2) — mp3
-function playHiss(){
-  const a=new Audio('hiss.mp3');a.volume=0.6;a.play().catch(()=>{});
-}
-
-function stopLoop(){
-  if(loopSrc){loopSrc.stop();loopSrc=null}
-}
-
-/* ======= Fur particles ======= */
+/* ======= VFX ======= */
 const furColors=['#e8ddd4','#d4c8bb','#c9baa8','#f0e8df','#bfb0a0','#3a3530','#555049'];
 function spawnFur(x,y){
-  const count=2+Math.floor(Math.random()*3);
-  for(let i=0;i<count;i++){
-    const el=document.createElement('div');
-    el.className='fur';
-    const size=3+Math.random()*5;
-    const isClump=Math.random()<0.25;
-    const w=isClump?size*2.5:size*0.4;
-    const h=isClump?size*2:size*2.5;
-    el.style.width=w+'px';el.style.height=h+'px';
+  for(let i=0;i<2+Math.floor(Math.random()*2);i++){
+    const el=document.createElement('div');el.className='fur';
+    const s=3+Math.random()*4;
+    const clump=Math.random()<0.2;
+    el.style.width=(clump?s*2.5:s*0.4)+'px';
+    el.style.height=(clump?s*2:s*2.5)+'px';
     el.style.background=furColors[Math.floor(Math.random()*furColors.length)];
-    el.style.left=(x+Math.random()*30-15)+'px';
-    el.style.top=(y+Math.random()*20-10)+'px';
-    el.style.setProperty('--fx',(Math.random()-0.5)*60+'px');
-    el.style.setProperty('--fy',(20+Math.random()*40)+'px');
+    el.style.left=(x+Math.random()*20-10)+'px';el.style.top=(y+Math.random()*16-8)+'px';
+    el.style.setProperty('--fx',(Math.random()-0.5)*50+'px');
+    el.style.setProperty('--fy',(15+Math.random()*35)+'px');
     el.style.setProperty('--fr',(Math.random()*360)+'deg');
-    if(isClump)el.style.borderRadius='40%';
-    document.body.appendChild(el);
-    setTimeout(()=>el.remove(),1200);
+    if(clump)el.style.borderRadius='40%';
+    document.body.appendChild(el);setTimeout(()=>el.remove(),1000);
   }
 }
-
-/* ======= Emoji particles ======= */
-function spawnParticle(x,y,emoji,bad){
-  const el=document.createElement('div');
-  el.className='particle'+(bad?' bad':'');
-  el.textContent=emoji;
+function spawnEmoji(x,y,e){
+  const el=document.createElement('div');el.className='particle';el.textContent=e;
   el.style.left=x+'px';el.style.top=y+'px';
-  document.body.appendChild(el);
-  setTimeout(()=>el.remove(),800);
+  document.body.appendChild(el);setTimeout(()=>el.remove(),700);
+}
+function spawnScorePop(x,y,n){
+  const el=document.createElement('div');el.className='score-pop';
+  el.textContent=(n>0?'+':'')+n;
+  el.style.color=n>0?'#22c55e':'#ef4444';
+  el.style.left=x+'px';el.style.top=y+'px';
+  document.body.appendChild(el);setTimeout(()=>el.remove(),600);
+}
+function screenFlash(color){
+  flash.className='flash '+color;
+  setTimeout(()=>{flash.className='flash'},120);
+}
+function screenShake(){
+  document.body.classList.remove('screen-shake');
+  void document.body.offsetWidth;
+  document.body.classList.add('screen-shake');
+  setTimeout(()=>document.body.classList.remove('screen-shake'),300);
 }
 
-/* ======= Score & Multiplier ======= */
-function addScore(n){
-  const actual=n>0?n*multiplier:n;
-  score+=actual;
-  if(score<0)score=0;
-  scoreEl.textContent=score;
-  scoreEl.classList.remove('bump-up','bump-down');
-  void scoreEl.offsetWidth;
-  scoreEl.classList.add(actual>0?'bump-up':'bump-down');
-  setTimeout(()=>scoreEl.classList.remove('bump-up','bump-down'),200);
-}
-function updateMultiplier(){
-  const prev=multiplier;
-  if(mood>=TH.happy2)multiplier=3;
-  else if(mood>=TH.happy1)multiplier=2;
-  else multiplier=1;
-  multEl.textContent='x'+multiplier;
-  multEl.className='multiplier'+(multiplier===2?' x2':multiplier===3?' x3':'');
+/* ======= State machine ======= */
+function showImg(s){
+  Object.values(imgs).forEach(i=>{i.classList.remove('active');i.classList.add('hidden')});
+  const m={default:imgs.default,happy1:imgs.happy1,happy2:imgs.happy2,angry1:imgs.angry1,angry2:imgs.angry2};
+  if(m[s]){m[s].classList.remove('hidden');m[s].classList.add('active')}
 }
 
-/* ======= Mood & State ======= */
-function getStateFromMood(m){
-  if(m<=TH.angry2)return 'angry2';
-  if(m<=TH.angry1)return 'angry1';
-  if(m>=TH.happy2)return 'happy2';
-  if(m>=TH.happy1)return 'happy1';
-  return 'default';
-}
-function updateMoodUI(){
-  const pct=Math.max(0,Math.min(100,mood));
-  moodBar.style.width=pct+'%';
-  if(mood>=TH.happy1){moodBar.style.background='#22c55e';moodLabel.textContent='기분: 좋음 ♥'}
-  else if(mood<=TH.angry1){moodBar.style.background='#ef4444';moodLabel.textContent='기분: 나쁨 💢'}
-  else{moodBar.style.background='#facc15';moodLabel.textContent='기분: 보통'}
-  updateMultiplier();
-}
-function showImage(state){
-  Object.values(imgs).forEach(img=>{img.classList.remove('active');img.classList.add('hidden')});
-  const map={default:imgs.default,happy1:imgs.happy1,happy2:imgs.happy2,angry1:imgs.angry1,angry2:imgs.angry2};
-  if(map[state]){map[state].classList.remove('hidden');map[state].classList.add('active')}
-}
-function setState(newState){
-  if(newState===currentState)return;
-  currentState=newState;
-  showImage(newState);
-  // 상태별 사운드
-  if(newState==='happy1'){
+function enterState(s){
+  if(s===currentState)return;
+  const prev=currentState;
+  currentState=s;
+  showImg(s);
+
+  if(s==='default'){
+    stateInd.className='state-indicator safe';stateInd.textContent='안전';
+    statusEl.textContent='쓰다듬어주세요!';statusEl.style.color='rgba(0,0,0,0.4)';
+    catWrap.classList.remove('danger-mode');
+    if(prev==='angry1'){playLoop('purr.mp3',0.3)}
+    scheduleNextDanger();
+  }else if(s==='happy1'){
+    stateInd.className='state-indicator happy';stateInd.textContent='기분 좋음 x2';
     statusEl.textContent='도동이가 골골거려요~';statusEl.style.color='#22c55e';
-    startPurr();
-  }else if(newState==='happy2'){
+    multiplier=2;multEl.textContent='x2';multEl.className='mult x2';
+    playLoop('purr.mp3',0.5);
+    screenFlash('green');
+  }else if(s==='happy2'){
+    stateInd.className='state-indicator happy';stateInd.textContent='최고 기분 x3';
     statusEl.textContent='도동이가 코~ 자고 있어요 zzZ';statusEl.style.color='#3b82f6';
-    startSnore();
-  }else if(newState==='angry1'){
-    statusEl.textContent='도동이가 그루밍 중... 츄웁츕';statusEl.style.color='#ef4444';
-    addScore(-3);
-    catWrap.classList.add('shake');setTimeout(()=>catWrap.classList.remove('shake'),400);
-    startGroom();
-  }else if(newState==='angry2'){
-    endGame();return;
-  }else{
-    statusEl.textContent='도동이를 쓰다듬어주세요';statusEl.style.color='rgba(0,0,0,0.45)';
-    stopLoop();
+    multiplier=3;multEl.textContent='x3';multEl.className='mult x3';
+    playLoop('snore.mp3',0.4);
+    screenFlash('green');
+  }else if(s==='angry1'){
+    // 위험! 째려보기 시작
+    stateInd.className='state-indicator danger';stateInd.textContent='⚠ 째려보는 중';
+    statusEl.textContent='멈춰!! 도동이가 째려봐요!';statusEl.style.color='#dc2626';
+    catWrap.classList.add('danger-mode');
+    stopLoop();playGroom();
+    multiplier=1;multEl.textContent='x1';multEl.className='mult';
+    comboStrokes=0;
+    // 일정 시간 후 안전으로 복귀 (쓰다듬지 않으면)
+    clearTimeout(dangerGraceTimer);
+    const grace=1500+Math.random()*2000;
+    dangerGraceTimer=setTimeout(()=>{
+      if(!gameActive||currentState!=='angry1')return;
+      if(!petting)enterState('default');
+      else gameOver(); // 아직도 쓰다듬고 있으면 게임오버
+    },grace);
+  }else if(s==='angry2'){
+    gameOver();
   }
+}
+
+/* ======= Danger scheduling — 핵심 긴장감 ======= */
+function scheduleNextDanger(){
+  clearTimeout(stateTimer);
+  if(!gameActive)return;
+  // 시간 지날수록 더 자주 째려봄
+  const elapsed=(Date.now()-gameStartTime)/1000;
+  const minDelay=Math.max(1200, 4000-elapsed*80); // 점점 짧아짐
+  const maxDelay=Math.max(2500, 7000-elapsed*100);
+  const delay=minDelay+Math.random()*(maxDelay-minDelay);
+  stateTimer=setTimeout(()=>{
+    if(!gameActive)return;
+    enterState('angry1');
+  },delay);
 }
 
 /* ======= Petting ======= */
 function onPetStart(x,y){
   if(!gameActive)return;
   ensureAudio();if(audioCtx&&audioCtx.state==='suspended')audioCtx.resume();
-  petting=true;lastX=x;lastY=y;lastPetTime=performance.now();
+  petting=true;lastX=x;lastY=y;lastMoveTime=performance.now();
   catWrap.classList.add('petting');
+
+  // 분노1에서 쓰다듬기 시작하면 → 즉시 게임오버!
+  if(currentState==='angry1'){
+    gameOver();
+  }
 }
+
 function onPetMove(x,y){
   if(!petting||!gameActive)return;
   const dist=Math.hypot(x-lastX,y-lastY);
   lastX=x;lastY=y;
   if(dist<2)return;
+
   const now=performance.now();
-  const dt=Math.max(1,now-lastPetTime);
-  petSpeed=dist/dt;lastPetTime=now;petStrokes++;
+  const dt=Math.max(1,now-lastMoveTime);
+  lastMoveTime=now;
+  comboStrokes++;
+
+  // 분노1에서 움직이면 → 게임오버
+  if(currentState==='angry1'){gameOver();return}
 
   // 털 이펙트
-  if(petStrokes%4===0)spawnFur(x,y);
+  if(comboStrokes%3===0)spawnFur(x,y);
 
-  if(petSpeed>2.5){
-    mood=Math.max(0,mood-1.2);
-    if(petStrokes%6===0)spawnParticle(x,y,'💢',true);
-  }else if(petSpeed>=0.15){
-    const bonus=(petSpeed>=0.3&&petSpeed<=1.8)?0.9:0.35;
-    mood=Math.min(100,mood+bonus);
-    if(petStrokes%10===0)spawnParticle(x,y,mood>=TH.happy1?'💕':'❤️',false);
-    if(petStrokes%8===0)addScore(1);
+  // 실시간 점수 — 매 움직임마다!
+  const pts=multiplier;
+  score+=pts;
+  scoreEl.textContent=score;
+  scoreEl.classList.add('hot');
+
+  // 점수 팝업 (가끔)
+  if(comboStrokes%12===0){
+    spawnScorePop(x-20+Math.random()*40, y-30, pts*12);
+    spawnEmoji(x,y,multiplier>=2?'💕':'❤️');
   }
-  const ns=getStateFromMood(mood);setState(ns);updateMoodUI();
 
-  clearTimeout(idleTimer);
-  idleTimer=setTimeout(()=>{if(gameActive&&petting){petting=false;catWrap.classList.remove('petting')}},800);
-}
-function onPetEnd(){if(!petting)return;petting=false;catWrap.classList.remove('petting')}
-
-/* ======= Random mood events ======= */
-function startMoodDecay(){
-  moodDecayTimer=setInterval(()=>{
-    if(!gameActive)return;
-    if(!petting){mood=Math.max(0,mood-0.4);const ns=getStateFromMood(mood);setState(ns);updateMoodUI()}
-  },200);
-  scheduleRandomEvent();
-}
-function scheduleRandomEvent(){
-  if(!gameActive)return;
-  moodEventTimer=setTimeout(()=>{if(!gameActive)return;triggerRandomEvent();scheduleRandomEvent()},1500+Math.random()*2500);
-}
-function triggerRandomEvent(){
-  const roll=Math.random();
-  const r=catWrap.getBoundingClientRect();
-  const px=r.left+r.width/2+(Math.random()-0.5)*60;
-  const py=r.top+r.height*0.3;
-  if(roll<0.45){
-    mood=Math.max(0,mood-(18+Math.random()*12));
-    spawnParticle(px,py,'😾',true);
-    statusEl.textContent='도동이가 갑자기 짜증!';statusEl.style.color='#ef4444';
-    catWrap.classList.add('shake');setTimeout(()=>catWrap.classList.remove('shake'),400);
-  }else if(roll<0.58){
-    mood=Math.min(100,mood+(8+Math.random()*6));
-    spawnParticle(px,py,'😻',false);addScore(2);
-    statusEl.textContent='도동이가 갑자기 기분 좋아!';statusEl.style.color='#22c55e';
-  }else if(roll<0.75){
-    mood=Math.max(0,mood-(10+Math.random()*8));
-    spawnParticle(px,py,'🐾',true);addScore(-3);
-    statusEl.textContent='도동이가 그루밍 시작...';statusEl.style.color='#f59e0b';
-  }else if(roll<0.9){
-    mood=Math.max(0,mood-8);
-    statusEl.textContent='도동이가 뭔가 불안해해요';statusEl.style.color='#f59e0b';
-  }else{
-    spawnParticle(px,py,'💤',false);
+  // 긍정 단계 전이
+  if(currentState==='default'&&comboStrokes>80){
+    enterState('happy1');
+  }else if(currentState==='happy1'&&comboStrokes>200){
+    enterState('happy2');
   }
-  const ns=getStateFromMood(mood);setState(ns);updateMoodUI();
 }
 
-/* ======= Game flow ======= */
-function startGame(){
-  score=0;mood=50;petStrokes=0;multiplier=1;currentState='default';gameActive=true;
-  clearInterval(moodDecayTimer);clearTimeout(moodEventTimer);stopLoop();
-  scoreEl.textContent='0';multEl.textContent='x1';multEl.className='multiplier';
-  showImage('default');updateMoodUI();
-  statusEl.textContent='도동이를 쓰다듬어주세요';statusEl.style.color='rgba(0,0,0,0.45)';
-  startOverlay.classList.add('hidden');endOverlay.classList.add('hidden');
-  startMoodDecay();
+function onPetEnd(){
+  if(!petting)return;
+  petting=false;
+  catWrap.classList.remove('petting');
+  scoreEl.classList.remove('hot');
 }
-function endGame(){
-  gameActive=false;petting=false;catWrap.classList.remove('petting');
-  clearInterval(moodDecayTimer);clearTimeout(idleTimer);clearTimeout(moodEventTimer);
-  stopLoop();playHiss();
-  showImage('angry2');
-  catWrap.classList.add('shake');
+
+/* ======= Game over ======= */
+function gameOver(){
+  gameActive=false;petting=false;
+  catWrap.classList.remove('petting','danger-mode');
+  clearTimeout(stateTimer);clearTimeout(dangerGraceTimer);
+  stopLoop();
+
+  // 임팩트!
+  playHiss();
+  screenShake();
+  screenFlash('red');
+  showImg('angry2');
+
+  // 최고 점수
+  if(score>bestScore){
+    bestScore=score;
+    localStorage.setItem('dodong_best',bestScore);
+  }
+
   setTimeout(()=>{
-    catWrap.classList.remove('shake');
-    resultImg.src='도동이_분노2단계.png';
-    resultTitle.textContent='하악!! 😾';
-    resultSub.textContent='도동이가 화났어요! 최종 점수:';
-    finalScore.textContent=score;
+    document.getElementById('finalScore').textContent=score;
+    document.getElementById('bestScoreEnd').textContent='BEST: '+bestScore;
+    bestEl.textContent='BEST: '+bestScore;
     endOverlay.classList.remove('hidden');
-  },800);
+  },600);
+}
+
+/* ======= Game start ======= */
+function startGame(){
+  score=0;comboStrokes=0;multiplier=1;currentState='';gameActive=true;
+  gameStartTime=Date.now();
+  clearTimeout(stateTimer);clearTimeout(dangerGraceTimer);stopLoop();
+  scoreEl.textContent='0';scoreEl.classList.remove('hot');
+  multEl.textContent='x1';multEl.className='mult';
+  startOverlay.classList.add('hidden');
+  endOverlay.classList.add('hidden');
+  enterState('default');
 }
 
 /* ======= Events ======= */
@@ -413,6 +444,6 @@ window.addEventListener('mouseup',()=>onPetEnd());
 catWrap.addEventListener('touchstart',(e)=>{e.preventDefault();const t=e.touches[0];if(t)onPetStart(t.clientX,t.clientY)},{passive:false});
 window.addEventListener('touchmove',(e)=>{const t=e.touches[0];if(t)onPetMove(t.clientX,t.clientY)},{passive:true});
 window.addEventListener('touchend',()=>onPetEnd());
-startBtn.addEventListener('click',startGame);
-retryBtn.addEventListener('click',startGame);
+document.getElementById('startBtn').addEventListener('click',startGame);
+document.getElementById('retryBtn').addEventListener('click',startGame);
 </script>
