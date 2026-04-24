@@ -447,7 +447,7 @@ function onPetMove(x,y){
     if(petStrokes%8===0)spawnParticle(x,y,'💢',true);
   }else if(petSpeed>=0.15&&petSpeed<=2.5){
     // 적당한 쓰다듬기 — 기분 좋아짐
-    const bonus=(petSpeed>=0.3&&petSpeed<=1.8)?0.9:0.4;
+    const bonus=(petSpeed>=0.3&&petSpeed<=1.8)?1.3:0.6;
     mood=Math.min(100,mood+bonus);
     if(petStrokes%10===0){
       spawnParticle(x,y,mood>=MOOD_THRESHOLDS.happy1?'💕':'❤️',false);
@@ -478,7 +478,9 @@ function onPetEnd(){
   catWrap.classList.remove('petting');
 }
 
-/* ======= Mood decay (쓰다듬지 않으면 기분 서서히 나빠짐) ======= */
+/* ======= Mood decay + 랜덤 기분 이벤트 ======= */
+let moodEventTimer=null;
+
 function startMoodDecay(){
   moodDecayTimer=setInterval(()=>{
     if(!gameActive)return;
@@ -489,6 +491,65 @@ function startMoodDecay(){
       updateMoodUI();
     }
   },200);
+  scheduleRandomEvent();
+}
+
+/* 고양이는 예측 불가능 — 3~7초마다 랜덤 기분 변동 */
+function scheduleRandomEvent(){
+  if(!gameActive)return;
+  const delay=3000+Math.random()*4000;
+  moodEventTimer=setTimeout(()=>{
+    if(!gameActive)return;
+    triggerRandomEvent();
+    scheduleRandomEvent();
+  },delay);
+}
+
+function triggerRandomEvent(){
+  const roll=Math.random();
+  const catRect=catWrap.getBoundingClientRect();
+  const px=catRect.left+catRect.width/2+(Math.random()-0.5)*60;
+  const py=catRect.top+catRect.height*0.3;
+
+  if(roll<0.35){
+    // 갑자기 짜증 (35%) — 기분 확 떨어짐
+    const drop=12+Math.random()*10;
+    mood=Math.max(0,mood-drop);
+    spawnParticle(px,py,'😾',true);
+    statusEl.textContent='도동이가 갑자기 짜증나 해요!';
+    statusEl.style.color='#ef4444';
+    catWrap.classList.add('shake');
+    setTimeout(()=>catWrap.classList.remove('shake'),400);
+  }else if(roll<0.55){
+    // 갑자기 기분 좋아짐 (20%) — 보너스 찬스
+    const boost=10+Math.random()*8;
+    mood=Math.min(100,mood+boost);
+    spawnParticle(px,py,'😻',false);
+    addScore(3);
+    statusEl.textContent='도동이가 갑자기 기분이 좋아요!';
+    statusEl.style.color='#22c55e';
+    playPurr();
+  }else if(roll<0.7){
+    // 그루밍 시작 (15%) — 쓰다듬기 멈춰야 함, 안 멈추면 짜증
+    const drop=8+Math.random()*6;
+    mood=Math.max(0,mood-drop);
+    spawnParticle(px,py,'🐾',true);
+    addScore(-3);
+    statusEl.textContent='도동이가 그루밍 중... 잠깐 멈춰!';
+    statusEl.style.color='#f59e0b';
+  }else if(roll<0.85){
+    // 살짝 불안 (15%) — 소폭 하락
+    mood=Math.max(0,mood-5);
+    statusEl.textContent='도동이가 뭔가 불안해해요';
+    statusEl.style.color='#f59e0b';
+  }else{
+    // 아무 일도 안 일어남 (15%) — 평화
+    spawnParticle(px,py,'💤',false);
+  }
+
+  const newState=getStateFromMood(mood);
+  setState(newState);
+  updateMoodUI();
 }
 
 /* ======= Game flow ======= */
@@ -496,6 +557,8 @@ function startGame(){
   score=0;mood=50;petStrokes=0;
   currentState='default';
   gameActive=true;
+  clearInterval(moodDecayTimer);
+  clearTimeout(moodEventTimer);
   scoreEl.textContent='0';
   showImage('default');
   updateMoodUI();
@@ -512,6 +575,7 @@ function endGame(success){
   catWrap.classList.remove('petting');
   clearInterval(moodDecayTimer);
   clearTimeout(idleTimer);
+  clearTimeout(moodEventTimer);
 
   if(success){
     addScore(50); // 보너스
