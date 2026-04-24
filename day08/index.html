@@ -56,19 +56,27 @@ body.happy-bg{background:#f0f7f0}
 .cat-wrap.danger-mode{animation:catTwitch .15s ease infinite alternate}
 @keyframes catTwitch{0%{transform:rotate(-0.5deg)}100%{transform:rotate(0.5deg)}}
 
-/* Fur */
-.fur{position:fixed;pointer-events:none;z-index:55;border-radius:50%;animation:furFall 1s ease-out forwards}
-@keyframes furFall{0%{opacity:0.8;transform:translate(0,0) rotate(0deg)}
-  100%{opacity:0;transform:translate(var(--fx),var(--fy)) rotate(var(--fr))}}
+/* Fur — realistic hair strands */
+.fur{position:fixed;pointer-events:none;z-index:55;
+  animation:furFall 1.2s ease-out forwards}
+.fur.strand{
+  width:2px;border-radius:1px;
+  background:linear-gradient(to bottom,var(--fur-c1),var(--fur-c2));
+  transform-origin:50% 0%;
+}
+.fur.clump{
+  border-radius:40%;
+  background:radial-gradient(ellipse at 30% 30%,var(--fur-c1),var(--fur-c2));
+}
+@keyframes furFall{
+  0%{opacity:0.9;transform:translate(0,0) rotate(var(--fr)) scale(1)}
+  40%{opacity:0.7}
+  100%{opacity:0;transform:translate(var(--fx),var(--fy)) rotate(var(--fr2)) scale(0.4)}
+}
 
 /* Particles */
 .particle{position:fixed;font-size:24px;pointer-events:none;z-index:60;animation:pUp .7s ease-out forwards}
 @keyframes pUp{0%{opacity:1;transform:translateY(0) scale(1)}100%{opacity:0;transform:translateY(-50px) scale(0.4)}}
-
-/* Score popup */
-.score-pop{position:fixed;font-size:16px;font-weight:800;pointer-events:none;z-index:60;
-  font-family:'Pretendard',sans-serif;animation:scorePop .6s ease-out forwards}
-@keyframes scorePop{0%{opacity:1;transform:translateY(0)}100%{opacity:0;transform:translateY(-40px)}}
 
 /* Screen flash */
 .flash{position:fixed;inset:0;pointer-events:none;z-index:150;opacity:0;transition:opacity .05s}
@@ -339,21 +347,42 @@ function playWarningTone(){
 }
 
 /* ======= VFX ======= */
-const furColors=['#e8ddd4','#d4c8bb','#c9baa8','#f0e8df','#bfb0a0','#3a3530','#555049'];
+const furColors=[
+  ['#e8ddd4','#d4c8bb'],['#d4c8bb','#bfb0a0'],['#c9baa8','#a89888'],
+  ['#f0e8df','#e0d4c8'],['#3a3530','#2a2520'],['#555049','#3a3530'],
+  ['#fff','#e8ddd4'],['#f5f0eb','#d4c8bb']
+];
 function spawnFur(x,y){
-  for(let i=0;i<2+Math.floor(Math.random()*2);i++){
-    const el=document.createElement('div');el.className='fur';
-    const s=3+Math.random()*4;
-    const clump=Math.random()<0.2;
-    el.style.width=(clump?s*2.5:s*0.4)+'px';
-    el.style.height=(clump?s*2:s*2.5)+'px';
-    el.style.background=furColors[Math.floor(Math.random()*furColors.length)];
-    el.style.left=(x+Math.random()*20-10)+'px';el.style.top=(y+Math.random()*16-8)+'px';
-    el.style.setProperty('--fx',(Math.random()-0.5)*50+'px');
-    el.style.setProperty('--fy',(15+Math.random()*35)+'px');
-    el.style.setProperty('--fr',(Math.random()*360)+'deg');
-    if(clump)el.style.borderRadius='40%';
-    document.body.appendChild(el);setTimeout(()=>el.remove(),1000);
+  const count=2+Math.floor(Math.random()*3);
+  for(let i=0;i<count;i++){
+    const el=document.createElement('div');
+    const pair=furColors[Math.floor(Math.random()*furColors.length)];
+    const isClump=Math.random()<0.15;
+
+    if(isClump){
+      el.className='fur clump';
+      const s=4+Math.random()*6;
+      el.style.width=s*1.5+'px';
+      el.style.height=s+'px';
+    }else{
+      el.className='fur strand';
+      const len=8+Math.random()*18;
+      const curve=Math.random()<0.5;
+      el.style.width=(1.5+Math.random()*1.5)+'px';
+      el.style.height=len+'px';
+      if(curve)el.style.borderRadius='0 0 50% 50%';
+    }
+
+    el.style.setProperty('--fur-c1',pair[0]);
+    el.style.setProperty('--fur-c2',pair[1]);
+    el.style.left=(x+(Math.random()-0.5)*24)+'px';
+    el.style.top=(y+(Math.random()-0.5)*16)+'px';
+    el.style.setProperty('--fx',(Math.random()-0.5)*70+'px');
+    el.style.setProperty('--fy',(20+Math.random()*50)+'px');
+    el.style.setProperty('--fr',(Math.random()*90-45)+'deg');
+    el.style.setProperty('--fr2',(Math.random()*180-90)+'deg');
+    document.body.appendChild(el);
+    setTimeout(()=>el.remove(),1200);
   }
 }
 function spawnScorePop(x,y,n){
@@ -621,13 +650,6 @@ function onPetMove(x,y){
 
   // fur effect
   if(comboStrokes%3===0)spawnFur(x,y);
-
-  // score popup (occasionally)
-  if(comboStrokes%20===0){
-    const comboMult=combo>0?combo:1;
-    const popPts=Math.floor(multiplier*comboMult*2);
-    spawnScorePop(x-20+Math.random()*40, y-30, popPts);
-  }
 
   // happy thresholds: 200 for happy1, 500 for happy2
   if(currentState==='default'&&comboStrokes>200){
