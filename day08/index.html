@@ -198,14 +198,14 @@ body.screen-shake{animation:screenShake .3s ease}
 
 <script>
 /* ================================================================
-   도동이 복복복 쓰다듬기 — 째무 스타일 리디자인
+   도동이 복복복 쓰다듬기 — v2 Enhanced
    
    핵심 루프:
-   1. 기본(안전) → 쓰다듬으면 실시간 점수 증가
-   2. 랜덤으로 갑자기 분노1(째려봄) 전환 — 이때 쓰다듬으면 즉시 게임오버
-   3. 분노1에서 손 떼고 기다리면 → 기본으로 복귀
-   4. 오래 잘 쓰다듬으면 긍정1(x2)→긍정2(x3) 배율
-   5. 시간 지날수록 분노 전환 빈도 증가 (난이도 스케일링)
+   1. 기본(안전) → 쓰다듬으면 프레임마다 점수 증가 (속도 기반)
+   2. 랜덤 위험 패턴: 경고→위험, 즉시 위험(서프라이즈), 페이크(페인트)
+   3. 콤보 시스템: 위험 생존 시 콤보 +1, 점수 배율에 반영
+   4. 안전 복귀 후 30% 확률로 즉시 재위험 (더블탭)
+   5. 긍정1(x2, 200스트로크)→긍정2(x3, 500스트로크)
    ================================================================ */
 
 const catWrap=document.getElementById('catWrap');
@@ -232,10 +232,14 @@ const imgs={
 let score=0, bestScore=parseInt(localStorage.getItem('dodong_best')||'0');
 let gameActive=false, petting=false, currentState='default';
 let multiplier=1, comboStrokes=0, gameStartTime=0;
+let combo=0; // danger survival combo
 let stateTimer=null, dangerGraceTimer=null;
-let lastX=0, lastY=0, lastMoveTime=0;
+let lastX=0, lastY=0, lastMoveTime=0, petSpeed=0;
 let loopAudio=null;
 let timerInterval=null;
+let scoreLoopRAF=null;
+let feinting=false; // feint state flag
+let pendingDoubleTap=false;
 
 bestEl.textContent='BEST: '+bestScore;
 
@@ -252,24 +256,86 @@ function playLoop(file,vol){
   const a=new Audio(file);a.loop=true;a.volume=vol||0.4;a.play().catch(()=>{});
   loopAudio=a;
 }
+function playOnce(file,vol){
+  const a=new Audio(file);a.loop=false;a.volume=vol||0.4;a.play().catch(()=>{});
+  return a;
+}
 const hissSounds=['hiss.mp3','hiss_growl1.mp3','hiss_growl2.mp3','hiss_complain.mp3'];
 function playHiss(){
   const file=hissSounds[Math.floor(Math.random()*hissSounds.length)];
   const a=new Audio(file);a.volume=0.8;a.play().catch(()=>{});
 }
-function playGroom(){
+
+/* Petting sound — brown noise bandpass filtered, volume tied to pet speed */
+let petNoiseNode=null, petNoiseGain=null;
+function startPetSound(){
   ensureAudio();if(!audioCtx)return;
-  for(let i=0;i<3;i++){
-    setTimeout(()=>{
-      const buf=audioCtx.createBuffer(1,audioCtx.sampleRate*0.05,audioCtx.sampleRate);
-      const d=buf.getChannelData(0);
-      for(let j=0;j<d.length;j++)d[j]=(Math.random()*2-1)*Math.exp(-j/(d.length*0.12))*0.4;
-      const s=audioCtx.createBufferSource();s.buffer=buf;
-      const bp=audioCtx.createBiquadFilter();bp.type='bandpass';bp.frequency.value=2800;bp.Q.value=4;
-      const g=audioCtx.createGain();g.gain.value=0.15;
-      s.connect(bp).connect(g).connect(audioCtx.destination);s.start();
-    },i*120);
-  }
+  if(petNoiseNode)return;
+  const bufSize=audioCtx.sampleRate*2;
+  const buf=audioCtx.createBuffer(1,bufSize,audioCtx.sampleRate);
+  const d=buf.getChannelData(0);
+  let last=0;
+  for(let i=0;i<bufSize;i++){last=(last+(Math.random()*2-1))*0.995;d[i]=last*0.5;}
+  // normalize
+  let mx=0;for(let i=0;i<bufSize;i++)mx=Math.max(mx,Math.abs(d[i]));
+  if(mx>0)for(let i=0;i<bufSize;i++)d[i]/=mx;
+
+  petNoiseNode=audioCtx.createBufferSource();petNoiseNode.buffer=buf;petNoiseNode.loop=true;
+  const bp=audioCtx.createBiquadFilter();bp.type='bandpass';bp.frequency.value=1200;bp.Q.value=2;
+  petNoiseGain=audioCtx.createGain();petNoiseGain.gain.value=0;
+  petNoiseNode.connect(bp).connect(petNoiseGain).connect(audioCtx.destination);
+  petNoiseNode.start();
+}
+function updatePetSoundVolume(speed){
+  if(!petNoiseGain||!audioCtx)return;
+  const vol=Math.min(0.18, speed/800*0.18);
+  petNoiseGain.gain.setTargetAtTime(vol,audioCtx.currentTime,0.05);
+}
+function stopPetSound(){
+  if(petNoiseNode){try{petNoiseNode.stop();}catch(e){}petNoiseNode=null;}
+  petNoiseGain=null;
+}
+
+/* Danger enter — sharp rising tone */
+function playDangerTone(){
+  ensureAudio();if(!audioCtx)return;
+  const o=audioCtx.createOscillator();const g=audioCtx.createGain();
+  o.type='sawtooth';
+  const t=audioCtx.currentTime;
+  o.frequency.setValueAtTime(300,t);
+  o.frequency.exponentialRampToValueAtTime(900,t+0.15);
+  g.gain.setValueAtTime(0.12,t);
+  g.gain.linearRampToValueAtTime(0,t+0.2);
+  o.connect(g).connect(audioCtx.destination);
+  o.start(t);o.stop(t+0.2);
+}
+
+/* Feint sound — short "mrr?" */
+function playFeintSound(){
+  ensureAudio();if(!audioCtx)return;
+  const o=audioCtx.createOscillator();const g=audioCtx.createGain();
+  o.type='triangle';
+  const t=audioCtx.currentTime;
+  o.frequency.setValueAtTime(220,t);
+  o.frequency.linearRampToValueAtTime(350,t+0.12);
+  o.frequency.linearRampToValueAtTime(280,t+0.2);
+  g.gain.setValueAtTime(0.08,t);
+  g.gain.linearRampToValueAtTime(0.06,t+0.1);
+  g.gain.linearRampToValueAtTime(0,t+0.25);
+  o.connect(g).connect(audioCtx.destination);
+  o.start(t);o.stop(t+0.25);
+}
+
+/* Warning twitch sound */
+function playWarningTone(){
+  ensureAudio();if(!audioCtx)return;
+  const o=audioCtx.createOscillator();const g=audioCtx.createGain();
+  o.type='sine';o.frequency.value=400;g.gain.value=0;
+  o.connect(g).connect(audioCtx.destination);
+  const t=audioCtx.currentTime;
+  g.gain.linearRampToValueAtTime(0.04,t+0.05);
+  g.gain.linearRampToValueAtTime(0,t+0.3);
+  o.start(t);o.stop(t+0.3);
 }
 
 /* ======= VFX ======= */
@@ -292,7 +358,7 @@ function spawnFur(x,y){
 }
 function spawnScorePop(x,y,n){
   const el=document.createElement('div');el.className='score-pop';
-  el.textContent=(n>0?'+':'')+n;
+  el.textContent=(n>0?'+':'')+Math.floor(n);
   el.style.color=n>0?'#22c55e':'#ef4444';
   el.style.left=x+'px';el.style.top=y+'px';
   document.body.appendChild(el);setTimeout(()=>el.remove(),600);
@@ -315,11 +381,22 @@ function showImg(s){
   if(m[s]){m[s].classList.remove('hidden');m[s].classList.add('active')}
 }
 
+function updateComboDisplay(){
+  if(combo>0){
+    multEl.textContent='\uD83D\uDD25'+combo+' x'+multiplier;
+  }else{
+    multEl.textContent='x'+multiplier;
+  }
+  if(multiplier>=3)multEl.className='mult x3';
+  else if(multiplier>=2)multEl.className='mult x2';
+  else multEl.className='mult';
+}
+
 function enterState(s){
-  if(s===currentState)return;
+  if(s===currentState&&s!=='default')return;
   const prev=currentState;
   currentState=s;
-  showImg(s);
+  showImg(s==='feint'?'angry1':s);
 
   if(s==='default'){
     stateInd.className='state-indicator safe';stateInd.textContent='안전';
@@ -330,19 +407,37 @@ function enterState(s){
     document.body.classList.remove('happy-bg');
     vignette.classList.remove('active');
     timerEl.classList.remove('danger');
-    if(prev==='angry1'){playLoop('purr.mp3',0.3)}
-    scheduleNextDanger();
+    feinting=false;
+
+    // survived danger → combo up + purr
+    if(prev==='angry1'){
+      combo++;
+      updateComboDisplay();
+      playOnce('purr.mp3',0.35);
+    }
+
+    // 30% chance of immediate double-tap danger
+    if(prev==='angry1'&&Math.random()<0.3){
+      pendingDoubleTap=true;
+      setTimeout(()=>{
+        if(!gameActive||currentState!=='default'){pendingDoubleTap=false;return;}
+        pendingDoubleTap=false;
+        triggerDanger();
+      },150+Math.random()*300);
+    }else{
+      scheduleNextDanger();
+    }
   }else if(s==='happy1'){
     stateInd.className='state-indicator happy';stateInd.textContent='기분 좋음 x2';
     statusEl.textContent='도동이가 골골거려요~';statusEl.style.color='#22c55e';
-    multiplier=2;multEl.textContent='x2';multEl.className='mult x2';
+    multiplier=2;updateComboDisplay();
     document.body.classList.add('happy-bg');
     playLoop('purr.mp3',0.5);
     screenFlash('green');
   }else if(s==='happy2'){
     stateInd.className='state-indicator happy';stateInd.textContent='최고 기분 x3';
     statusEl.textContent='도동이가 코~ 자고 있어요 zzZ';statusEl.style.color='#3b82f6';
-    multiplier=3;multEl.textContent='x3';multEl.className='mult x3';
+    multiplier=3;updateComboDisplay();
     playLoop('snore.mp3',0.4);
     screenFlash('green');
   }else if(s==='angry1'){
@@ -354,73 +449,156 @@ function enterState(s){
     document.body.classList.remove('happy-bg');
     vignette.classList.add('active');
     timerEl.classList.add('danger');
-    stopLoop();playGroom();
-    multiplier=1;multEl.textContent='x1';multEl.className='mult';
+    stopLoop();
+    playDangerTone();
+    // reset happy multiplier on danger
+    multiplier=1;updateComboDisplay();
     comboStrokes=0;
-    // 일정 시간 후 안전으로 복귀 (쓰다듬지 않으면)
+
+    // grace period: 2-5s scaling down with time, min 1.2s
     clearTimeout(dangerGraceTimer);
     const elapsed=(Date.now()-gameStartTime)/1000;
-    const grace=2500+Math.random()*2500-Math.min(elapsed*30,1500); // 2.5~5초, 시간 지나면 줄어듦
-    const actualGrace=Math.max(1500,grace);
+    const grace=2000+Math.random()*3000-Math.min(elapsed*25,2500);
+    const actualGrace=Math.max(1200,grace);
     dangerGraceTimer=setTimeout(()=>{
       if(!gameActive||currentState!=='angry1')return;
       if(!petting)enterState('default');
-      else gameOver(); // 아직도 쓰다듬고 있으면 게임오버
+      else gameOver();
     },actualGrace);
   }else if(s==='angry2'){
     gameOver();
   }
 }
 
-/* ======= Danger scheduling — 읽을 수 있는 긴장감 ======= */
+/* ======= Feint (fake danger) ======= */
+function triggerFeint(){
+  if(!gameActive||currentState==='angry1')return;
+  feinting=true;
+  const prevState=currentState;
+  // show angry face briefly
+  showImg('angry1');
+  stateInd.className='state-indicator danger';stateInd.textContent='⚠ ...?!';
+  statusEl.textContent='손 떼!!';statusEl.style.color='#dc2626';
+  statusEl.classList.add('danger-text');
+  document.body.classList.add('danger-bg');
+  vignette.classList.add('active');
+  timerEl.classList.add('danger');
+  playFeintSound();
+
+  // after 0.5s, return to previous state
+  setTimeout(()=>{
+    if(!gameActive){feinting=false;return;}
+    feinting=false;
+    showImg(prevState);
+    statusEl.classList.remove('danger-text');
+    document.body.classList.remove('danger-bg');
+    vignette.classList.remove('active');
+    timerEl.classList.remove('danger');
+    // restore state indicator
+    if(prevState==='happy1'){
+      stateInd.className='state-indicator happy';stateInd.textContent='기분 좋음 x2';
+      statusEl.textContent='도동이가 골골거려요~';statusEl.style.color='#22c55e';
+    }else if(prevState==='happy2'){
+      stateInd.className='state-indicator happy';stateInd.textContent='최고 기분 x3';
+      statusEl.textContent='도동이가 코~ 자고 있어요 zzZ';statusEl.style.color='#3b82f6';
+    }else{
+      stateInd.className='state-indicator safe';stateInd.textContent='안전';
+      statusEl.textContent='쓰다듬어주세요!';statusEl.style.color='rgba(0,0,0,0.4)';
+    }
+    scheduleNextDanger();
+  },500);
+}
+
+/* ======= Danger scheduling — truly random ======= */
 let warningTimer=null;
+
+function triggerDanger(){
+  if(!gameActive)return;
+  catWrap.style.transform='';
+  enterState('angry1');
+}
 
 function scheduleNextDanger(){
   clearTimeout(stateTimer);clearTimeout(warningTimer);
-  if(!gameActive)return;
-  // 시간 지날수록 안전 구간이 줄어듦 (but 최소 3초는 보장)
+  if(!gameActive||pendingDoubleTap)return;
+
+  // truly random safe interval: 2s to 15s, no linear pattern
   const elapsed=(Date.now()-gameStartTime)/1000;
-  const minSafe=Math.max(3000, 6000-elapsed*40);
-  const maxSafe=Math.max(5000, 12000-elapsed*60);
-  const safeTime=minSafe+Math.random()*(maxSafe-minSafe);
+  // base range shrinks with time but stays unpredictable
+  const minSafe=Math.max(2000, 4000-elapsed*30);
+  const maxSafe=Math.max(4000, 15000-elapsed*80);
+  const safeTime=minSafe+Math.random()*Math.random()*(maxSafe-minSafe); // double random for non-uniform distribution
 
-  // 째려보기 1초 전에 경고 (도동이 미세 떨림 + 상태 표시 변화)
-  warningTimer=setTimeout(()=>{
-    if(!gameActive||currentState==='angry1')return;
-    // 예고: 살짝 불안한 표시
-    stateInd.className='state-indicator danger';stateInd.textContent='...?';
-    statusEl.textContent='도동이가 뭔가 느끼고 있어요...';statusEl.style.color='#f59e0b';
-    catWrap.style.transition='transform .1s';
-    catWrap.style.transform='rotate(-1deg)';
-    setTimeout(()=>{if(catWrap.style.transform==='rotate(-1deg)')catWrap.style.transform='rotate(0.5deg)'},150);
-    // 경고음
-    if(audioCtx){
-      const o=audioCtx.createOscillator();const g=audioCtx.createGain();
-      o.type='sine';o.frequency.value=400;g.gain.value=0;
-      o.connect(g).connect(audioCtx.destination);
-      const t=audioCtx.currentTime;
-      g.gain.linearRampToValueAtTime(0.04,t+0.05);
-      g.gain.linearRampToValueAtTime(0,t+0.3);
-      o.start(t);o.stop(t+0.3);
+  // decide danger pattern: warned(40%), surprise(30%), feint(30%)
+  const roll=Math.random();
+
+  if(roll<0.4){
+    // WARNED: 1-second warning then danger
+    warningTimer=setTimeout(()=>{
+      if(!gameActive||currentState==='angry1')return;
+      stateInd.className='state-indicator danger';stateInd.textContent='...?';
+      statusEl.textContent='도동이가 뭔가 느끼고 있어요...';statusEl.style.color='#f59e0b';
+      catWrap.style.transition='transform .1s';
+      catWrap.style.transform='rotate(-1deg)';
+      setTimeout(()=>{if(catWrap.style.transform==='rotate(-1deg)')catWrap.style.transform='rotate(0.5deg)'},150);
+      playWarningTone();
+    }, safeTime-1000);
+
+    stateTimer=setTimeout(()=>{
+      if(!gameActive)return;
+      triggerDanger();
+    },safeTime);
+  }else if(roll<0.7){
+    // SURPRISE: instant danger, no warning!
+    stateTimer=setTimeout(()=>{
+      if(!gameActive)return;
+      triggerDanger();
+    },safeTime);
+  }else{
+    // FEINT: fake danger
+    stateTimer=setTimeout(()=>{
+      if(!gameActive)return;
+      triggerFeint();
+    },safeTime);
+  }
+}
+
+/* ======= Score loop — frame-based scoring ======= */
+let lastScoreFrame=0;
+function scoreLoop(ts){
+  if(!gameActive){scoreLoopRAF=null;return;}
+  if(!lastScoreFrame)lastScoreFrame=ts;
+  const dt=(ts-lastScoreFrame)/1000; // seconds
+  lastScoreFrame=ts;
+
+  if(petting&&currentState!=='angry1'&&!feinting){
+    // speedFactor: 0.5 to 2.0 based on pet speed
+    const speedFactor=Math.max(0.5,Math.min(2.0,petSpeed/300));
+    const comboMult=combo>0?combo:1;
+    const pts=multiplier*comboMult*speedFactor*dt*60; // ~60fps normalized
+    score+=pts;
+    scoreEl.textContent=Math.floor(score);
+    scoreEl.classList.add('hot');
+    updatePetSoundVolume(petSpeed);
+  }else{
+    scoreEl.classList.remove('hot');
+    if(petNoiseGain&&audioCtx){
+      petNoiseGain.gain.setTargetAtTime(0,audioCtx.currentTime,0.1);
     }
-  }, safeTime-1000);
+  }
 
-  // 실제 째려보기 전환
-  stateTimer=setTimeout(()=>{
-    if(!gameActive)return;
-    catWrap.style.transform='';
-    enterState('angry1');
-  },safeTime);
+  scoreLoopRAF=requestAnimationFrame(scoreLoop);
 }
 
 /* ======= Petting ======= */
 function onPetStart(x,y){
   if(!gameActive)return;
   ensureAudio();if(audioCtx&&audioCtx.state==='suspended')audioCtx.resume();
-  petting=true;lastX=x;lastY=y;lastMoveTime=performance.now();
+  petting=true;lastX=x;lastY=y;lastMoveTime=performance.now();petSpeed=0;
   catWrap.classList.add('petting');
+  startPetSound();
 
-  // 분노1에서 쓰다듬기 시작하면 → 즉시 게임오버!
+  // touching during danger → game over
   if(currentState==='angry1'){
     gameOver();
   }
@@ -435,38 +613,36 @@ function onPetMove(x,y){
   const now=performance.now();
   const dt=Math.max(1,now-lastMoveTime);
   lastMoveTime=now;
+  petSpeed=dist/dt*1000; // pixels per second
   comboStrokes++;
 
-  // 분노1에서 움직이면 → 게임오버
+  // touching during danger → game over
   if(currentState==='angry1'){gameOver();return}
 
-  // 털 이펙트
+  // fur effect
   if(comboStrokes%3===0)spawnFur(x,y);
 
-  // 실시간 점수 — 매 움직임마다!
-  const pts=multiplier;
-  score+=pts;
-  scoreEl.textContent=score;
-  scoreEl.classList.add('hot');
-
-  // 점수 팝업 (가끔)
-  if(comboStrokes%15===0){
-    spawnScorePop(x-20+Math.random()*40, y-30, pts*15);
+  // score popup (occasionally)
+  if(comboStrokes%20===0){
+    const comboMult=combo>0?combo:1;
+    const popPts=Math.floor(multiplier*comboMult*2);
+    spawnScorePop(x-20+Math.random()*40, y-30, popPts);
   }
 
-  // 긍정 단계 전이 — 충분히 쓰다듬어야 올라감
-  if(currentState==='default'&&comboStrokes>150){
+  // happy thresholds: 200 for happy1, 500 for happy2
+  if(currentState==='default'&&comboStrokes>200){
     enterState('happy1');
-  }else if(currentState==='happy1'&&comboStrokes>350){
+  }else if(currentState==='happy1'&&comboStrokes>500){
     enterState('happy2');
   }
 }
 
 function onPetEnd(){
   if(!petting)return;
-  petting=false;
+  petting=false;petSpeed=0;
   catWrap.classList.remove('petting');
   scoreEl.classList.remove('hot');
+  stopPetSound();
 }
 
 /* ======= Game over ======= */
@@ -476,32 +652,37 @@ function gameOver(){
   catWrap.style.transform='';
   clearTimeout(stateTimer);clearTimeout(dangerGraceTimer);clearTimeout(warningTimer);
   clearInterval(timerInterval);
-  stopLoop();
+  if(scoreLoopRAF){cancelAnimationFrame(scoreLoopRAF);scoreLoopRAF=null;}
+  stopLoop();stopPetSound();
   document.body.classList.remove('danger-bg','happy-bg');
   vignette.classList.remove('active');
+  statusEl.classList.remove('danger-text');
+  timerEl.classList.remove('danger');
+  feinting=false;pendingDoubleTap=false;
 
-  // 임팩트!
+  // impact!
   playHiss();
   screenShake();
   screenFlash('red');
   showImg('angry2');
 
+  const finalScoreVal=Math.floor(score);
   const survived=((Date.now()-gameStartTime)/1000).toFixed(1);
 
-  // 최고 점수
-  const isNewBest=score>bestScore;
+  // best score
+  const isNewBest=finalScoreVal>bestScore;
   if(isNewBest){
-    bestScore=score;
+    bestScore=finalScoreVal;
     localStorage.setItem('dodong_best',bestScore);
   }
 
   setTimeout(()=>{
-    document.getElementById('finalScore').textContent=score;
+    document.getElementById('finalScore').textContent=finalScoreVal;
     document.getElementById('bestScoreEnd').textContent='BEST: '+bestScore;
     document.getElementById('survivalTime').textContent='생존: '+survived+'초';
     bestEl.textContent='BEST: '+bestScore;
     endOverlay.classList.remove('hidden');
-    if(isNewBest&&score>0){
+    if(isNewBest&&finalScoreVal>0){
       newBestEl.classList.add('show');
       setTimeout(()=>newBestEl.classList.remove('show'),2000);
     }
@@ -510,9 +691,11 @@ function gameOver(){
 
 /* ======= Game start ======= */
 function startGame(){
-  score=0;comboStrokes=0;multiplier=1;currentState='';gameActive=true;
-  gameStartTime=Date.now();
-  clearTimeout(stateTimer);clearTimeout(dangerGraceTimer);clearTimeout(warningTimer);stopLoop();
+  score=0;comboStrokes=0;multiplier=1;combo=0;currentState='';gameActive=true;
+  gameStartTime=Date.now();petSpeed=0;feinting=false;pendingDoubleTap=false;
+  clearTimeout(stateTimer);clearTimeout(dangerGraceTimer);clearTimeout(warningTimer);
+  stopLoop();stopPetSound();
+  if(scoreLoopRAF){cancelAnimationFrame(scoreLoopRAF);scoreLoopRAF=null;}
   scoreEl.textContent='0';scoreEl.classList.remove('hot');
   multEl.textContent='x1';multEl.className='mult';
   startOverlay.classList.add('hidden');
@@ -520,6 +703,7 @@ function startGame(){
   document.body.classList.remove('danger-bg','happy-bg');
   vignette.classList.remove('active');
   timerEl.classList.remove('danger');
+  statusEl.classList.remove('danger-text');
   timerEl.textContent='0.0s';
   clearInterval(timerInterval);
   timerInterval=setInterval(()=>{
@@ -527,6 +711,8 @@ function startGame(){
     const t=((Date.now()-gameStartTime)/1000).toFixed(1);
     timerEl.textContent=t+'s';
   },100);
+  lastScoreFrame=0;
+  scoreLoopRAF=requestAnimationFrame(scoreLoop);
   enterState('default');
 }
 
