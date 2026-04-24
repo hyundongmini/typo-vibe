@@ -158,85 +158,49 @@ function ensureAudio(){
   audioCtx=new AC();
 }
 
-// 골골 소리 (긍정1) — 저주파 진동
+// 골골 소리 (긍정1) — mp3
 function startPurr(){
   stopLoop();
-  if(!audioCtx)return;
-  const o=audioCtx.createOscillator();
-  const g=audioCtx.createGain();
-  const lfo=audioCtx.createOscillator();
-  const lfoG=audioCtx.createGain();
-  o.type='sine';o.frequency.value=28;
-  lfo.type='sine';lfo.frequency.value=22;
-  lfoG.gain.value=15;
-  lfo.connect(lfoG).connect(o.frequency);
-  g.gain.value=0.07;
-  o.connect(g).connect(audioCtx.destination);
-  o.start();lfo.start();
-  loopSrc={stop:()=>{try{o.stop();lfo.stop()}catch(e){}}};
+  const a=new Audio('purr.mp3');a.loop=true;a.volume=0.5;a.play().catch(()=>{});
+  loopSrc={stop:()=>{a.pause();a.currentTime=0}};
 }
 
-// 코자는 소리 (긍정2) — 느린 호흡 노이즈
+// 코자는 소리 (긍정2) — mp3
 function startSnore(){
   stopLoop();
-  if(!audioCtx)return;
-  const bufSize=audioCtx.sampleRate*2;
-  const buf=audioCtx.createBuffer(1,bufSize,audioCtx.sampleRate);
-  const d=buf.getChannelData(0);
-  let last=0;
-  for(let i=0;i<bufSize;i++){last=(last+0.01*(Math.random()*2-1))/1.01;d[i]=last*2}
-  const src=audioCtx.createBufferSource();
-  src.buffer=buf;src.loop=true;
-  const lfo=audioCtx.createOscillator();
-  const lfoG=audioCtx.createGain();
-  lfo.type='sine';lfo.frequency.value=0.5;
-  lfoG.gain.value=0.06;
-  const g=audioCtx.createGain();g.gain.value=0;
-  lfo.connect(lfoG).connect(g.gain);
-  const bp=audioCtx.createBiquadFilter();
-  bp.type='bandpass';bp.frequency.value=200;bp.Q.value=2;
-  src.connect(bp).connect(g).connect(audioCtx.destination);
-  src.start();lfo.start();
-  loopSrc={stop:()=>{try{src.stop();lfo.stop()}catch(e){}}};
+  const a=new Audio('snore.mp3');a.loop=true;a.volume=0.4;a.play().catch(()=>{});
+  loopSrc={stop:()=>{a.pause();a.currentTime=0}};
 }
 
-// 그루밍 소리 (분노1) — 츄웁츕 반복
+// 그루밍 소리 (분노1) — 합성 츄웁츕
 function startGroom(){
   stopLoop();
   if(!audioCtx)return;
   let running=true;
   function tick(){
     if(!running)return;
-    const o=audioCtx.createOscillator();
-    const g=audioCtx.createGain();
-    o.type='sawtooth';o.frequency.value=800+Math.random()*400;
-    g.gain.value=0;
-    o.connect(g).connect(audioCtx.destination);
-    const t=audioCtx.currentTime;
-    g.gain.linearRampToValueAtTime(0.06,t+0.02);
-    g.gain.linearRampToValueAtTime(0,t+0.08);
-    o.start(t);o.stop(t+0.1);
-    setTimeout(tick,200+Math.random()*300);
+    // 짧은 "츕" 소리 — 입술 소리 시뮬레이션
+    const bufSize=Math.floor(audioCtx.sampleRate*0.06);
+    const buf=audioCtx.createBuffer(1,bufSize,audioCtx.sampleRate);
+    const d=buf.getChannelData(0);
+    for(let i=0;i<bufSize;i++){
+      const env=Math.exp(-i/(bufSize*0.15));
+      d[i]=(Math.random()*2-1)*0.3*env;
+    }
+    const src=audioCtx.createBufferSource();src.buffer=buf;
+    const bp=audioCtx.createBiquadFilter();bp.type='bandpass';bp.frequency.value=2500+Math.random()*1500;bp.Q.value=3;
+    const g=audioCtx.createGain();g.gain.value=0.12;
+    src.connect(bp).connect(g).connect(audioCtx.destination);
+    src.start();
+    setTimeout(tick,150+Math.random()*200);
   }
   tick();
   loopSrc={stop:()=>{running=false}};
 }
 
-// 하악 소리 (분노2) — 한 번
+// 하악 소리 (분노2) — mp3
 function playHiss(){
-  if(!audioCtx)return;
-  const bufSize=audioCtx.sampleRate*0.5;
-  const buf=audioCtx.createBuffer(1,bufSize,audioCtx.sampleRate);
-  const d=buf.getChannelData(0);
-  for(let i=0;i<bufSize;i++){
-    const env=1-i/bufSize;
-    d[i]=(Math.random()*2-1)*0.4*env;
-  }
-  const src=audioCtx.createBufferSource();src.buffer=buf;
-  const hp=audioCtx.createBiquadFilter();hp.type='highpass';hp.frequency.value=2000;
-  const g=audioCtx.createGain();g.gain.value=0.25;
-  src.connect(hp).connect(g).connect(audioCtx.destination);
-  src.start();
+  const a=new Audio('hiss.mp3');a.volume=0.6;a.play().catch(()=>{});
 }
 
 function stopLoop(){
@@ -362,10 +326,10 @@ function onPetMove(x,y){
   if(petStrokes%4===0)spawnFur(x,y);
 
   if(petSpeed>2.5){
-    mood=Math.max(0,mood-0.8);
-    if(petStrokes%8===0)spawnParticle(x,y,'💢',true);
+    mood=Math.max(0,mood-1.2);
+    if(petStrokes%6===0)spawnParticle(x,y,'💢',true);
   }else if(petSpeed>=0.15){
-    const bonus=(petSpeed>=0.3&&petSpeed<=1.8)?1.3:0.5;
+    const bonus=(petSpeed>=0.3&&petSpeed<=1.8)?0.9:0.35;
     mood=Math.min(100,mood+bonus);
     if(petStrokes%10===0)spawnParticle(x,y,mood>=TH.happy1?'💕':'❤️',false);
     if(petStrokes%8===0)addScore(1);
@@ -381,34 +345,34 @@ function onPetEnd(){if(!petting)return;petting=false;catWrap.classList.remove('p
 function startMoodDecay(){
   moodDecayTimer=setInterval(()=>{
     if(!gameActive)return;
-    if(!petting){mood=Math.max(0,mood-0.15);const ns=getStateFromMood(mood);setState(ns);updateMoodUI()}
+    if(!petting){mood=Math.max(0,mood-0.4);const ns=getStateFromMood(mood);setState(ns);updateMoodUI()}
   },200);
   scheduleRandomEvent();
 }
 function scheduleRandomEvent(){
   if(!gameActive)return;
-  moodEventTimer=setTimeout(()=>{if(!gameActive)return;triggerRandomEvent();scheduleRandomEvent()},3000+Math.random()*4000);
+  moodEventTimer=setTimeout(()=>{if(!gameActive)return;triggerRandomEvent();scheduleRandomEvent()},1500+Math.random()*2500);
 }
 function triggerRandomEvent(){
   const roll=Math.random();
   const r=catWrap.getBoundingClientRect();
   const px=r.left+r.width/2+(Math.random()-0.5)*60;
   const py=r.top+r.height*0.3;
-  if(roll<0.35){
-    mood=Math.max(0,mood-(12+Math.random()*10));
+  if(roll<0.45){
+    mood=Math.max(0,mood-(18+Math.random()*12));
     spawnParticle(px,py,'😾',true);
     statusEl.textContent='도동이가 갑자기 짜증!';statusEl.style.color='#ef4444';
     catWrap.classList.add('shake');setTimeout(()=>catWrap.classList.remove('shake'),400);
-  }else if(roll<0.55){
-    mood=Math.min(100,mood+(10+Math.random()*8));
-    spawnParticle(px,py,'😻',false);addScore(3);
+  }else if(roll<0.58){
+    mood=Math.min(100,mood+(8+Math.random()*6));
+    spawnParticle(px,py,'😻',false);addScore(2);
     statusEl.textContent='도동이가 갑자기 기분 좋아!';statusEl.style.color='#22c55e';
-  }else if(roll<0.7){
-    mood=Math.max(0,mood-(8+Math.random()*6));
-    spawnParticle(px,py,'🐾',true);addScore(-2);
+  }else if(roll<0.75){
+    mood=Math.max(0,mood-(10+Math.random()*8));
+    spawnParticle(px,py,'🐾',true);addScore(-3);
     statusEl.textContent='도동이가 그루밍 시작...';statusEl.style.color='#f59e0b';
-  }else if(roll<0.85){
-    mood=Math.max(0,mood-5);
+  }else if(roll<0.9){
+    mood=Math.max(0,mood-8);
     statusEl.textContent='도동이가 뭔가 불안해해요';statusEl.style.color='#f59e0b';
   }else{
     spawnParticle(px,py,'💤',false);
