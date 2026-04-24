@@ -319,30 +319,58 @@ function enterState(s){
     comboStrokes=0;
     // 일정 시간 후 안전으로 복귀 (쓰다듬지 않으면)
     clearTimeout(dangerGraceTimer);
-    const grace=1500+Math.random()*2000;
+    const elapsed=(Date.now()-gameStartTime)/1000;
+    const grace=2500+Math.random()*2500-Math.min(elapsed*30,1500); // 2.5~5초, 시간 지나면 줄어듦
+    const actualGrace=Math.max(1500,grace);
     dangerGraceTimer=setTimeout(()=>{
       if(!gameActive||currentState!=='angry1')return;
       if(!petting)enterState('default');
       else gameOver(); // 아직도 쓰다듬고 있으면 게임오버
-    },grace);
+    },actualGrace);
   }else if(s==='angry2'){
     gameOver();
   }
 }
 
-/* ======= Danger scheduling — 핵심 긴장감 ======= */
+/* ======= Danger scheduling — 읽을 수 있는 긴장감 ======= */
+let warningTimer=null;
+
 function scheduleNextDanger(){
-  clearTimeout(stateTimer);
+  clearTimeout(stateTimer);clearTimeout(warningTimer);
   if(!gameActive)return;
-  // 시간 지날수록 더 자주 째려봄
+  // 시간 지날수록 안전 구간이 줄어듦 (but 최소 3초는 보장)
   const elapsed=(Date.now()-gameStartTime)/1000;
-  const minDelay=Math.max(1200, 4000-elapsed*80); // 점점 짧아짐
-  const maxDelay=Math.max(2500, 7000-elapsed*100);
-  const delay=minDelay+Math.random()*(maxDelay-minDelay);
+  const minSafe=Math.max(3000, 6000-elapsed*40);
+  const maxSafe=Math.max(5000, 12000-elapsed*60);
+  const safeTime=minSafe+Math.random()*(maxSafe-minSafe);
+
+  // 째려보기 1초 전에 경고 (도동이 미세 떨림 + 상태 표시 변화)
+  warningTimer=setTimeout(()=>{
+    if(!gameActive||currentState==='angry1')return;
+    // 예고: 살짝 불안한 표시
+    stateInd.className='state-indicator danger';stateInd.textContent='...?';
+    statusEl.textContent='도동이가 뭔가 느끼고 있어요...';statusEl.style.color='#f59e0b';
+    catWrap.style.transition='transform .1s';
+    catWrap.style.transform='rotate(-1deg)';
+    setTimeout(()=>{if(catWrap.style.transform==='rotate(-1deg)')catWrap.style.transform='rotate(0.5deg)'},150);
+    // 경고음
+    if(audioCtx){
+      const o=audioCtx.createOscillator();const g=audioCtx.createGain();
+      o.type='sine';o.frequency.value=400;g.gain.value=0;
+      o.connect(g).connect(audioCtx.destination);
+      const t=audioCtx.currentTime;
+      g.gain.linearRampToValueAtTime(0.04,t+0.05);
+      g.gain.linearRampToValueAtTime(0,t+0.3);
+      o.start(t);o.stop(t+0.3);
+    }
+  }, safeTime-1000);
+
+  // 실제 째려보기 전환
   stateTimer=setTimeout(()=>{
     if(!gameActive)return;
+    catWrap.style.transform='';
     enterState('angry1');
-  },delay);
+  },safeTime);
 }
 
 /* ======= Petting ======= */
@@ -387,10 +415,10 @@ function onPetMove(x,y){
     spawnEmoji(x,y,multiplier>=2?'💕':'❤️');
   }
 
-  // 긍정 단계 전이
-  if(currentState==='default'&&comboStrokes>80){
+  // 긍정 단계 전이 — 충분히 쓰다듬어야 올라감
+  if(currentState==='default'&&comboStrokes>150){
     enterState('happy1');
-  }else if(currentState==='happy1'&&comboStrokes>200){
+  }else if(currentState==='happy1'&&comboStrokes>350){
     enterState('happy2');
   }
 }
@@ -406,7 +434,8 @@ function onPetEnd(){
 function gameOver(){
   gameActive=false;petting=false;
   catWrap.classList.remove('petting','danger-mode');
-  clearTimeout(stateTimer);clearTimeout(dangerGraceTimer);
+  catWrap.style.transform='';
+  clearTimeout(stateTimer);clearTimeout(dangerGraceTimer);clearTimeout(warningTimer);
   stopLoop();
 
   // 임팩트!
@@ -433,7 +462,7 @@ function gameOver(){
 function startGame(){
   score=0;comboStrokes=0;multiplier=1;currentState='';gameActive=true;
   gameStartTime=Date.now();
-  clearTimeout(stateTimer);clearTimeout(dangerGraceTimer);stopLoop();
+  clearTimeout(stateTimer);clearTimeout(dangerGraceTimer);clearTimeout(warningTimer);stopLoop();
   scoreEl.textContent='0';scoreEl.classList.remove('hot');
   multEl.textContent='x1';multEl.className='mult';
   startOverlay.classList.add('hidden');
