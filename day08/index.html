@@ -217,7 +217,11 @@ function playLoop(file,vol){
   const a=new Audio(file);a.loop=true;a.volume=vol||0.4;a.play().catch(()=>{});
   loopAudio=a;
 }
-function playHiss(){const a=new Audio('hiss.mp3');a.volume=0.7;a.play().catch(()=>{})}
+const hissSounds=['hiss.mp3','hiss_growl1.mp3','hiss_growl2.mp3','hiss_complain.mp3'];
+function playHiss(){
+  const file=hissSounds[Math.floor(Math.random()*hissSounds.length)];
+  const a=new Audio(file);a.volume=0.8;a.play().catch(()=>{});
+}
 function playGroom(){
   ensureAudio();if(!audioCtx)return;
   for(let i=0;i<3;i++){
