@@ -7,12 +7,12 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-html,body{min-height:100%}
+html,body{min-height:100%;overflow-x:hidden}
 body{
-  background:#fff;
+  background:#fafaf7;
   font-family:'Pretendard',-apple-system,sans-serif;
-  color:#000;
-  padding:80px 24px 120px;
+  color:#111;
+  padding:80px 24px 180px;
   -webkit-font-smoothing:antialiased;
 }
 
@@ -23,109 +23,91 @@ h1.head{
   font-size:clamp(28px,4.4vw,44px);
   letter-spacing:-0.03em;
   line-height:1.25;
-  margin-bottom:48px;
+  margin-bottom:40px;
   cursor:text;
+}
+
+.meta{
+  font-size:11px;
+  letter-spacing:2px;
+  color:rgba(0,0,0,0.4);
+  text-transform:uppercase;
+  margin-bottom:56px;
+  font-weight:500;
 }
 
 article{
   font-size:15px;
-  line-height:1.85;
+  line-height:1.95;
   letter-spacing:-0.005em;
   color:#111;
 }
 article p{margin-bottom:1.3em}
 article p:last-child{margin-bottom:0}
 
-/* ======= Collected chips (stacked bricks) ======= */
-.chips-wrap{
-  margin-top:80px;
-  padding-top:40px;
-  border-top:1px solid rgba(0,0,0,0.08);
-  position:relative;
-}
-.chips-label{
-  font:500 11px/1 monospace;
-  letter-spacing:3px;
-  color:rgba(0,0,0,0.4);
-  text-transform:uppercase;
-  margin-bottom:20px;
-  display:flex;align-items:center;gap:10px;
-}
-.chips-label .count{
-  display:inline-flex;align-items:center;justify-content:center;
-  min-width:22px;height:22px;padding:0 7px;
-  background:#000;color:#fff;border-radius:100px;
-  font:600 11px/1 monospace;letter-spacing:0.5px;
-}
-.chips{
-  display:flex;flex-wrap:wrap;gap:6px;align-items:flex-start;
-}
-.chip{
-  font-family:'Pretendard',-apple-system,sans-serif;
-  font-weight:900;
-  font-size:clamp(20px,3.2vw,34px);
-  letter-spacing:-0.02em;
-  line-height:1.1;
-  color:#000;
-  padding:10px 14px 12px;
-  border:none;
-  cursor:pointer;
-  user-select:none;
-  animation:chipIn .22s cubic-bezier(.2,1.2,.3,1) both;
-  transition:transform .15s ease,filter .15s ease;
-  display:inline-block;
-  white-space:pre-wrap;
-  word-break:keep-all;
-  position:relative;
-}
-.chip:hover{transform:translateY(-2px) rotate(-0.5deg);filter:saturate(1.15)}
-.chip:active{transform:translateY(0) scale(0.98)}
-.chip::after{
-  content:'×';
-  position:absolute;top:-6px;right:-6px;
-  width:18px;height:18px;border-radius:50%;
-  background:#000;color:#fff;font-size:12px;font-weight:700;
-  display:flex;align-items:center;justify-content:center;
-  opacity:0;transition:opacity .15s ease;
-  pointer-events:none;
-}
-.chip:hover::after{opacity:1}
-.chip.round{
-  border-radius:100px;
-  padding:10px 18px 12px;
-}
-@keyframes chipIn{
-  from{opacity:0;transform:translateY(-4px) scale(0.92)}
-  to{opacity:1;transform:translateY(0) scale(1)}
-}
-
-/* Highlight layer sits on top of text but visually blends behind */
+/* Highlight layer: behind text, multiply blend */
 .hl-layer{
   position:absolute;inset:0;
   pointer-events:none;
   z-index:1;
-}
-.hl-layer rect{
   mix-blend-mode:multiply;
-  opacity:0.85;
 }
+.hl-layer rect{mix-blend-mode:multiply}
 
-/* Text stays above highlight visually via z-index stacking context */
 .wrap{position:relative}
-h1.head, article{position:relative;z-index:2}
+h1.head, article, .meta{position:relative;z-index:2}
 
-/* When dragging, prevent text selection flashing so experience is clean */
-body.drawing{
-  cursor:crosshair;
-  user-select:none;
-  -webkit-user-select:none;
+body.drawing{cursor:crosshair;user-select:none;-webkit-user-select:none}
+body.drawing *{cursor:crosshair!important}
+
+/* Physics box layer */
+.box-layer{
+  position:fixed;inset:0;
+  pointer-events:none; /* layer는 통과, 개별 박스만 잡힘 */
+  z-index:40;
+  overflow:hidden;
 }
-body.drawing h1.head,
-body.drawing article{cursor:crosshair}
+.drop-box{
+  position:absolute;left:0;top:0;
+  font-family:'Pretendard',-apple-system,sans-serif;
+  font-weight:800;
+  font-size:clamp(14px,1.8vw,18px);
+  letter-spacing:-0.015em;
+  line-height:1.2;
+  color:#111;
+  padding:7px 13px 8px;
+  white-space:nowrap;
+  max-width:min(520px,80vw);
+  overflow:hidden;
+  text-overflow:ellipsis;
+  box-shadow:0 3px 14px rgba(0,0,0,0.12),0 1px 3px rgba(0,0,0,0.08);
+  will-change:transform;
+  transform-origin:50% 50%;
+  user-select:none;
+  animation:boxPop .2s ease-out both;
+  border-radius:3px;
+  cursor:grab;
+  pointer-events:auto;
+}
+.drop-box.round{border-radius:100px;padding:7px 16px 8px}
+.drop-box.dragging{cursor:grabbing;box-shadow:0 8px 30px rgba(0,0,0,0.22),0 2px 6px rgba(0,0,0,0.10);z-index:50}
+@keyframes boxPop{0%{opacity:0}100%{opacity:1}}
 
-/* ======= Palette (fixed bottom) ======= */
+/* 원문 반짝 */
+@keyframes flashLine{
+  0%{background:rgba(255,240,0,0.45)}
+  100%{background:transparent}
+}
+.flash-target{
+  background:transparent;
+  animation:flashLine 1.3s ease-out;
+  border-radius:3px;
+  padding:0 2px;margin:0 -2px;
+}
+
+/* Palette */
 .palette{
-  position:fixed;bottom:20px;left:50%;transform:translateX(-50%);
+  position:fixed;bottom:24px;left:50%;transform:translateX(-50%);
   display:flex;gap:10px;align-items:center;
   padding:10px 14px;
   background:rgba(255,255,255,0.95);
@@ -133,92 +115,84 @@ body.drawing article{cursor:crosshair}
   border-radius:100px;
   box-shadow:0 4px 20px rgba(0,0,0,0.08),0 1px 3px rgba(0,0,0,0.05);
   backdrop-filter:blur(10px);
+  -webkit-backdrop-filter:blur(10px);
   z-index:100;
 }
 .color-btn{
-  width:30px;height:30px;
-  border-radius:50%;
-  border:2px solid rgba(0,0,0,0.06);
-  cursor:pointer;
-  transition:transform 0.15s ease,border-color 0.15s ease;
-  padding:0;
+  width:30px;height:30px;border-radius:50%;
+  border:2px solid rgba(0,0,0,0.08);cursor:pointer;
+  transition:transform .15s,border-color .15s,box-shadow .15s;padding:0;
 }
 .color-btn:hover{transform:scale(1.1)}
 .color-btn.active{
-  border-color:#000;
-  transform:scale(1.15);
+  border-color:#111;transform:scale(1.15);
   box-shadow:0 0 0 3px rgba(0,0,0,0.08);
 }
-.divider{
-  width:1px;height:22px;
-  background:rgba(0,0,0,0.1);
-  margin:0 4px;
-}
+.divider{width:1px;height:22px;background:rgba(0,0,0,0.1);margin:0 4px}
 .tool-btn{
-  width:32px;height:32px;
-  border-radius:50%;
-  border:2px solid rgba(0,0,0,0.06);
-  background:#fff;
-  cursor:pointer;
+  width:32px;height:32px;border-radius:50%;
+  border:2px solid rgba(0,0,0,0.08);background:#fff;cursor:pointer;
   display:flex;align-items:center;justify-content:center;
-  transition:all 0.15s ease;
-  padding:0;
+  transition:all .15s;padding:0;
 }
 .tool-btn:hover{background:#f5f5f5;transform:scale(1.08)}
-.tool-btn.active{
-  border-color:#000;
-  background:#000;color:#fff;
-}
+.tool-btn.active{border-color:#111;background:#111;color:#fff}
 .tool-btn svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 
 .day-tag{
   position:fixed;bottom:14px;right:18px;
-  font:11px/1 monospace;
-  color:rgba(0,0,0,0.35);
-  letter-spacing:1px;
-  pointer-events:none;
-  z-index:99;
+  font:11px/1 monospace;color:rgba(0,0,0,0.35);
+  letter-spacing:1px;pointer-events:none;z-index:99;
 }
 .hint{
-  position:fixed;top:14px;right:18px;
-  font:10px/1.4 monospace;
-  color:rgba(0,0,0,0.35);
-  letter-spacing:2px;
-  text-align:right;
-  pointer-events:none;
-  z-index:99;
+  position:fixed;top:16px;right:18px;
+  font:10px/1.4 monospace;color:rgba(0,0,0,0.35);
+  letter-spacing:2px;text-align:right;pointer-events:none;z-index:99;
 }
 
-/* Back-to-archive */
+/* Counter */
+.counter{
+  position:fixed;top:46px;right:18px;
+  font:500 12px/1 'Pretendard',-apple-system,sans-serif;
+  color:rgba(0,0,0,0.55);
+  letter-spacing:-0.01em;
+  pointer-events:none;z-index:99;
+  display:flex;align-items:baseline;gap:3px;
+}
+.counter .c-num{
+  font-weight:800;font-size:14px;color:#111;
+  font-variant-numeric:tabular-nums;
+  transition:transform .18s cubic-bezier(.2,.8,.2,1);
+}
+.counter .c-num.bump{transform:translateY(-2px)}
+.counter .c-lbl{color:rgba(0,0,0,0.4);margin-right:4px}
+.counter .c-dot{color:rgba(0,0,0,0.25);margin:0 3px}
+
+/* Back */
 .back-to-archive{
   position:fixed;top:16px;left:16px;z-index:9999;
   display:inline-flex;align-items:center;gap:6px;
   padding:8px 14px 8px 12px;
-  background:rgba(255,255,255,0.9);
-  color:#111;
+  background:rgba(255,255,255,0.9);color:#111;
   font:500 12px/1 -apple-system,'Pretendard','SF Pro Text',sans-serif;
-  letter-spacing:-0.01em;
-  text-decoration:none;
-  border:1px solid rgba(0,0,0,0.08);
-  border-radius:100px;
+  letter-spacing:-0.01em;text-decoration:none;
+  border:1px solid rgba(0,0,0,0.08);border-radius:100px;
   box-shadow:0 2px 8px rgba(0,0,0,0.12),0 1px 2px rgba(0,0,0,0.06);
-  backdrop-filter:blur(10px);
-  -webkit-backdrop-filter:blur(10px);
-  transition:background 0.2s ease,transform 0.2s ease,box-shadow 0.2s ease;
-  user-select:none;
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  transition:background .2s,transform .2s,box-shadow .2s;user-select:none;
 }
 .back-to-archive:hover{
-  background:#fff;
-  transform:translateX(-2px);
+  background:#fff;transform:translateX(-2px);
   box-shadow:0 4px 12px rgba(0,0,0,0.18),0 2px 4px rgba(0,0,0,0.08);
 }
-.back-to-archive svg{flex:none;transition:transform 0.2s ease;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.back-to-archive svg{flex:none;transition:transform .2s;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .back-to-archive:hover svg{transform:translateX(-2px)}
 
 @media(max-width:640px){
-  body{padding:70px 20px 100px}
-  h1.head{font-size:28px;margin-bottom:36px}
-  article{font-size:14px;line-height:1.8}
+  body{padding:70px 20px 140px}
+  h1.head{font-size:28px;margin-bottom:28px}
+  .meta{margin-bottom:40px}
+  article{font-size:14px;line-height:1.85}
   .palette{gap:8px;padding:8px 12px}
   .color-btn{width:26px;height:26px}
   .tool-btn{width:28px;height:28px}
@@ -236,6 +210,7 @@ body.drawing article{cursor:crosshair}
   <svg class="hl-layer" id="hlLayer" xmlns="http://www.w3.org/2000/svg"></svg>
 
   <h1 class="head">아이들이 세상을<br>바라보는 방법에 대한 탐색</h1>
+  <div class="meta">영화 &lt;아무도 모른다&gt; / 고레에다 히로카즈</div>
 
   <article id="article">
     <p>어쩌면 이 영화가 그 제목을 통해 말하려 했던 것은, 아이들의 존재와 생존을 위한 몸부림을 '아무도 몰랐던' 어른-사회의 무책임에 대한 반성의 촉구 같은 것이 아닐지도 모른다. 정작 아무도 몰랐던 것 그리고 지금까지도 아무도 잘 모르고 있는 것은, 그 아이들이 보여준 놀라운 삶에의 의지와 삶의 감각(감독은 그것을 "삶의 리얼리티를 느낄 수 있는 육체적인 기억"이라고 표현한다)일 것이라고, 영화는 말한다.</p>
@@ -250,23 +225,17 @@ body.drawing article{cursor:crosshair}
 
     <p>다음과 같은 고레에다 감독의 진심어린 연출의 변은, 그 새로움을 찾는 모든 감독들이 스스로에게 던지는 질문이자 다짐일 것이다. "소년의 옆에서 어깨를 다독여주고자 했다. 안아주는 건 안 된다… 나도 카메라도 거리를 유지할 필요가 있었다."</p>
   </article>
-
-  <section class="chips-wrap" id="chipsWrap" hidden>
-    <div class="chips-label">
-      <span>Collected</span>
-      <span class="count" id="chipCount">0</span>
-    </div>
-    <div class="chips" id="chips"></div>
-  </section>
 </div>
 
+<div class="box-layer" id="boxLayer"></div>
+
 <div class="palette" id="palette">
-  <button class="color-btn active" data-color="#7ef9ff" style="background:#7ef9ff" aria-label="시안"></button>
-  <button class="color-btn" data-color="#fff176" style="background:#fff176" aria-label="노랑"></button>
-  <button class="color-btn" data-color="#b5ff9e" style="background:#b5ff9e" aria-label="연두"></button>
-  <button class="color-btn" data-color="#ff9ec7" style="background:#ff9ec7" aria-label="핑크"></button>
-  <button class="color-btn" data-color="#ffb570" style="background:#ffb570" aria-label="주황"></button>
-  <button class="color-btn" data-color="#c9a7ff" style="background:#c9a7ff" aria-label="보라"></button>
+  <button class="color-btn active" data-color="#fff566" style="background:#fff566" aria-label="노랑"></button>
+  <button class="color-btn" data-color="#a7f3c8" style="background:#a7f3c8" aria-label="민트"></button>
+  <button class="color-btn" data-color="#9fd8ff" style="background:#9fd8ff" aria-label="하늘"></button>
+  <button class="color-btn" data-color="#ffb3d1" style="background:#ffb3d1" aria-label="핑크"></button>
+  <button class="color-btn" data-color="#ffc78a" style="background:#ffc78a" aria-label="주황"></button>
+  <button class="color-btn" data-color="#d4b5ff" style="background:#d4b5ff" aria-label="보라"></button>
   <div class="divider"></div>
   <button class="tool-btn" id="eraseBtn" aria-label="지우개">
     <svg viewBox="0 0 24 24"><path d="M20 20H9l-5-5a1 1 0 0 1 0-1.4L14.5 3a1 1 0 0 1 1.4 0l5 5a1 1 0 0 1 0 1.4L11 20"/><path d="M22 20h-6"/></svg>
@@ -279,22 +248,234 @@ body.drawing article{cursor:crosshair}
 <div class="hint">DRAG to highlight</div>
 <div class="day-tag">day 07 / typo-vibe</div>
 
+<div class="counter" id="counter" aria-live="polite">
+  <span class="c-num" id="cSent">0</span><span class="c-lbl">줄</span>
+  <span class="c-dot">·</span>
+  <span class="c-num" id="cChar">0</span><span class="c-lbl">자</span>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/matter-js@0.19.0/build/matter.min.js"></script>
 <script>
+/* day 07 — 블록형 형광펜 + 떨어지는 문장 박스 + 집어던지기 + 카운터 + 사운드 */
+
 const wrap=document.getElementById('wrap');
+const cSent=document.getElementById('cSent');
+const cChar=document.getElementById('cChar');
 const hlLayer=document.getElementById('hlLayer');
 const palette=document.getElementById('palette');
 const eraseBtn=document.getElementById('eraseBtn');
 const clearBtn=document.getElementById('clearBtn');
-const chipsSection=document.getElementById('chipsWrap');
-const chipsEl=document.getElementById('chips');
-const chipCountEl=document.getElementById('chipCount');
+const boxLayer=document.getElementById('boxLayer');
 
-let currentColor='#7ef9ff';
+let currentColor='#fff566';
 let eraseMode=false;
-let lastRangeText=''; // updated during drag for commit on mouseup
 let stripeId=0;
 
-// === PALETTE ===
+/* ======= Counter ======= */
+let sentCount=0, charCount=0;
+function bump(el){el.classList.remove('bump');void el.offsetWidth;el.classList.add('bump')}
+function updateCounter(newChars){
+  sentCount++;charCount+=newChars;
+  cSent.textContent=sentCount;cChar.textContent=charCount;
+  bump(cSent);bump(cChar);
+}
+function resetCounter(){sentCount=0;charCount=0;cSent.textContent='0';cChar.textContent='0'}
+
+/* ======= Sound (사각사각 마커 소리) ======= */
+let audioCtx=null,noiseBuffer=null,activeNoise=null;
+function ensureAudio(){
+  if(audioCtx)return;
+  const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return;
+  audioCtx=new AC();
+  const bufferSize=audioCtx.sampleRate*1.5;
+  noiseBuffer=audioCtx.createBuffer(1,bufferSize,audioCtx.sampleRate);
+  const out=noiseBuffer.getChannelData(0);
+  let lastOut=0;
+  for(let i=0;i<bufferSize;i++){
+    const white=Math.random()*2-1;
+    lastOut=(lastOut+(0.02*white))/1.02;
+    out[i]=lastOut*3.0;
+  }
+}
+function startScratch(){
+  if(!audioCtx||!noiseBuffer||activeNoise)return;
+  const src=audioCtx.createBufferSource();
+  src.buffer=noiseBuffer;src.loop=true;
+  const bp=audioCtx.createBiquadFilter();
+  bp.type='bandpass';bp.frequency.value=1700;bp.Q.value=0.9;
+  const hp=audioCtx.createBiquadFilter();
+  hp.type='highpass';hp.frequency.value=600;
+  const gain=audioCtx.createGain();gain.gain.value=0;
+  src.connect(bp).connect(hp).connect(gain).connect(audioCtx.destination);
+  gain.gain.linearRampToValueAtTime(0.05,audioCtx.currentTime+0.04);
+  src.start();activeNoise={src,gain,bp};
+}
+function modulateScratch(speed){
+  if(!activeNoise)return;
+  const t=audioCtx.currentTime;
+  const g=Math.min(0.12,0.02+speed*0.18);
+  activeNoise.gain.gain.linearRampToValueAtTime(g,t+0.03);
+  activeNoise.bp.frequency.linearRampToValueAtTime(1400+speed*1200,t+0.03);
+}
+function stopScratch(){
+  if(!activeNoise)return;
+  const {src,gain}=activeNoise;
+  const t=audioCtx.currentTime;
+  gain.gain.cancelScheduledValues(t);
+  gain.gain.linearRampToValueAtTime(0,t+0.12);
+  setTimeout(()=>{try{src.stop()}catch(e){}},160);
+  activeNoise=null;
+}
+function clickTick(){
+  if(!audioCtx)return;
+  const o=audioCtx.createOscillator();const g=audioCtx.createGain();
+  o.type='sine';o.frequency.value=520;g.gain.value=0;
+  o.connect(g).connect(audioCtx.destination);
+  const t=audioCtx.currentTime;
+  g.gain.linearRampToValueAtTime(0.08,t+0.005);
+  g.gain.linearRampToValueAtTime(0,t+0.09);
+  o.start(t);o.stop(t+0.1);
+}
+
+/* Matter.js */
+const {Engine,World,Bodies,Body,Mouse,MouseConstraint,Events}=Matter;
+const engine=Engine.create();
+engine.gravity.y=1.1;
+const world=engine.world;
+
+let ground,leftWall,rightWall;
+function buildWalls(){
+  if(ground)World.remove(world,[ground,leftWall,rightWall]);
+  const w=window.innerWidth,h=window.innerHeight;
+  const t=400;
+  ground=Bodies.rectangle(w/2,h+t/2-6,w*2,t,{isStatic:true,friction:0.9,restitution:0.05});
+  leftWall=Bodies.rectangle(-t/2,h/2,t,h*4,{isStatic:true});
+  rightWall=Bodies.rectangle(w+t/2,h/2,t,h*4,{isStatic:true});
+  World.add(world,[ground,leftWall,rightWall]);
+}
+buildWalls();
+window.addEventListener('resize',buildWalls);
+
+const boxes=[];
+const byBodyId=new Map();
+
+function addDropBox(text,color,originRect){
+  const el=document.createElement('div');
+  el.className='drop-box';
+  if([...text].length<=6)el.classList.add('round');
+  el.style.background=color;
+  el.textContent=text;
+  el.style.transform='translate(-9999px,-9999px)';
+  boxLayer.appendChild(el);
+
+  const rect=el.getBoundingClientRect();
+  const w=Math.max(40,rect.width);
+  const h=Math.max(24,rect.height);
+
+  let cx=window.innerWidth/2, cy=120;
+  if(originRect){
+    cx=originRect.left+originRect.width/2;
+    cy=originRect.top+originRect.height/2;
+  }
+  cx=Math.max(w/2+8,Math.min(window.innerWidth-w/2-8,cx));
+
+  const body=Bodies.rectangle(cx,cy,w,h,{
+    restitution:0.18,friction:0.55,frictionAir:0.012,density:0.0016,
+    chamfer:{radius:4}
+  });
+  Body.setAngularVelocity(body,(Math.random()-0.5)*0.15);
+  Body.setVelocity(body,{x:(Math.random()-0.5)*2,y:1.5+Math.random()*1.5});
+  World.add(world,body);
+
+  const entry={
+    body,el,w,h,
+    srcRect: originRect?{x:originRect.left,y:window.scrollY+originRect.top,w:originRect.width,h:originRect.height}:null
+  };
+  boxes.push(entry);
+  byBodyId.set(body.id,entry);
+  bindBoxTap(entry);
+
+  if(boxes.length>60){
+    const old=boxes.shift();
+    byBodyId.delete(old.body.id);
+    World.remove(world,old.body);
+    old.el.remove();
+  }
+}
+
+/* 박스 "짧은 탭"이면 원문으로 스크롤, 드래그면 MouseConstraint가 처리 */
+function bindBoxTap(entry){
+  const {el}=entry;
+  let pressed=false,downX=0,downY=0,downT=0,moved=false;
+  const down=(x,y)=>{pressed=true;moved=false;downX=x;downY=y;downT=Date.now();el.classList.add('dragging')};
+  const moveCheck=(x,y)=>{if(pressed&&Math.hypot(x-downX,y-downY)>6)moved=true};
+  const upCheck=(x,y)=>{
+    if(!pressed)return;pressed=false;el.classList.remove('dragging');
+    const dt=Date.now()-downT,dist=Math.hypot(x-downX,y-downY);
+    if(!moved&&dist<6&&dt<260)scrollToSource(entry);
+  };
+  el.addEventListener('mousedown',(e)=>down(e.clientX,e.clientY));
+  el.addEventListener('touchstart',(e)=>{const t=e.touches[0];if(t)down(t.clientX,t.clientY)},{passive:true});
+  window.addEventListener('mousemove',(e)=>moveCheck(e.clientX,e.clientY),{passive:true});
+  window.addEventListener('touchmove',(e)=>{const t=e.touches[0];if(t)moveCheck(t.clientX,t.clientY)},{passive:true});
+  window.addEventListener('mouseup',(e)=>upCheck(e.clientX,e.clientY),{passive:true});
+  window.addEventListener('touchend',(e)=>{const t=e.changedTouches[0];if(t)upCheck(t.clientX,t.clientY)},{passive:true});
+}
+
+function scrollToSource(entry){
+  if(!entry.srcRect)return;
+  const targetY=entry.srcRect.y-window.innerHeight/3;
+  window.scrollTo({top:Math.max(0,targetY),behavior:'smooth'});
+  clickTick();
+  const wrapRect=wrap.getBoundingClientRect();
+  const pageWrapTop=window.scrollY+wrapRect.top;
+  const g=document.createElementNS('http://www.w3.org/2000/svg','g');
+  g.setAttribute('data-flash','1');
+  const r=document.createElementNS('http://www.w3.org/2000/svg','rect');
+  r.setAttribute('x',entry.srcRect.x-wrapRect.left);
+  r.setAttribute('y',entry.srcRect.y-pageWrapTop);
+  r.setAttribute('width',entry.srcRect.w);
+  r.setAttribute('height',entry.srcRect.h);
+  r.setAttribute('fill','#fff566');
+  r.setAttribute('rx',2);
+  r.style.transition='opacity 1.2s ease-out';
+  r.style.opacity='0.9';
+  g.appendChild(r);hlLayer.appendChild(g);
+  requestAnimationFrame(()=>{r.style.opacity='0'});
+  setTimeout(()=>g.remove(),1400);
+}
+
+/* ======= MouseConstraint — 박스 집어 던지기 ======= */
+const mouse=Mouse.create(document.body);
+if(mouse.mousewheel){
+  document.body.removeEventListener('wheel',mouse.mousewheel);
+  document.body.removeEventListener('DOMMouseScroll',mouse.mousewheel);
+}
+const mouseConstraint=MouseConstraint.create(engine,{
+  mouse,
+  constraint:{stiffness:0.2,damping:0.1,render:{visible:false}}
+});
+World.add(world,mouseConstraint);
+Events.on(mouseConstraint,'startdrag',(e)=>{
+  const b=e.body;if(!b)return;
+  const entry=byBodyId.get(b.id);if(entry)entry.el.classList.add('dragging');
+});
+Events.on(mouseConstraint,'enddrag',(e)=>{
+  const b=e.body;if(!b)return;
+  const entry=byBodyId.get(b.id);if(entry)entry.el.classList.remove('dragging');
+});
+
+(function loop(){
+  Engine.update(engine,1000/60);
+  for(const b of boxes){
+    const {x,y}=b.body.position;
+    const a=b.body.angle;
+    b.el.style.transform=`translate(${x-b.w/2}px,${y-b.h/2}px) rotate(${a}rad)`;
+  }
+  requestAnimationFrame(loop);
+})();
+
+/* Palette */
 palette.querySelectorAll('.color-btn').forEach(btn=>{
   btn.addEventListener('click',()=>{
     palette.querySelectorAll('.color-btn').forEach(b=>b.classList.remove('active'));
@@ -304,26 +485,24 @@ palette.querySelectorAll('.color-btn').forEach(btn=>{
     eraseBtn.classList.remove('active');
   });
 });
-
 eraseBtn.addEventListener('click',()=>{
   eraseMode=!eraseMode;
   eraseBtn.classList.toggle('active',eraseMode);
   if(eraseMode){
     palette.querySelectorAll('.color-btn').forEach(b=>b.classList.remove('active'));
   }else{
-    // reactivate current color
     const active=palette.querySelector(`.color-btn[data-color="${currentColor}"]`);
     if(active)active.classList.add('active');
   }
 });
-
 clearBtn.addEventListener('click',()=>{
   hlLayer.innerHTML='';
-  chipsEl.innerHTML='';
-  updateChipsVisibility();
+  for(const b of boxes){World.remove(world,b.body);b.el.remove()}
+  boxes.length=0;byBodyId.clear();
+  resetCounter();
 });
 
-// === RESIZE SVG LAYER ===
+/* Resize SVG layer */
 function resizeLayer(){
   const r=wrap.getBoundingClientRect();
   hlLayer.setAttribute('width',r.width);
@@ -332,14 +511,12 @@ function resizeLayer(){
 }
 resizeLayer();
 window.addEventListener('resize',resizeLayer);
-// Also refresh after web fonts settle
 if(document.fonts&&document.fonts.ready){document.fonts.ready.then(resizeLayer)}
+if(window.ResizeObserver){new ResizeObserver(resizeLayer).observe(wrap)}
 
-// === DRAG TO HIGHLIGHT ===
-let dragging=false;
-let startX=0,startY=0;
-let currentRect=null;
-let currentStripe=null; // for multi-line
+/* Drag to highlight */
+let dragging=false,startX=0,startY=0,currentStripe=null,lastRangeText='';
+let lastMoveTime=0,lastMoveX=0,lastMoveY=0;
 
 function mousePos(e){
   const r=wrap.getBoundingClientRect();
@@ -347,124 +524,75 @@ function mousePos(e){
   const y=(e.touches?e.touches[0].clientY:e.clientY)-r.top;
   return {x,y};
 }
-
-function shouldSkip(target){
-  return target.closest('.palette')||target.closest('.back-to-archive');
-}
+function shouldSkip(t){return t.closest('.palette')||t.closest('.back-to-archive')||t.closest('.drop-box')}
 
 function onDown(e){
   if(shouldSkip(e.target))return;
-  // Only start on primary button for mouse
   if(e.button!==undefined&&e.button!==0)return;
-
+  ensureAudio();
+  if(audioCtx&&audioCtx.state==='suspended')audioCtx.resume();
   const {x,y}=mousePos(e);
-  dragging=true;
-  startX=x;startY=y;
-  lastRangeText='';
+  dragging=true;startX=x;startY=y;lastRangeText='';
+  lastMoveTime=performance.now();lastMoveX=x;lastMoveY=y;
   currentStripe=document.createElementNS('http://www.w3.org/2000/svg','g');
   stripeId++;
   currentStripe.setAttribute('data-id','s'+stripeId);
   hlLayer.appendChild(currentStripe);
-
-  // Single rect to start (will grow)
-  currentRect=createRect(x,y,0,0);
-  currentStripe.appendChild(currentRect);
-
   document.body.classList.add('drawing');
+  if(!eraseMode)startScratch();
   e.preventDefault();
 }
-
 function onMove(e){
   if(!dragging)return;
   const {x,y}=mousePos(e);
   updateStripe(startX,startY,x,y);
-  e.preventDefault();
+  const now=performance.now();
+  const dt=Math.max(8,now-lastMoveTime);
+  const dd=Math.hypot(x-lastMoveX,y-lastMoveY);
+  const speed=Math.min(1,(dd/dt)*0.06);
+  modulateScratch(speed);
+  lastMoveTime=now;lastMoveX=x;lastMoveY=y;
+  // 마우스 이벤트에서만 기본동작 막음 (터치는 passive 경합 방지)
+  if(!e.touches)e.preventDefault();
 }
-
 function onUp(){
   if(!dragging)return;
   dragging=false;
   document.body.classList.remove('drawing');
+  stopScratch();
 
   if(eraseMode&&currentStripe){
-    // In erase mode: remove intersecting stripes (and their chips) then remove the eraser stripe itself
     const eraser=currentStripe.getBoundingClientRect();
-    const stripes=[...hlLayer.querySelectorAll(':scope > g')];
+    const stripes=[...hlLayer.querySelectorAll(':scope > g:not([data-flash])')];
     stripes.forEach(g=>{
       if(g===currentStripe)return;
       const br=g.getBoundingClientRect();
       const intersect=!(br.right<eraser.left||br.left>eraser.right||br.bottom<eraser.top||br.top>eraser.bottom);
-      if(intersect){
-        const id=g.getAttribute('data-id');
-        if(id){
-          const chip=chipsEl.querySelector(`.chip[data-id="${id}"]`);
-          if(chip)chip.remove();
-        }
-        g.remove();
-      }
+      if(intersect)g.remove();
     });
     currentStripe.remove();
   }else if(currentStripe){
-    // Commit chip for this highlight
     const text=cleanText(lastRangeText);
     if(text){
-      addChip(text,currentColor,currentStripe.getAttribute('data-id'));
-    }else{
-      // nothing meaningful captured — drop the empty stripe so we don't leave orphan marks
-      if(currentStripe.children.length===0)currentStripe.remove();
+      const br=currentStripe.getBoundingClientRect();
+      addDropBox(text,currentColor,br);
+      updateCounter([...text].length);
     }
+    if(currentStripe.children.length===0)currentStripe.remove();
   }
-
-  currentStripe=null;
-  currentRect=null;
-  lastRangeText='';
+  currentStripe=null;lastRangeText='';
 }
 
-function cleanText(s){
-  if(!s)return '';
-  return s.replace(/\s+/g,' ').trim();
-}
+function cleanText(s){return s?s.replace(/\s+/g,' ').trim():''}
 
-function addChip(text,color,linkedId){
-  const b=document.createElement('button');
-  b.className='chip';
-  // Shorter chips (< ~8 chars) get rounded pill look — matches the poster vibe
-  if([...text].length<=8)b.classList.add('round');
-  b.style.background=color;
-  b.textContent=text;
-  if(linkedId)b.setAttribute('data-id',linkedId);
-  b.title='클릭해서 삭제';
-  b.addEventListener('click',()=>{
-    const id=b.getAttribute('data-id');
-    b.remove();
-    if(id){
-      const g=hlLayer.querySelector(`g[data-id="${id}"]`);
-      if(g)g.remove();
-    }
-    updateChipsVisibility();
-  });
-  chipsEl.appendChild(b);
-  updateChipsVisibility();
-}
-
-function updateChipsVisibility(){
-  const n=chipsEl.children.length;
-  chipCountEl.textContent=n;
-  chipsSection.hidden=n===0;
-}
-
-// Build a rect-creating helper
 function createRect(x,y,w,h){
   const r=document.createElementNS('http://www.w3.org/2000/svg','rect');
-  const color=eraseMode?'rgba(0,0,0,0.08)':currentColor;
-  r.setAttribute('x',x);
-  r.setAttribute('y',y);
-  r.setAttribute('width',w);
-  r.setAttribute('height',h);
-  r.setAttribute('fill',color);
-  r.setAttribute('rx',2);
+  const color=eraseMode?'rgba(0,0,0,0.10)':currentColor;
+  r.setAttribute('x',x);r.setAttribute('y',y);
+  r.setAttribute('width',w);r.setAttribute('height',h);
+  r.setAttribute('fill',color);r.setAttribute('rx',1.5);
   if(eraseMode){
-    r.setAttribute('stroke','rgba(0,0,0,0.4)');
+    r.setAttribute('stroke','rgba(0,0,0,0.35)');
     r.setAttribute('stroke-dasharray','4 3');
     r.setAttribute('stroke-width','1');
     r.style.mixBlendMode='normal';
@@ -472,8 +600,6 @@ function createRect(x,y,w,h){
   return r;
 }
 
-// Use DOM Range to get exact rectangles for the dragged text.
-// Fallback: rough line-height based boxes if caret APIs aren't available.
 function caretFromPoint(cx,cy){
   if(document.caretPositionFromPoint){
     const p=document.caretPositionFromPoint(cx,cy);
@@ -488,96 +614,62 @@ function caretFromPoint(cx,cy){
 
 function updateStripe(x1,y1,x2,y2){
   while(currentStripe.firstChild)currentStripe.removeChild(currentStripe.firstChild);
-
   const wrapRect=wrap.getBoundingClientRect();
-  // Convert local wrap coords to viewport coords
   const v1={x:x1+wrapRect.left,y:y1+wrapRect.top};
   const v2={x:x2+wrapRect.left,y:y2+wrapRect.top};
-
   const a=caretFromPoint(v1.x,v1.y);
   const b=caretFromPoint(v2.x,v2.y);
 
-  // If we can't hit any text node (e.g., dragging empty margin), fall back.
   if(!a||!b||!isInsideContent(a.node)||!isInsideContent(b.node)){
-    drawFallbackRects(x1,y1,x2,y2,wrapRect);
-    return;
+    drawFallbackRects(x1,y1,x2,y2);return;
   }
-
-  // Order start/end by document position
   const range=document.createRange();
   try{
     const cmp=compareBoundary(a.node,a.offset,b.node,b.offset);
-    if(cmp<=0){
-      range.setStart(a.node,a.offset);
-      range.setEnd(b.node,b.offset);
-    }else{
-      range.setStart(b.node,b.offset);
-      range.setEnd(a.node,a.offset);
-    }
-  }catch(err){
-    drawFallbackRects(x1,y1,x2,y2,wrapRect);
-    return;
-  }
+    if(cmp<=0){range.setStart(a.node,a.offset);range.setEnd(b.node,b.offset)}
+    else{range.setStart(b.node,b.offset);range.setEnd(a.node,a.offset)}
+  }catch(err){drawFallbackRects(x1,y1,x2,y2);return}
 
-  // Keep the text in a module variable so we can commit on mouseup
   lastRangeText=range.toString();
-
-  // getClientRects() gives one rect per line fragment — exactly what we want
   const rects=range.getClientRects();
-  if(!rects.length){
-    drawFallbackRects(x1,y1,x2,y2,wrapRect);
-    return;
-  }
+  if(!rects.length){drawFallbackRects(x1,y1,x2,y2);return}
 
   for(const cr of rects){
     if(cr.width<1||cr.height<1)continue;
     const x=cr.left-wrapRect.left;
     const y=cr.top-wrapRect.top;
-    // Shrink vertically a touch so the highlight feels like a marker stripe, not a full block
-    const padY=Math.max(1,cr.height*0.08);
-    currentStripe.appendChild(createRect(x,y+padY,cr.width,cr.height-padY*2));
+    const extendY=cr.height*0.22;
+    currentStripe.appendChild(createRect(x,y-extendY*0.3,cr.width,cr.height+extendY));
   }
 }
 
 function isInsideContent(node){
   if(!node)return false;
   const el=node.nodeType===3?node.parentElement:node;
-  return !!(el&&(el.closest('article')||el.closest('h1.head')));
+  return !!(el&&(el.closest('article')||el.closest('h1.head')||el.closest('.meta')));
 }
-
 function compareBoundary(n1,o1,n2,o2){
-  // -1 if (n1,o1) < (n2,o2), 0 equal, 1 if greater
   if(n1===n2)return o1-o2;
   const pos=n1.compareDocumentPosition(n2);
   if(pos&Node.DOCUMENT_POSITION_FOLLOWING)return -1;
   if(pos&Node.DOCUMENT_POSITION_PRECEDING)return 1;
   return 0;
 }
-
-function drawFallbackRects(x1,y1,x2,y2,wrapRect){
-  // Minimal fallback: a single thin rect between drag points
+function drawFallbackRects(x1,y1,x2,y2){
   const left=Math.min(x1,x2);
   const top=Math.min(y1,y2);
   const w=Math.abs(x2-x1);
-  const h=Math.max(12,Math.abs(y2-y1));
+  const h=Math.max(14,Math.abs(y2-y1));
   currentStripe.appendChild(createRect(left,top,w,h));
 }
 
-// Events
 wrap.addEventListener('mousedown',onDown);
 window.addEventListener('mousemove',onMove);
 window.addEventListener('mouseup',onUp);
-
 wrap.addEventListener('touchstart',onDown,{passive:false});
 window.addEventListener('touchmove',onMove,{passive:false});
 window.addEventListener('touchend',onUp);
-
-// Prevent default text selection while we draw
-wrap.addEventListener('selectstart',(e)=>{
-  if(shouldSkip(e.target))return;
-  e.preventDefault();
-});
+wrap.addEventListener('selectstart',(e)=>{if(shouldSkip(e.target))return;e.preventDefault()});
 </script>
-
 </body>
 </html>
