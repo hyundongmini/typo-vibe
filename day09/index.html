@@ -11,7 +11,7 @@ html,body{height:100%;overflow:hidden}
 body{background:#080810;font-family:'Pretendard',sans-serif}
 #bg-text{
   position:fixed;inset:0;display:flex;flex-direction:column;
-  align-items:center;justify-content:center;z-index:1;pointer-events:none;
+  align-items:center;justify-content:center;z-index:3;pointer-events:none;
 }
 #bg-text .line{
   font-weight:800;color:rgba(255,255,255,0.45);
@@ -110,16 +110,16 @@ function createGlassMat(){
   return new THREE.MeshPhysicalMaterial({
     color:0xffffff,
     metalness:0.0,
-    roughness:0.0,
-    transmission:0.95,      // 투명도 (유리)
-    thickness:1.5,          // 유리 두께 (굴절 강도)
-    ior:1.5,                // 굴절률 (유리=1.5, 물=1.33)
-    envMapIntensity:2.0,    // 환경 반사 강도
-    clearcoat:1.0,          // 클리어코트 (광택 레이어)
+    roughness:0.02,
+    transmission:0.98,      // 거의 완전 투명
+    thickness:0.6,          // 얇게 — 더 투명하게
+    ior:1.4,                // 굴절률
+    envMapIntensity:1.5,
+    clearcoat:1.0,
     clearcoatRoughness:0.0,
     transparent:true,
-    opacity:0.9,
-    side:THREE.FrontSide,
+    opacity:0.35,           // 낮춰서 뒤 텍스트 비침
+    side:THREE.DoubleSide,
     depthWrite:false,
   });
 }
@@ -174,8 +174,8 @@ for(const d of blobData){
 
   const mat=createGlassMat();
   // Vary IOR slightly per blob
-  mat.ior=1.3+Math.random()*0.4;
-  mat.thickness=0.8+Math.random()*2.0;
+  mat.ior=1.2+Math.random()*0.3;
+  mat.thickness=0.3+Math.random()*0.8;
 
   const mesh=new THREE.Mesh(geo,mat);
   mesh.position.set(...d.pos);
@@ -198,7 +198,7 @@ const smallGeo=new THREE.SphereGeometry(1,12,12);
 const smalls=[];
 for(let i=0;i<50;i++){
   const mat=createGlassMat();
-  mat.transmission=0.8;mat.thickness=0.3;mat.opacity=0.5;
+  mat.transmission=0.95;mat.thickness=0.15;mat.opacity=0.25;
   const m=new THREE.Mesh(smallGeo,mat);
   const s=0.03+Math.random()*0.1;
   m.scale.set(s,s,s);
