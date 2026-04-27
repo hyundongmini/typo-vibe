@@ -8,21 +8,21 @@
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{height:100%;overflow:hidden}
-body{background:#f0ede8;font-family:'Pretendard',sans-serif}
+body{background:#0a0a0a;font-family:'Pretendard',sans-serif}
 canvas{position:fixed;inset:0;z-index:1;cursor:crosshair}
 .back-to-archive{
   position:fixed;top:16px;left:16px;z-index:9999;
   display:inline-flex;align-items:center;gap:6px;
   padding:8px 14px 8px 12px;
-  background:rgba(0,0,0,0.05);color:rgba(0,0,0,0.5);
+  background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.5);
   font:500 12px/1 'Pretendard',sans-serif;
-  text-decoration:none;border:1px solid rgba(0,0,0,0.06);border-radius:100px;
+  text-decoration:none;border:1px solid rgba(255,255,255,0.08);border-radius:100px;
   backdrop-filter:blur(10px);transition:background .2s,transform .2s;
 }
-.back-to-archive:hover{background:rgba(0,0,0,0.1);transform:translateX(-2px)}
+.back-to-archive:hover{background:rgba(255,255,255,0.12);transform:translateX(-2px)}
 .back-to-archive svg{flex:none;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-.day-tag{position:fixed;bottom:14px;right:18px;font:11px/1 monospace;color:rgba(0,0,0,0.15);pointer-events:none;z-index:99}
-.hint{position:fixed;bottom:36px;left:0;right:0;text-align:center;font:10px/1 monospace;color:rgba(0,0,0,0.2);pointer-events:none;z-index:99;letter-spacing:2px}
+.day-tag{position:fixed;bottom:14px;right:18px;font:11px/1 monospace;color:rgba(255,255,255,0.12);pointer-events:none;z-index:99}
+.hint{position:fixed;bottom:36px;left:0;right:0;text-align:center;font:10px/1 monospace;color:rgba(255,255,255,0.15);pointer-events:none;z-index:99;letter-spacing:2px}
 </style>
 </head>
 <body>
@@ -54,7 +54,7 @@ function createBgTexture(){
   bgCtx=bgCanvas.getContext('2d');
   bgCanvas.width=W;bgCanvas.height=H;
 
-  bgCtx.fillStyle='#f0ede8';
+  bgCtx.fillStyle='#0a0a0a';
   bgCtx.fillRect(0,0,W,H);
 
   const fs=Math.min(W*0.22,H*0.18);
@@ -64,7 +64,7 @@ function createBgTexture(){
   bgCtx.letterSpacing='0.08em';
 
   // Main text
-  bgCtx.fillStyle='rgba(0,0,0,0.12)';
+  bgCtx.fillStyle='rgba(255,255,255,0.5)';
   const lines=['비 가','찬 란 히'];
   const lineH=fs*1.25;
   const startY=H/2-lineH*0.5;
@@ -74,7 +74,7 @@ function createBgTexture(){
 
   // Sub
   bgCtx.font=`300 ${Math.max(10,fs*0.08)}px 'Pretendard',sans-serif`;
-  bgCtx.fillStyle='rgba(0,0,0,0.06)';
+  bgCtx.fillStyle='rgba(255,255,255,0.1)';
   bgCtx.fillText('TYPO-VIBE DAY 09',W/2,startY+lineH*2.2);
 }
 
@@ -162,7 +162,7 @@ function drawBlob(b,t){
   );
 
   // Slight tint overlay
-  ctx.fillStyle='rgba(240,237,232,0.08)';
+  ctx.fillStyle='rgba(10,10,15,0.06)';
   ctx.fillRect(x-r,y-r,r*2,r*2);
 
   ctx.restore(); // unclip
@@ -183,8 +183,8 @@ function drawBlob(b,t){
   ctx.fillStyle=edgeGrad;
   ctx.fill();
 
-  // === HIGHLIGHT: top-left specular ===
-  const hlX=x-r*0.3,hlY=y-r*0.35;
+  // === HIGHLIGHT: specular follows light direction ===
+  const hlX=x-r*lightX,hlY=y-r*lightY;
   const hlGrad=ctx.createRadialGradient(hlX,hlY,0,hlX,hlY,r*0.45);
   hlGrad.addColorStop(0,'rgba(255,255,255,0.85)');
   hlGrad.addColorStop(0.3,'rgba(255,255,255,0.3)');
@@ -233,7 +233,7 @@ function drawBlob(b,t){
   // === SHADOW on background ===
   ctx.beginPath();
   ctx.ellipse(x+r*0.1,y+r*1.05,r*0.7,r*0.08,0,0,Math.PI*2);
-  ctx.fillStyle='rgba(0,0,0,0.06)';
+  ctx.fillStyle='rgba(255,255,255,0.03)';
   ctx.fill();
 
   ctx.restore();
@@ -250,7 +250,7 @@ function drawConnections(){
         const alpha=0.04*(1-d/threshold);
         ctx.beginPath();
         ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);
-        ctx.strokeStyle=`rgba(0,0,0,${alpha})`;
+        ctx.strokeStyle=`rgba(255,255,255,${alpha})`;
         ctx.lineWidth=Math.min(a.r,b.r)*0.15;
         ctx.stroke();
       }
@@ -312,9 +312,17 @@ function spawnFromTrail(){
 }
 
 /* ======= Render ======= */
+let lightX=0.3,lightY=0.35; // normalized light direction
+
 function render(){
   ctx.clearRect(0,0,W,H);
   const t=performance.now()*0.001;
+
+  // Update light position based on mouse
+  if(mx>0){
+    lightX=0.15+(mx/W)*0.3; // 0.15~0.45
+    lightY=0.15+(my/H)*0.3;
+  }
 
   update(t);
 
@@ -329,6 +337,25 @@ function render(){
   for(const b of sorted){
     drawBlob(b,t);
   }
+
+  // Bloom glow pass — draw bright spots again with blur
+  ctx.save();
+  ctx.globalCompositeOperation='screen';
+  ctx.globalAlpha=0.15;
+  ctx.filter='blur(20px)';
+  for(const b of sorted){
+    if(b.r<20)continue;
+    const hlX=b.x-b.r*lightX,hlY=b.y-b.r*lightY;
+    const grad=ctx.createRadialGradient(hlX,hlY,0,hlX,hlY,b.r*0.6);
+    grad.addColorStop(0,'rgba(255,255,255,0.8)');
+    grad.addColorStop(1,'rgba(255,255,255,0)');
+    ctx.beginPath();ctx.arc(hlX,hlY,b.r*0.6,0,Math.PI*2);
+    ctx.fillStyle=grad;ctx.fill();
+  }
+  ctx.filter='none';
+  ctx.globalAlpha=1;
+  ctx.globalCompositeOperation='source-over';
+  ctx.restore();
 
   requestAnimationFrame(render);
 }
