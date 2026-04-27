@@ -70,7 +70,7 @@ function createBgTexture(){
   const fs=Math.min(W*0.22,H*0.18);
   bgCtx.font=`900 ${fs}px 'Pretendard',sans-serif`;
   bgCtx.textAlign='center';bgCtx.textBaseline='middle';
-  bgCtx.fillStyle='rgba(255,255,255,0.45)';
+  bgCtx.fillStyle='rgba(255,255,255,0.6)';
   const lines=['비 가','찬 란 히'];
   const lineH=fs*1.25;
   const startY=H/2-lineH*0.5;
@@ -265,19 +265,26 @@ function renderRefract(){
    LAYER 2: WebGL — glass spheres with env reflection + fresnel
    ============================================================ */
 const glCanvas=document.getElementById('gl');
-const renderer=new THREE.WebGLRenderer({canvas:glCanvas,alpha:true,antialias:true});
+const renderer=new THREE.WebGLRenderer({canvas:glCanvas,alpha:true,antialias:true,premultipliedAlpha:false});
 renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
 renderer.toneMapping=THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure=1.2;
+renderer.setClearColor(0x000000,0);
 
 const scene=new THREE.Scene();
 const camera=new THREE.PerspectiveCamera(40,1,0.1,100);
 camera.position.z=9;
 
-const composer=new EffectComposer(renderer);
+const rtParams={format:THREE.RGBAFormat,stencilBuffer:false};
+const rt=new THREE.WebGLRenderTarget(W||800,H||600,rtParams);
+const composer=new EffectComposer(renderer,rt);
 composer.addPass(new RenderPass(scene,camera));
 const bloom=new UnrealBloomPass(new THREE.Vector2(W||800,H||600),0.3,0.2,0.95);
 composer.addPass(bloom);
+// Make render pass not clear to black
+composer.passes[0].clear=true;
+composer.passes[0].clearColor=new THREE.Color(0,0,0);
+composer.passes[0].clearAlpha=0;
 
 // HDRI
 const pmrem=new THREE.PMREMGenerator(renderer);
