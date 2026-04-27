@@ -65,7 +65,7 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
 renderer.toneMapping=THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure=1.3;
 renderer.setSize(innerWidth,innerHeight);
-renderer.setClearColor(0x080810,0.85); // semi-transparent — video bleeds through
+renderer.setClearColor(0x080810,0.4); // 40% — video clearly visible
 
 const scene=new THREE.Scene();
 // No scene.background — let alpha show through to video
@@ -73,8 +73,12 @@ const camera=new THREE.PerspectiveCamera(35,innerWidth/innerHeight,0.1,100);
 camera.position.z=10;
 
 /* Post-processing */
-const composer=new EffectComposer(renderer);
-composer.addPass(new RenderPass(scene,camera));
+const rtOpts={format:THREE.RGBAFormat,stencilBuffer:false};
+const compRT=new THREE.WebGLRenderTarget(innerWidth,innerHeight,rtOpts);
+const composer=new EffectComposer(renderer,compRT);
+const rPass=new RenderPass(scene,camera);
+rPass.clearAlpha=0;
+composer.addPass(rPass);
 composer.addPass(new UnrealBloomPass(new THREE.Vector2(innerWidth,innerHeight),0.4,0.3,0.9));
 
 /* ======= Text plane INSIDE the 3D scene (behind blobs) ======= */
