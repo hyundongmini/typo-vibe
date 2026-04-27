@@ -14,9 +14,9 @@ body{background:#080810;font-family:'Pretendard',sans-serif}
   align-items:center;justify-content:center;z-index:3;pointer-events:none;
 }
 #bg-text .line{
-  font-weight:800;color:rgba(255,255,255,0.45);
+  font-weight:700;color:rgba(255,255,255,0.5);
   font-size:clamp(60px,14vw,160px);
-  letter-spacing:-0.04em;line-height:1.1;
+  letter-spacing:0.08em;line-height:1.15;
 }
 #bg-text .sub{
   font-size:clamp(10px,1.5vw,14px);font-weight:300;
@@ -110,17 +110,21 @@ function createGlassMat(){
   return new THREE.MeshPhysicalMaterial({
     color:0xffffff,
     metalness:0.0,
-    roughness:0.02,
-    transmission:0.98,      // 거의 완전 투명
-    thickness:0.6,          // 얇게 — 더 투명하게
-    ior:1.4,                // 굴절률
-    envMapIntensity:1.5,
+    roughness:0.01,
+    transmission:0.99,
+    thickness:0.3,
+    ior:1.35,
+    envMapIntensity:2.0,
     clearcoat:1.0,
     clearcoatRoughness:0.0,
     transparent:true,
-    opacity:0.35,           // 낮춰서 뒤 텍스트 비침
+    opacity:0.18,
     side:THREE.DoubleSide,
     depthWrite:false,
+    attenuationColor:new THREE.Color(0.95,0.95,1.0),
+    attenuationDistance:2.0,
+    specularIntensity:1.0,
+    specularColor:new THREE.Color(1,1,1),
   });
 }
 
@@ -174,8 +178,8 @@ for(const d of blobData){
 
   const mat=createGlassMat();
   // Vary IOR slightly per blob
-  mat.ior=1.2+Math.random()*0.3;
-  mat.thickness=0.3+Math.random()*0.8;
+  mat.ior=1.2+Math.random()*0.25;
+  mat.thickness=0.15+Math.random()*0.4;
 
   const mesh=new THREE.Mesh(geo,mat);
   mesh.position.set(...d.pos);
@@ -198,7 +202,7 @@ const smallGeo=new THREE.SphereGeometry(1,12,12);
 const smalls=[];
 for(let i=0;i<50;i++){
   const mat=createGlassMat();
-  mat.transmission=0.95;mat.thickness=0.15;mat.opacity=0.25;
+  mat.transmission=0.98;mat.thickness=0.1;mat.opacity=0.12;
   const m=new THREE.Mesh(smallGeo,mat);
   const s=0.03+Math.random()*0.1;
   m.scale.set(s,s,s);
@@ -223,7 +227,10 @@ function animate(){
 
   for(const b of blobs){
     const d=b.userData;
-    // Floating
+    // Floating upward slowly + gentle sway
+    d.oy-=0.003; // 천천히 위로
+    if(d.oy<-4){d.oy=4;d.ox=(Math.random()-0.5)*4} // 위로 나가면 아래서 재등장
+
     b.position.x=d.ox+Math.sin(t*d.speed+d.phase)*0.35;
     b.position.y=d.oy+Math.cos(t*d.speed*0.7+d.phase)*0.3;
     b.position.z=d.oz+Math.sin(t*d.speed*0.4+d.phase*2)*0.15;
@@ -232,7 +239,18 @@ function animate(){
     b.rotation.x+=d.rotSpeed.x*0.01;
     b.rotation.y+=d.rotSpeed.y*0.01;
 
-    // Mouse repulsion (project mouse to 3D)
+    // Surface ripple — morph vertices over time
+    const posAttr=b.geometry.attributes.position;
+    if(!d.origPos)d.origPos=posAttr.array.slice();
+    for(let i=0;i<posAttr.count;i++){
+      const ox=d.origPos[i*3],oy=d.origPos[i*3+1],oz=d.origPos[i*3+2];
+      const wave=Math.sin(ox*4+t*1.5)*Math.sin(oy*3+t*1.2)*Math.cos(oz*2+t*0.8)*0.04;
+      posAttr.setXYZ(i,ox*(1+wave),oy*(1+wave),oz*(1+wave));
+    }
+    posAttr.needsUpdate=true;
+    b.geometry.computeVertexNormals();
+
+    // Mouse repulsion
     if(mouse.x>-5){
       const mouseWorld=new THREE.Vector3(mouse.x,mouse.y,0.5).unproject(camera);
       const dir=mouseWorld.sub(camera.position).normalize();
@@ -243,11 +261,17 @@ function animate(){
       const dy=b.position.y-my3;
       const dist=Math.hypot(dx,dy);
       if(dist<2.5&&dist>0){
-        const force=1.0*(1-dist/2.5);
+        const force=1.2*(1-dist/2.5);
         b.position.x+=dx/dist*force;
         b.position.y+=dy/dist*force;
       }
     }
+  }
+
+  // Mouse-following light
+  if(mouse.x>-5){
+    pointLight.position.x=mouse.x*4;
+    pointLight.position.y=mouse.y*3;
   }
 
   // Small bubbles rise
