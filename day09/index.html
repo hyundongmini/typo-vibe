@@ -9,7 +9,9 @@
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{height:100%;overflow:hidden}
 body{background:#0a0a0a;font-family:'Pretendard',sans-serif}
-canvas{position:fixed;inset:0;z-index:1;cursor:crosshair}
+canvas#refract{position:fixed;inset:0;z-index:1}
+canvas#gl{position:fixed;inset:0;z-index:2;pointer-events:none}
+.interact-layer{position:fixed;inset:0;z-index:3;cursor:crosshair}
 .back-to-archive{
   position:fixed;top:16px;left:16px;z-index:9999;
   display:inline-flex;align-items:center;gap:6px;
@@ -30,367 +32,430 @@ canvas{position:fixed;inset:0;z-index:1;cursor:crosshair}
   <svg viewBox="0 0 24 24" width="14" height="14"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
   <span>뒤로가기</span>
 </a>
-<canvas id="c"></canvas>
-<div class="hint">CLICK to split · DRAG to create · SCROLL to zoom</div>
+<canvas id="refract"></canvas>
+<canvas id="gl"></canvas>
+<div class="interact-layer" id="interactLayer"></div>
+<div class="hint">CLICK to split · DRAG to create</div>
 <div class="day-tag">day 09 / typo-vibe</div>
 
-<script>
-/* ================================================================
-   day 09 — "비가 찬란히"
-   밝은 배경 + 텍스트 위에 유리 물방울.
-   물방울 안에서 텍스트가 렌즈처럼 확대/왜곡됨.
-   Canvas 2D — 배경 텍스처 굴절 기반.
-   ================================================================ */
+<script type="importmap">
+{"imports":{
+  "three":"https://cdn.jsdelivr.net/npm/three@0.164.1/build/three.module.js",
+  "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.164.1/examples/jsm/"
+}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import {RGBELoader} from 'three/addons/loaders/RGBELoader.js';
+import {EffectComposer} from 'three/addons/postprocessing/EffectComposer.js';
+import {RenderPass} from 'three/addons/postprocessing/RenderPass.js';
+import {UnrealBloomPass} from 'three/addons/postprocessing/UnrealBloomPass.js';
 
-const canvas=document.getElementById('c');
-const ctx=canvas.getContext('2d');
 let W,H;
 let mx=-9999,my=-9999,isDragging=false,dragTrail=[];
 
-/* ======= Background text texture ======= */
+/* ============================================================
+   LAYER 1: Canvas 2D — text refraction (lens effect)
+   ============================================================ */
+const rc=document.getElementById('refract');
+const rctx=rc.getContext('2d');
 let bgCanvas,bgCtx;
+
 function createBgTexture(){
   bgCanvas=document.createElement('canvas');
   bgCtx=bgCanvas.getContext('2d');
   bgCanvas.width=W;bgCanvas.height=H;
-
   bgCtx.fillStyle='#0a0a0a';
   bgCtx.fillRect(0,0,W,H);
-
   const fs=Math.min(W*0.22,H*0.18);
-  bgCtx.font=`900 ${fs}px 'Pretendard',-apple-system,sans-serif`;
-  bgCtx.textAlign='center';
-  bgCtx.textBaseline='middle';
-  bgCtx.letterSpacing='0.08em';
-
-  // Main text
-  bgCtx.fillStyle='rgba(255,255,255,0.5)';
+  bgCtx.font=`900 ${fs}px 'Pretendard',sans-serif`;
+  bgCtx.textAlign='center';bgCtx.textBaseline='middle';
+  bgCtx.fillStyle='rgba(255,255,255,0.45)';
   const lines=['비 가','찬 란 히'];
   const lineH=fs*1.25;
   const startY=H/2-lineH*0.5;
-  lines.forEach((line,i)=>{
-    bgCtx.fillText(line,W/2,startY+i*lineH);
-  });
-
-  // Sub
+  lines.forEach((l,i)=>bgCtx.fillText(l,W/2,startY+i*lineH));
   bgCtx.font=`300 ${Math.max(10,fs*0.08)}px 'Pretendard',sans-serif`;
-  bgCtx.fillStyle='rgba(255,255,255,0.1)';
+  bgCtx.fillStyle='rgba(255,255,255,0.08)';
   bgCtx.fillText('TYPO-VIBE DAY 09',W/2,startY+lineH*2.2);
 }
 
-/* ======= Blobs ======= */
+/* Blob data shared between layers */
 let blobs=[];
-function initBlobs(){
-  blobs=[];
-  const configs=[
-    {x:W*0.38,y:H*0.32,r:Math.min(W,H)*0.14},
-    {x:W*0.62,y:H*0.45,r:Math.min(W,H)*0.18},
-    {x:W*0.45,y:H*0.65,r:Math.min(W,H)*0.12},
-    {x:W*0.3,y:H*0.55,r:Math.min(W,H)*0.1},
-    {x:W*0.7,y:H*0.28,r:Math.min(W,H)*0.08},
-    {x:W*0.55,y:H*0.2,r:Math.min(W,H)*0.06},
-    {x:W*0.25,y:H*0.75,r:Math.min(W,H)*0.07},
-    {x:W*0.72,y:H*0.7,r:Math.min(W,H)*0.09},
-    {x:W*0.5,y:H*0.48,r:Math.min(W,H)*0.2},
-    {x:W*0.15,y:H*0.4,r:Math.min(W,H)*0.05},
-    {x:W*0.82,y:H*0.55,r:Math.min(W,H)*0.055},
-    {x:W*0.6,y:H*0.82,r:Math.min(W,H)*0.04},
-  ];
-  for(const c of configs){
-    blobs.push(makeBlob(c.x,c.y,c.r));
-  }
-}
-
 function makeBlob(x,y,r){
   return {
-    ox:x,oy:y,x,y,r,
-    vx:0,vy:0,
+    ox:x,oy:y,x,y,r,vx:0,vy:0,
     phase:Math.random()*Math.PI*2,
     speed:0.2+Math.random()*0.4,
-    ior:1.3+Math.random()*0.3, // refraction strength
-    // organic shape deformation
+    ior:1.3+Math.random()*0.3,
     deform:Array.from({length:12},()=>0.9+Math.random()*0.2),
     deformPhase:Array.from({length:12},()=>Math.random()*Math.PI*2),
     deformSpeed:Array.from({length:12},()=>0.3+Math.random()*0.6),
   };
 }
+function initBlobs(){
+  blobs=[];
+  const S=Math.min(W,H);
+  const configs=[
+    {x:W*0.38,y:H*0.32,r:S*0.14},{x:W*0.62,y:H*0.45,r:S*0.18},
+    {x:W*0.45,y:H*0.65,r:S*0.12},{x:W*0.3,y:H*0.55,r:S*0.1},
+    {x:W*0.7,y:H*0.28,r:S*0.08},{x:W*0.55,y:H*0.2,r:S*0.06},
+    {x:W*0.25,y:H*0.75,r:S*0.07},{x:W*0.72,y:H*0.7,r:S*0.09},
+    {x:W*0.5,y:H*0.48,r:S*0.2},{x:W*0.15,y:H*0.4,r:S*0.05},
+    {x:W*0.82,y:H*0.55,r:S*0.055},{x:W*0.6,y:H*0.82,r:S*0.04},
+  ];
+  for(const c of configs)blobs.push(makeBlob(c.x,c.y,c.r));
+}
 
-/* ======= Draw a single glass blob ======= */
-function drawBlob(b,t){
+let lightX=0.3,lightY=0.35;
+
+function drawRefractBlob(b,t){
   const {x,y,r,ior}=b;
-
-  ctx.save();
-
-  // Build organic clip path
+  rctx.save();
+  // Organic clip path
   const pts=b.deform.length;
   const angleStep=Math.PI*2/pts;
-  ctx.beginPath();
-  const pathPoints=[];
+  const pathPts=[];
+  rctx.beginPath();
   for(let i=0;i<=pts;i++){
     const idx=i%pts;
     const angle=idx*angleStep-Math.PI/2;
     const d=b.deform[idx]+Math.sin(t*b.deformSpeed[idx]+b.deformPhase[idx])*0.06;
-    const px=x+Math.cos(angle)*r*d;
-    const py=y+Math.sin(angle)*r*d;
-    pathPoints.push({x:px,y:py});
+    pathPts.push({x:x+Math.cos(angle)*r*d,y:y+Math.sin(angle)*r*d});
   }
-  // Smooth curve through points
-  ctx.moveTo(pathPoints[0].x,pathPoints[0].y);
-  for(let i=1;i<pathPoints.length;i++){
-    const prev=pathPoints[i-1];
-    const curr=pathPoints[i];
-    const cpx=(prev.x+curr.x)/2;
-    const cpy=(prev.y+curr.y)/2;
-    ctx.quadraticCurveTo(prev.x,prev.y,cpx,cpy);
+  rctx.moveTo(pathPts[0].x,pathPts[0].y);
+  for(let i=1;i<pathPts.length;i++){
+    const p=pathPts[i-1],c=pathPts[i];
+    rctx.quadraticCurveTo(p.x,p.y,(p.x+c.x)/2,(p.y+c.y)/2);
   }
-  ctx.closePath();
-  ctx.save();
-  ctx.clip();
+  rctx.closePath();
+  rctx.save();rctx.clip();
 
-  // === REFRACTION: draw magnified/shifted background inside blob ===
-  const mag=ior; // magnification factor
-  const srcW=r*2/mag;
-  const srcH=r*2/mag;
-  const srcX=x-srcW/2;
-  const srcY=y-srcH/2;
+  // Refracted (magnified) background
+  const mag=ior;
+  const srcW=r*2/mag,srcH=r*2/mag;
+  rctx.drawImage(bgCanvas,
+    Math.max(0,x-srcW/2),Math.max(0,y-srcH/2),
+    Math.min(srcW,W),Math.min(srcH,H),
+    x-r,y-r,r*2,r*2);
+  rctx.fillStyle='rgba(10,10,15,0.05)';
+  rctx.fillRect(x-r,y-r,r*2,r*2);
+  rctx.restore();
 
-  // Draw refracted background (magnified = lens effect)
-  ctx.drawImage(bgCanvas,
-    Math.max(0,srcX),Math.max(0,srcY),
-    Math.min(srcW,W-srcX),Math.min(srcH,H-srcY),
-    x-r,y-r,r*2,r*2
-  );
-
-  // Slight tint overlay
-  ctx.fillStyle='rgba(10,10,15,0.06)';
-  ctx.fillRect(x-r,y-r,r*2,r*2);
-
-  ctx.restore(); // unclip
-
-  // === EDGE: dark rim (refraction edge darkening) ===
-  ctx.beginPath();
-  ctx.moveTo(pathPoints[0].x,pathPoints[0].y);
-  for(let i=1;i<pathPoints.length;i++){
-    const prev=pathPoints[i-1],curr=pathPoints[i];
-    ctx.quadraticCurveTo(prev.x,prev.y,(prev.x+curr.x)/2,(prev.y+curr.y)/2);
+  // Edge darkening (fresnel-like)
+  rctx.beginPath();
+  rctx.moveTo(pathPts[0].x,pathPts[0].y);
+  for(let i=1;i<pathPts.length;i++){
+    const p=pathPts[i-1],c=pathPts[i];
+    rctx.quadraticCurveTo(p.x,p.y,(p.x+c.x)/2,(p.y+c.y)/2);
   }
-  ctx.closePath();
-  const edgeGrad=ctx.createRadialGradient(x,y,r*0.6,x,y,r*1.05);
-  edgeGrad.addColorStop(0,'rgba(0,0,0,0)');
-  edgeGrad.addColorStop(0.7,'rgba(0,0,0,0)');
-  edgeGrad.addColorStop(0.88,'rgba(0,0,0,0.15)');
-  edgeGrad.addColorStop(1,'rgba(0,0,0,0.35)');
-  ctx.fillStyle=edgeGrad;
-  ctx.fill();
+  rctx.closePath();
+  const eg=rctx.createRadialGradient(x,y,r*0.5,x,y,r*1.05);
+  eg.addColorStop(0,'rgba(0,0,0,0)');
+  eg.addColorStop(0.75,'rgba(0,0,0,0)');
+  eg.addColorStop(0.9,'rgba(0,0,0,0.2)');
+  eg.addColorStop(1,'rgba(0,0,0,0.45)');
+  rctx.fillStyle=eg;rctx.fill();
 
-  // === HIGHLIGHT: specular follows light direction ===
+  // Specular highlight (follows light)
   const hlX=x-r*lightX,hlY=y-r*lightY;
-  const hlGrad=ctx.createRadialGradient(hlX,hlY,0,hlX,hlY,r*0.45);
-  hlGrad.addColorStop(0,'rgba(255,255,255,0.85)');
-  hlGrad.addColorStop(0.3,'rgba(255,255,255,0.3)');
-  hlGrad.addColorStop(1,'rgba(255,255,255,0)');
-  ctx.beginPath();
-  ctx.arc(hlX,hlY,r*0.45,0,Math.PI*2);
-  ctx.fillStyle=hlGrad;
-  ctx.fill();
+  const hg=rctx.createRadialGradient(hlX,hlY,0,hlX,hlY,r*0.45);
+  hg.addColorStop(0,'rgba(255,255,255,0.9)');
+  hg.addColorStop(0.25,'rgba(255,255,255,0.35)');
+  hg.addColorStop(1,'rgba(255,255,255,0)');
+  rctx.beginPath();rctx.arc(hlX,hlY,r*0.45,0,Math.PI*2);
+  rctx.fillStyle=hg;rctx.fill();
 
-  // === SECONDARY HIGHLIGHT: bottom-right ===
+  // Secondary highlight
   if(r>30){
-    const hl2X=x+r*0.2,hl2Y=y+r*0.25;
-    const hl2Grad=ctx.createRadialGradient(hl2X,hl2Y,0,hl2X,hl2Y,r*0.2);
-    hl2Grad.addColorStop(0,'rgba(255,255,255,0.4)');
-    hl2Grad.addColorStop(1,'rgba(255,255,255,0)');
-    ctx.beginPath();
-    ctx.arc(hl2X,hl2Y,r*0.2,0,Math.PI*2);
-    ctx.fillStyle=hl2Grad;
-    ctx.fill();
+    const h2x=x+r*0.2,h2y=y+r*0.25;
+    const h2g=rctx.createRadialGradient(h2x,h2y,0,h2x,h2y,r*0.18);
+    h2g.addColorStop(0,'rgba(255,255,255,0.4)');
+    h2g.addColorStop(1,'rgba(255,255,255,0)');
+    rctx.beginPath();rctx.arc(h2x,h2y,r*0.18,0,Math.PI*2);
+    rctx.fillStyle=h2g;rctx.fill();
   }
 
-  // === OUTLINE: thin bright edge ===
-  ctx.beginPath();
-  ctx.moveTo(pathPoints[0].x,pathPoints[0].y);
-  for(let i=1;i<pathPoints.length;i++){
-    const prev=pathPoints[i-1],curr=pathPoints[i];
-    ctx.quadraticCurveTo(prev.x,prev.y,(prev.x+curr.x)/2,(prev.y+curr.y)/2);
-  }
-  ctx.closePath();
-  ctx.strokeStyle='rgba(255,255,255,0.5)';
-  ctx.lineWidth=1.5;
-  ctx.stroke();
-
-  // === CAUSTIC: bright spot at bottom ===
+  // Caustic (bottom bright spot)
   if(r>25){
-    const caustX=x+r*0.05,caustY=y+r*0.6;
-    const caustGrad=ctx.createRadialGradient(caustX,caustY,0,caustX,caustY,r*0.3);
-    caustGrad.addColorStop(0,'rgba(255,255,255,0.2)');
-    caustGrad.addColorStop(1,'rgba(255,255,255,0)');
-    ctx.beginPath();
-    ctx.arc(caustX,caustY,r*0.3,0,Math.PI*2);
-    ctx.fillStyle=caustGrad;
-    ctx.fill();
+    const cx2=x+r*0.05,cy2=y+r*0.55;
+    const cg=rctx.createRadialGradient(cx2,cy2,0,cx2,cy2,r*0.25);
+    cg.addColorStop(0,'rgba(255,255,255,0.25)');
+    cg.addColorStop(1,'rgba(255,255,255,0)');
+    rctx.beginPath();rctx.arc(cx2,cy2,r*0.25,0,Math.PI*2);
+    rctx.fillStyle=cg;rctx.fill();
   }
 
-  // === SHADOW on background ===
-  ctx.beginPath();
-  ctx.ellipse(x+r*0.1,y+r*1.05,r*0.7,r*0.08,0,0,Math.PI*2);
-  ctx.fillStyle='rgba(255,255,255,0.03)';
-  ctx.fill();
+  // Bright edge outline
+  rctx.beginPath();
+  rctx.moveTo(pathPts[0].x,pathPts[0].y);
+  for(let i=1;i<pathPts.length;i++){
+    const p=pathPts[i-1],c=pathPts[i];
+    rctx.quadraticCurveTo(p.x,p.y,(p.x+c.x)/2,(p.y+c.y)/2);
+  }
+  rctx.closePath();
+  rctx.strokeStyle='rgba(255,255,255,0.4)';
+  rctx.lineWidth=1.2;rctx.stroke();
 
-  ctx.restore();
+  rctx.restore();
 }
 
-/* ======= Connection lines ======= */
-function drawConnections(){
+function renderRefract(){
+  rctx.clearRect(0,0,W,H);
+  const t=performance.now()*0.001;
+
+  // Update light from mouse
+  if(mx>0){lightX=0.15+(mx/W)*0.3;lightY=0.15+(my/H)*0.3}
+
+  // Physics
+  for(const b of blobs){
+    if(b.vx){b.ox+=b.vx;b.oy+=b.vy;b.vx*=0.96;b.vy*=0.96}
+    b.x=b.ox+Math.sin(t*b.speed+b.phase)*6;
+    b.y=b.oy+Math.cos(t*b.speed*0.7+b.phase)*5;
+    const dx=b.x-mx,dy=b.y-my;
+    const dist=Math.hypot(dx,dy);
+    const repR=isDragging?180:100;
+    if(dist<repR&&dist>0){
+      const f=(isDragging?12:4)*(1-dist/repR);
+      b.x+=dx/dist*f;b.y+=dy/dist*f;
+    }
+  }
+
+  // Background
+  rctx.drawImage(bgCanvas,0,0);
+
+  // Connections
   for(let i=0;i<blobs.length;i++){
     for(let j=i+1;j<blobs.length;j++){
       const a=blobs[i],b=blobs[j];
       const d=Math.hypot(a.x-b.x,a.y-b.y);
-      const threshold=a.r+b.r+40;
-      if(d<threshold){
-        const alpha=0.04*(1-d/threshold);
-        ctx.beginPath();
-        ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);
-        ctx.strokeStyle=`rgba(255,255,255,${alpha})`;
-        ctx.lineWidth=Math.min(a.r,b.r)*0.15;
-        ctx.stroke();
+      const th=a.r+b.r+40;
+      if(d<th){
+        rctx.beginPath();rctx.moveTo(a.x,a.y);rctx.lineTo(b.x,b.y);
+        rctx.strokeStyle=`rgba(255,255,255,${0.04*(1-d/th)})`;
+        rctx.lineWidth=Math.min(a.r,b.r)*0.12;rctx.stroke();
       }
     }
   }
+
+  // Blobs (big behind small)
+  const sorted=[...blobs].sort((a,b)=>b.r-a.r);
+  for(const b of sorted)drawRefractBlob(b,t);
+
+  // Bloom glow
+  rctx.save();
+  rctx.globalCompositeOperation='screen';
+  rctx.globalAlpha=0.12;
+  rctx.filter='blur(18px)';
+  for(const b of sorted){
+    if(b.r<20)continue;
+    const hx=b.x-b.r*lightX,hy=b.y-b.r*lightY;
+    const g=rctx.createRadialGradient(hx,hy,0,hx,hy,b.r*0.5);
+    g.addColorStop(0,'rgba(255,255,255,0.8)');
+    g.addColorStop(1,'rgba(255,255,255,0)');
+    rctx.beginPath();rctx.arc(hx,hy,b.r*0.5,0,Math.PI*2);
+    rctx.fillStyle=g;rctx.fill();
+  }
+  rctx.filter='none';rctx.globalAlpha=1;
+  rctx.globalCompositeOperation='source-over';
+  rctx.restore();
 }
 
-/* ======= Physics ======= */
-function update(t){
+/* ============================================================
+   LAYER 2: WebGL — glass spheres with env reflection + fresnel
+   ============================================================ */
+const glCanvas=document.getElementById('gl');
+const renderer=new THREE.WebGLRenderer({canvas:glCanvas,alpha:true,antialias:true});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+renderer.toneMapping=THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure=1.2;
+
+const scene=new THREE.Scene();
+const camera=new THREE.PerspectiveCamera(40,1,0.1,100);
+camera.position.z=9;
+
+const composer=new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene,camera));
+const bloom=new UnrealBloomPass(new THREE.Vector2(W||800,H||600),0.5,0.3,0.9);
+composer.addPass(bloom);
+
+// HDRI
+const pmrem=new THREE.PMREMGenerator(renderer);
+pmrem.compileEquirectangularShader();
+new RGBELoader().load('env.hdr',(tex)=>{
+  const envMap=pmrem.fromEquirectangular(tex).texture;
+  scene.environment=envMap;
+  tex.dispose();pmrem.dispose();
+  for(const m of glBlobs)m.material.envMap=envMap;
+});
+
+// Lights
+scene.add(new THREE.DirectionalLight(0xffffff,2).translateZ(5).translateY(3).translateX(2));
+scene.add(new THREE.DirectionalLight(0x6688cc,1).translateZ(3).translateX(-3).translateY(1));
+const pLight=new THREE.PointLight(0xffffff,1.5,20);
+pLight.position.set(0,0,4);scene.add(pLight);
+
+function createGlassMat(){
+  return new THREE.MeshPhysicalMaterial({
+    color:0xffffff,metalness:0,roughness:0.01,
+    transmission:0.97,thickness:0.4,ior:1.4,
+    envMapIntensity:2.5,clearcoat:1,clearcoatRoughness:0,
+    transparent:true,opacity:0.12,
+    side:THREE.DoubleSide,depthWrite:false,
+    attenuationColor:new THREE.Color(0.9,0.92,1.0),
+    attenuationDistance:3,specularIntensity:1.2,
+  });
+}
+
+const glBlobs=[];
+function initGLBlobs(){
+  // Clear old
+  for(const m of glBlobs){scene.remove(m);m.geometry.dispose();m.material.dispose()}
+  glBlobs.length=0;
+
   for(const b of blobs){
-    b.x=b.ox+Math.sin(t*b.speed+b.phase)*6;
-    b.y=b.oy+Math.cos(t*b.speed*0.7+b.phase)*5;
-
-    // Split velocity decay
-    if(b.vx){b.ox+=b.vx;b.oy+=b.vy;b.vx*=0.96;b.vy*=0.96}
-
-    // Mouse repulsion
-    const dx=b.x-mx,dy=b.y-my;
-    const dist=Math.hypot(dx,dy);
-    const repelR=isDragging?180:100;
-    if(dist<repelR&&dist>0){
-      const force=(isDragging?12:4)*(1-dist/repelR);
-      b.x+=dx/dist*force;
-      b.y+=dy/dist*force;
+    // Convert screen coords to 3D
+    const nx=(b.ox/W)*2-1;
+    const ny=-(b.oy/H)*2+1;
+    const s3=b.r/Math.min(W,H)*8;
+    const geo=new THREE.SphereGeometry(s3,48,48);
+    // Organic deform
+    const pa=geo.attributes.position;
+    const seed=Math.random()*100;
+    for(let i=0;i<pa.count;i++){
+      const x=pa.getX(i),y=pa.getY(i),z=pa.getZ(i);
+      const n=Math.sin(x*3+seed)*Math.sin(y*2.5+seed*0.7)*Math.sin(z*2+seed*1.3);
+      pa.setXYZ(i,x*(1+n*0.1),y*(1+n*0.1),z*(1+n*0.1));
     }
+    geo.computeVertexNormals();
+    const mat=createGlassMat();
+    mat.ior=1.2+Math.random()*0.3;
+    mat.thickness=0.2+Math.random()*0.5;
+    const mesh=new THREE.Mesh(geo,mat);
+    // Position in 3D space matching 2D
+    const vec=new THREE.Vector3(nx,ny,0.5).unproject(camera);
+    const dir=vec.sub(camera.position).normalize();
+    const t=-camera.position.z/dir.z;
+    mesh.position.set(camera.position.x+dir.x*t,camera.position.y+dir.y*t,0);
+    mesh.userData={blobIdx:glBlobs.length,origPos:mesh.position.clone()};
+    scene.add(mesh);
+    glBlobs.push(mesh);
   }
 }
 
-/* ======= Split ======= */
+function updateGLBlobs(){
+  for(let i=0;i<Math.min(glBlobs.length,blobs.length);i++){
+    const b=blobs[i],m=glBlobs[i];
+    const nx=(b.x/W)*2-1;
+    const ny=-(b.y/H)*2+1;
+    const vec=new THREE.Vector3(nx,ny,0.5).unproject(camera);
+    const dir=vec.sub(camera.position).normalize();
+    const t=-camera.position.z/dir.z;
+    m.position.set(camera.position.x+dir.x*t,camera.position.y+dir.y*t,0);
+    // Surface ripple
+    const time=performance.now()*0.001;
+    const pa=m.geometry.attributes.position;
+    if(!m.userData.origVerts)m.userData.origVerts=pa.array.slice();
+    const ov=m.userData.origVerts;
+    for(let j=0;j<pa.count;j++){
+      const ox=ov[j*3],oy=ov[j*3+1],oz=ov[j*3+2];
+      const wave=Math.sin(ox*4+time*1.5)*Math.sin(oy*3+time*1.2)*Math.cos(oz*2+time*0.8)*0.03;
+      pa.setXYZ(j,ox*(1+wave),oy*(1+wave),oz*(1+wave));
+    }
+    pa.needsUpdate=true;
+    m.geometry.computeVertexNormals();
+  }
+  // Mouse light
+  if(mx>0){
+    pLight.position.x=((mx/W)*2-1)*4;
+    pLight.position.y=(-(my/H)*2+1)*3;
+  }
+  camera.position.x=Math.sin(performance.now()*0.0001)*0.1;
+  camera.position.y=Math.cos(performance.now()*0.00008)*0.08;
+  camera.lookAt(0,0,0);
+}
+
+/* ============================================================
+   INTERACTIONS
+   ============================================================ */
 function splitAt(px,py){
   for(let i=blobs.length-1;i>=0;i--){
     const b=blobs[i];
     if(Math.hypot(b.x-px,b.y-py)<b.r&&b.r>20){
-      const newR=b.r*0.55;
-      b.r=b.r*0.6;
+      b.r*=0.6;
       b.deform=Array.from({length:12},()=>0.9+Math.random()*0.2);
       for(let j=0;j<2;j++){
-        const angle=Math.random()*Math.PI*2;
-        const nb=makeBlob(b.ox+Math.cos(angle)*b.r,b.oy+Math.sin(angle)*b.r,newR);
-        nb.vx=Math.cos(angle)*2;nb.vy=Math.sin(angle)*2;
+        const a=Math.random()*Math.PI*2;
+        const nb=makeBlob(b.ox+Math.cos(a)*b.r,b.oy+Math.sin(a)*b.r,b.r*0.55/0.6);
+        nb.vx=Math.cos(a)*2;nb.vy=Math.sin(a)*2;
         blobs.push(nb);
       }
-      if(blobs.length>35){blobs.splice(0,blobs.length-35)}
-      break;
+      if(blobs.length>30)blobs.splice(0,blobs.length-30);
+      syncGLBlobs();break;
     }
   }
 }
-
-/* ======= Drag create ======= */
 function spawnFromTrail(){
   const step=Math.max(1,Math.floor(dragTrail.length/6));
   for(let i=0;i<dragTrail.length;i+=step){
     const p=dragTrail[i];
-    const r=8+Math.random()*20;
-    const nb=makeBlob(p.x+(Math.random()-0.5)*20,p.y+(Math.random()-0.5)*20,r);
-    blobs.push(nb);
+    blobs.push(makeBlob(p.x+(Math.random()-0.5)*20,p.y+(Math.random()-0.5)*20,8+Math.random()*20));
   }
-  if(blobs.length>40)blobs.splice(0,blobs.length-40);
+  if(blobs.length>35)blobs.splice(0,blobs.length-35);
+  syncGLBlobs();
+}
+function syncGLBlobs(){
+  // Rebuild GL blobs to match
+  for(const m of glBlobs){scene.remove(m);m.geometry.dispose();m.material.dispose()}
+  glBlobs.length=0;
+  initGLBlobs();
 }
 
-/* ======= Render ======= */
-let lightX=0.3,lightY=0.35; // normalized light direction
-
-function render(){
-  ctx.clearRect(0,0,W,H);
-  const t=performance.now()*0.001;
-
-  // Update light position based on mouse
-  if(mx>0){
-    lightX=0.15+(mx/W)*0.3; // 0.15~0.45
-    lightY=0.15+(my/H)*0.3;
-  }
-
-  update(t);
-
-  // Draw background
-  ctx.drawImage(bgCanvas,0,0);
-
-  // Draw connections
-  drawConnections();
-
-  // Sort blobs by size (big behind small)
-  const sorted=[...blobs].sort((a,b)=>b.r-a.r);
-  for(const b of sorted){
-    drawBlob(b,t);
-  }
-
-  // Bloom glow pass — draw bright spots again with blur
-  ctx.save();
-  ctx.globalCompositeOperation='screen';
-  ctx.globalAlpha=0.15;
-  ctx.filter='blur(20px)';
-  for(const b of sorted){
-    if(b.r<20)continue;
-    const hlX=b.x-b.r*lightX,hlY=b.y-b.r*lightY;
-    const grad=ctx.createRadialGradient(hlX,hlY,0,hlX,hlY,b.r*0.6);
-    grad.addColorStop(0,'rgba(255,255,255,0.8)');
-    grad.addColorStop(1,'rgba(255,255,255,0)');
-    ctx.beginPath();ctx.arc(hlX,hlY,b.r*0.6,0,Math.PI*2);
-    ctx.fillStyle=grad;ctx.fill();
-  }
-  ctx.filter='none';
-  ctx.globalAlpha=1;
-  ctx.globalCompositeOperation='source-over';
-  ctx.restore();
-
-  requestAnimationFrame(render);
-}
-
-/* ======= Events ======= */
-canvas.addEventListener('mousemove',(e)=>{mx=e.clientX;my=e.clientY;
+const il=document.getElementById('interactLayer');
+il.addEventListener('mousemove',(e)=>{mx=e.clientX;my=e.clientY;
   if(isDragging)dragTrail.push({x:mx,y:my})});
-canvas.addEventListener('mouseleave',()=>{mx=-9999;my=-9999});
-canvas.addEventListener('mousedown',(e)=>{isDragging=true;dragTrail=[];splitAt(e.clientX,e.clientY)});
+il.addEventListener('mouseleave',()=>{mx=-9999;my=-9999});
+il.addEventListener('mousedown',(e)=>{isDragging=true;dragTrail=[];splitAt(e.clientX,e.clientY)});
 window.addEventListener('mouseup',()=>{
   if(isDragging&&dragTrail.length>5)spawnFromTrail();
   isDragging=false;dragTrail=[];
 });
-canvas.addEventListener('touchstart',(e)=>{
+il.addEventListener('touchstart',(e)=>{
   e.preventDefault();const t=e.touches[0];mx=t.clientX;my=t.clientY;
   isDragging=true;dragTrail=[];splitAt(mx,my);
 },{passive:false});
-canvas.addEventListener('touchmove',(e)=>{
+il.addEventListener('touchmove',(e)=>{
   const t=e.touches[0];mx=t.clientX;my=t.clientY;
   if(isDragging)dragTrail.push({x:mx,y:my});
 },{passive:true});
-canvas.addEventListener('touchend',()=>{
+il.addEventListener('touchend',()=>{
   if(isDragging&&dragTrail.length>5)spawnFromTrail();
   isDragging=false;dragTrail=[];mx=-9999;my=-9999;
 });
 
+/* ============================================================
+   MAIN LOOP
+   ============================================================ */
+function animate(){
+  requestAnimationFrame(animate);
+  renderRefract();
+  updateGLBlobs();
+  composer.render();
+}
+
 function resize(){
-  W=canvas.width=window.innerWidth;
-  H=canvas.height=window.innerHeight;
+  W=window.innerWidth;H=window.innerHeight;
+  rc.width=W;rc.height=H;
+  renderer.setSize(W,H);
+  camera.aspect=W/H;camera.updateProjectionMatrix();
+  composer.setSize(W,H);
   createBgTexture();
   initBlobs();
+  initGLBlobs();
 }
 window.addEventListener('resize',resize);
 resize();
-render();
+animate();
 </script>
 </body>
 </html>
