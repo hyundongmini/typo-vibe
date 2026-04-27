@@ -8,21 +8,34 @@
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{height:100%;overflow:hidden}
-body{background:#0a0a0a;display:flex;align-items:center;justify-content:center}
-canvas{display:block;cursor:default}
+body{background:#080810;font-family:'Pretendard',sans-serif}
+#bg-text{
+  position:fixed;inset:0;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;z-index:1;pointer-events:none;
+}
+#bg-text .line{
+  font-weight:800;color:rgba(255,255,255,0.5);
+  font-size:clamp(60px,14vw,160px);
+  letter-spacing:-0.04em;line-height:1.1;
+}
+#bg-text .sub{
+  font-size:clamp(10px,1.5vw,14px);font-weight:300;
+  color:rgba(255,255,255,0.12);margin-top:20px;letter-spacing:4px;
+}
+canvas#gl{position:fixed;inset:0;z-index:2}
 .back-to-archive{
   position:fixed;top:16px;left:16px;z-index:9999;
   display:inline-flex;align-items:center;gap:6px;
   padding:8px 14px 8px 12px;
-  background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.6);
-  font:500 12px/1 -apple-system,'Pretendard',sans-serif;
-  text-decoration:none;border:1px solid rgba(255,255,255,0.08);border-radius:100px;
-  backdrop-filter:blur(10px);transition:background .2s,transform .2s;
+  background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.5);
+  font:500 12px/1 'Pretendard',sans-serif;
+  text-decoration:none;border:1px solid rgba(255,255,255,0.06);border-radius:100px;
+  backdrop-filter:blur(10px);transition:background .2s,transform .2s;z-index:9999;
 }
-.back-to-archive:hover{background:rgba(255,255,255,0.15);transform:translateX(-2px)}
+.back-to-archive:hover{background:rgba(255,255,255,0.12);transform:translateX(-2px)}
 .back-to-archive svg{flex:none;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-.day-tag{position:fixed;bottom:14px;right:18px;font:11px/1 monospace;color:rgba(255,255,255,0.12);pointer-events:none;z-index:99}
-.hint{position:fixed;bottom:36px;left:0;right:0;text-align:center;font:10px/1 monospace;color:rgba(255,255,255,0.18);pointer-events:none;z-index:99;letter-spacing:2px}
+.day-tag{position:fixed;bottom:14px;right:18px;font:11px/1 monospace;color:rgba(255,255,255,0.1);pointer-events:none;z-index:99}
+.hint{position:fixed;bottom:36px;left:0;right:0;text-align:center;font:10px/1 monospace;color:rgba(255,255,255,0.15);pointer-events:none;z-index:99;letter-spacing:2px}
 </style>
 </head>
 <body>
@@ -30,350 +43,260 @@ canvas{display:block;cursor:default}
   <svg viewBox="0 0 24 24" width="14" height="14"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
   <span>뒤로가기</span>
 </a>
-<canvas id="c"></canvas>
-<div class="hint">MOVE to disturb · CLICK to burst</div>
+<div id="bg-text">
+  <div class="line">비가</div>
+  <div class="line">찬란히</div>
+  <div class="sub">TYPO-VIBE DAY 09</div>
+</div>
+<canvas id="gl"></canvas>
+<div class="hint">MOVE to interact</div>
 <div class="day-tag">day 09 / typo-vibe</div>
 
-<script>
-const canvas=document.getElementById('c');
-const ctx=canvas.getContext('2d');
-let W,H;
-let mx=-9999,my=-9999,mDown=false;
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.164.1/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.164.1/examples/jsm/"}}
+</script>
+<script type="module">
+import * as THREE from 'three';
 
-/* ======= Text texture (offscreen) ======= */
-let textCanvas,textCtx;
+/* ======= Setup ======= */
+const canvas=document.getElementById('gl');
+const renderer=new THREE.WebGLRenderer({canvas,alpha:true,antialias:true});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+renderer.setSize(window.innerWidth,window.innerHeight);
+renderer.toneMapping=THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure=1.2;
 
-function createTextTexture(){
-  textCanvas=document.createElement('canvas');
-  textCtx=textCanvas.getContext('2d');
-  textCanvas.width=W;textCanvas.height=H;
+const scene=new THREE.Scene();
+const camera=new THREE.PerspectiveCamera(45,window.innerWidth/window.innerHeight,0.1,100);
+camera.position.z=8;
 
-  textCtx.fillStyle='#0a0a0a';
-  textCtx.fillRect(0,0,W,H);
-
-  const fontSize=Math.min(W*0.18,H*0.14);
-  textCtx.font=`800 ${fontSize}px 'Pretendard',-apple-system,sans-serif`;
-  textCtx.textAlign='center';
-  textCtx.textBaseline='middle';
-  textCtx.fillStyle='rgba(255,255,255,0.7)';
-
-  const lines=['비가','찬란히'];
-  const lineH=fontSize*1.3;
-  const startY=H/2-lineH*0.5;
-  lines.forEach((line,i)=>{
-    textCtx.fillText(line,W/2,startY+i*lineH);
-  });
-
-  // 작은 부제
-  textCtx.font=`300 ${Math.max(12,fontSize*0.15)}px 'Pretendard',sans-serif`;
-  textCtx.fillStyle='rgba(255,255,255,0.15)';
-  textCtx.fillText('typo-vibe day 09',W/2,startY+lineH*2+20);
+/* ======= Background texture from DOM text ======= */
+function captureTextTexture(){
+  const c=document.createElement('canvas');
+  const ctx=c.getContext('2d');
+  c.width=1024;c.height=1024;
+  ctx.fillStyle='#080810';
+  ctx.fillRect(0,0,1024,1024);
+  const fs=Math.min(c.width*0.2,180);
+  ctx.font=`800 ${fs}px Pretendard,-apple-system,sans-serif`;
+  ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.fillStyle='rgba(255,255,255,0.6)';
+  ctx.fillText('비가',512,400);
+  ctx.fillText('찬란히',512,600);
+  ctx.font=`300 ${fs*0.1}px Pretendard,sans-serif`;
+  ctx.fillStyle='rgba(255,255,255,0.15)';
+  ctx.fillText('TYPO-VIBE DAY 09',512,740);
+  const tex=new THREE.CanvasTexture(c);
+  tex.needsUpdate=true;
+  return tex;
 }
+const bgTexture=captureTextTexture();
 
-/* ======= Blobs (organic water drops) ======= */
+/* ======= Glass/Water material (custom shader) ======= */
+const waterVertexShader=`
+varying vec3 vNormal;
+varying vec3 vViewDir;
+varying vec3 vWorldPos;
+varying vec2 vUv;
+uniform float uTime;
+
+void main(){
+  // Organic deformation
+  vec3 pos=position;
+  float n=sin(pos.x*3.0+uTime*0.8)*sin(pos.y*2.5+uTime*0.6)*sin(pos.z*2.0+uTime*0.7);
+  pos+=normal*n*0.08;
+
+  vec4 worldPos=modelMatrix*vec4(pos,1.0);
+  vWorldPos=worldPos.xyz;
+  vNormal=normalize(normalMatrix*normal);
+  vViewDir=normalize(cameraPosition-worldPos.xyz);
+  vUv=uv;
+  gl_Position=projectionMatrix*viewMatrix*worldPos;
+}`;
+
+const waterFragmentShader=`
+uniform sampler2D uBgTex;
+uniform float uTime;
+uniform vec2 uResolution;
+varying vec3 vNormal;
+varying vec3 vViewDir;
+varying vec3 vWorldPos;
+varying vec2 vUv;
+
+void main(){
+  vec3 normal=normalize(vNormal);
+  vec3 viewDir=normalize(vViewDir);
+
+  // Fresnel (edge = more reflective)
+  float fresnel=pow(1.0-max(dot(normal,viewDir),0.0),3.0);
+  fresnel=mix(0.05,1.0,fresnel);
+
+  // Refraction — sample background texture with offset
+  vec2 screenUV=gl_FragCoord.xy/uResolution;
+  vec2 refractOffset=normal.xy*0.15;
+  vec2 refractUV=screenUV+refractOffset;
+  vec4 refractColor=texture2D(uBgTex,refractUV);
+
+  // Chromatic aberration
+  float rr=texture2D(uBgTex,refractUV+vec2(0.008,0.0)).r;
+  float gg=texture2D(uBgTex,refractUV).g;
+  float bb=texture2D(uBgTex,refractUV-vec2(0.008,0.0)).b;
+  vec3 chromaticRefract=vec3(rr,gg,bb);
+
+  // Reflection (fake environment — gradient)
+  vec3 reflectDir=reflect(-viewDir,normal);
+  float envY=reflectDir.y*0.5+0.5;
+  vec3 envColor=mix(vec3(0.02,0.02,0.06),vec3(0.15,0.15,0.25),envY);
+
+  // Specular highlights
+  vec3 lightDir=normalize(vec3(1.0,1.5,2.0));
+  vec3 halfDir=normalize(lightDir+viewDir);
+  float spec=pow(max(dot(normal,halfDir),0.0),80.0);
+  float spec2=pow(max(dot(normal,normalize(vec3(-0.5,1.0,1.5))),0.0),40.0)*0.3;
+
+  // Combine
+  vec3 color=mix(chromaticRefract*1.1,envColor,fresnel*0.6);
+  color+=vec3(1.0)*spec*0.9;
+  color+=vec3(0.8,0.85,1.0)*spec2;
+
+  // Edge rim light
+  float rim=pow(1.0-max(dot(normal,viewDir),0.0),2.0);
+  color+=vec3(0.3,0.35,0.5)*rim*0.4;
+
+  // Subtle iridescence
+  float iri=sin(dot(normal,vec3(1.0,0.5,0.3))*8.0+uTime)*0.5+0.5;
+  color+=vec3(0.05,0.02,0.08)*iri*fresnel*0.3;
+
+  float alpha=mix(0.3,0.85,fresnel);
+  alpha=max(alpha,spec*0.8);
+
+  gl_FragColor=vec4(color,alpha);
+}`;
+
+const waterMaterial=new THREE.ShaderMaterial({
+  vertexShader:waterVertexShader,
+  fragmentShader:waterFragmentShader,
+  uniforms:{
+    uBgTex:{value:bgTexture},
+    uTime:{value:0},
+    uResolution:{value:new THREE.Vector2(window.innerWidth,window.innerHeight)},
+  },
+  transparent:true,
+  side:THREE.FrontSide,
+  depthWrite:false,
+});
+
+/* ======= Create blobs ======= */
 const blobs=[];
-const BLOB_COUNT=14;
+const blobData=[
+  {pos:[-1.2,-0.8,0],s:1.2},
+  {pos:[1.0,0.5,0.5],s:0.9},
+  {pos:[-0.3,1.2,-0.3],s:0.7},
+  {pos:[0.8,-1.0,0.2],s:1.0},
+  {pos:[-1.5,0.6,0.3],s:0.6},
+  {pos:[1.5,-0.3,-0.2],s:0.8},
+  {pos:[0.0,0.0,0.8],s:1.4},
+  {pos:[-0.6,-1.5,0.1],s:0.5},
+  {pos:[0.5,1.5,-0.1],s:0.55},
+  {pos:[-1.8,0.0,0.4],s:0.45},
+  {pos:[1.8,1.0,0.2],s:0.4},
+  {pos:[0.2,-0.5,1.0],s:0.35},
+];
 
-function initBlobs(){
-  blobs.length=0;
-  for(let i=0;i<BLOB_COUNT;i++){
-    const r=30+Math.random()*Math.random()*120;
-    blobs.push({
-      x:W*0.15+Math.random()*W*0.7,
-      y:H*0.1+Math.random()*H*0.8,
-      r,
-      ox:0,oy:0, // will be set
-      vx:0,vy:0,
-      // organic shape: control points for deformation
-      deform:Array.from({length:8},()=>0.85+Math.random()*0.3),
-      deformSpeed:Array.from({length:8},()=>0.2+Math.random()*0.5),
-      deformPhase:Array.from({length:8},()=>Math.random()*Math.PI*2),
-      phase:Math.random()*Math.PI*2,
-      floatSpeed:0.15+Math.random()*0.3,
-      // refraction
-      lensStrength:1.15+Math.random()*0.25,
-    });
-    blobs[i].ox=blobs[i].x;
-    blobs[i].oy=blobs[i].y;
-  }
-  // Sort by size (small in front for depth)
-  blobs.sort((a,b)=>b.r-a.r);
+for(const d of blobData){
+  const geo=new THREE.SphereGeometry(d.s,48,48);
+  const mesh=new THREE.Mesh(geo,waterMaterial.clone());
+  mesh.position.set(...d.pos);
+  mesh.userData={
+    ox:d.pos[0],oy:d.pos[1],oz:d.pos[2],
+    phase:Math.random()*Math.PI*2,
+    speed:0.2+Math.random()*0.4,
+  };
+  scene.add(mesh);
+  blobs.push(mesh);
 }
 
-/* ======= Draw organic blob shape path ======= */
-function blobPath(b,t,scale){
-  const s=scale||1;
-  const pts=b.deform.length;
-  const angleStep=Math.PI*2/pts;
-  ctx.beginPath();
-  for(let i=0;i<=pts;i++){
-    const idx=i%pts;
-    const angle=idx*angleStep;
-    const d=b.deform[idx]+Math.sin(t*b.deformSpeed[idx]+b.deformPhase[idx])*0.08;
-    const rr=b.r*d*s;
-    const px=b.x+Math.cos(angle)*rr;
-    const py=b.y+Math.sin(angle)*rr;
-    if(i===0)ctx.moveTo(px,py);
-    else{
-      // smooth with quadratic curve
-      const prevIdx=(i-1)%pts;
-      const prevAngle=prevIdx*angleStep;
-      const prevD=b.deform[prevIdx]+Math.sin(t*b.deformSpeed[prevIdx]+b.deformPhase[prevIdx])*0.08;
-      const prevR=b.r*prevD*s;
-      const cpx=b.x+Math.cos((prevAngle+angle)/2)*(prevR+rr)/2*1.02;
-      const cpy=b.y+Math.sin((prevAngle+angle)/2)*(prevR+rr)/2*1.02;
-      ctx.quadraticCurveTo(cpx,cpy,px,py);
-    }
-  }
-  ctx.closePath();
+/* ======= Small bubbles ======= */
+const smallGeo=new THREE.SphereGeometry(1,16,16);
+const smallMat=new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:0.08});
+const smalls=[];
+for(let i=0;i<40;i++){
+  const m=new THREE.Mesh(smallGeo,smallMat.clone());
+  const s=0.02+Math.random()*0.08;
+  m.scale.set(s,s,s);
+  m.position.set((Math.random()-0.5)*6,(Math.random()-0.5)*5,(Math.random()-0.5)*2);
+  m.userData={vy:0.002+Math.random()*0.005,phase:Math.random()*Math.PI*2};
+  scene.add(m);
+  smalls.push(m);
 }
 
-/* ======= Draw a single water blob ======= */
-function drawBlob(b,t){
-  ctx.save();
+/* ======= Mouse ======= */
+const mouse=new THREE.Vector2(-10,-10);
+const raycaster=new THREE.Raycaster();
 
-  // 1. Clip to blob shape
-  blobPath(b,t);
-  ctx.save();
-  ctx.clip();
+canvas.addEventListener('mousemove',(e)=>{
+  mouse.x=(e.clientX/window.innerWidth)*2-1;
+  mouse.y=-(e.clientY/window.innerHeight)*2+1;
+});
+canvas.addEventListener('mouseleave',()=>{mouse.x=-10;mouse.y=-10});
 
-  // 2. Draw refracted text inside (magnified + shifted)
-  const lens=b.lensStrength;
-  const srcX=b.x-b.r*lens;
-  const srcY=b.y-b.r*lens;
-  const srcW=b.r*2*lens;
-  const srcH=b.r*2*lens;
-  const dstX=b.x-b.r;
-  const dstY=b.y-b.r;
-  const dstW=b.r*2;
-  const dstH=b.r*2;
+/* ======= Animate ======= */
+function animate(){
+  requestAnimationFrame(animate);
+  const t=performance.now()*0.001;
 
-  // Slight chromatic aberration
-  ctx.globalAlpha=0.85;
-  try{
-    ctx.drawImage(textCanvas,
-      Math.max(0,srcX-3),Math.max(0,srcY),Math.min(srcW,W),Math.min(srcH,H),
-      dstX,dstY,dstW,dstH);
-  }catch(e){}
-
-  // 3. Glass fill (dark tinted)
-  ctx.globalAlpha=0.15;
-  ctx.fillStyle='#1a1a2e';
-  ctx.fillRect(dstX,dstY,dstW,dstH);
-
-  ctx.restore(); // unclip
-
-  // 4. Edge highlight (rim light)
-  blobPath(b,t);
-  ctx.strokeStyle='rgba(255,255,255,0.25)';
-  ctx.lineWidth=1.5;
-  ctx.stroke();
-
-  // 5. Inner edge glow
-  blobPath(b,t);
-  const edgeGrad=ctx.createRadialGradient(b.x,b.y,b.r*0.7,b.x,b.y,b.r);
-  edgeGrad.addColorStop(0,'rgba(255,255,255,0)');
-  edgeGrad.addColorStop(0.85,'rgba(255,255,255,0)');
-  edgeGrad.addColorStop(1,'rgba(255,255,255,0.08)');
-  ctx.fillStyle=edgeGrad;
-  ctx.fill();
-
-  // 6. Top-left highlight (specular)
-  const hlX=b.x-b.r*0.35;
-  const hlY=b.y-b.r*0.35;
-  const hlR=b.r*0.4;
-  const hlGrad=ctx.createRadialGradient(hlX,hlY,0,hlX,hlY,hlR);
-  hlGrad.addColorStop(0,'rgba(255,255,255,0.55)');
-  hlGrad.addColorStop(0.4,'rgba(255,255,255,0.15)');
-  hlGrad.addColorStop(1,'rgba(255,255,255,0)');
-  ctx.beginPath();
-  ctx.arc(hlX,hlY,hlR,0,Math.PI*2);
-  ctx.fillStyle=hlGrad;
-  ctx.fill();
-
-  // 7. Small secondary highlight (bottom-right)
-  if(b.r>40){
-    const hl2X=b.x+b.r*0.25;
-    const hl2Y=b.y+b.r*0.3;
-    const hl2R=b.r*0.15;
-    const hl2Grad=ctx.createRadialGradient(hl2X,hl2Y,0,hl2X,hl2Y,hl2R);
-    hl2Grad.addColorStop(0,'rgba(255,255,255,0.3)');
-    hl2Grad.addColorStop(1,'rgba(255,255,255,0)');
-    ctx.beginPath();
-    ctx.arc(hl2X,hl2Y,hl2R,0,Math.PI*2);
-    ctx.fillStyle=hl2Grad;
-    ctx.fill();
-  }
-
-  // 8. Shadow on background
-  ctx.beginPath();
-  ctx.ellipse(b.x+b.r*0.15,b.y+b.r*1.05,b.r*0.7,b.r*0.1,0,0,Math.PI*2);
-  ctx.fillStyle='rgba(0,0,0,0.2)';
-  ctx.fill();
-
-  ctx.restore();
-}
-
-/* ======= Small floating bubbles ======= */
-const smallBubbles=[];
-function initSmallBubbles(){
-  smallBubbles.length=0;
-  for(let i=0;i<30;i++){
-    smallBubbles.push({
-      x:Math.random()*W,
-      y:Math.random()*H,
-      r:2+Math.random()*8,
-      vy:-0.2-Math.random()*0.5,
-      vx:(Math.random()-0.5)*0.3,
-      phase:Math.random()*Math.PI*2,
-    });
-  }
-}
-
-function drawSmallBubble(sb){
-  const grad=ctx.createRadialGradient(sb.x-sb.r*0.3,sb.y-sb.r*0.3,0,sb.x,sb.y,sb.r);
-  grad.addColorStop(0,'rgba(255,255,255,0.15)');
-  grad.addColorStop(0.7,'rgba(255,255,255,0.05)');
-  grad.addColorStop(1,'rgba(255,255,255,0.02)');
-  ctx.beginPath();
-  ctx.arc(sb.x,sb.y,sb.r,0,Math.PI*2);
-  ctx.fillStyle=grad;
-  ctx.fill();
-  ctx.strokeStyle='rgba(255,255,255,0.12)';
-  ctx.lineWidth=0.5;
-  ctx.stroke();
-}
-
-/* ======= Physics ======= */
-function update(t){
-  // Blobs: float + mouse interaction
+  // Update blob positions (floating)
   for(const b of blobs){
-    // Gentle floating
-    b.x=b.ox+Math.sin(t*b.floatSpeed+b.phase)*8;
-    b.y=b.oy+Math.cos(t*b.floatSpeed*0.7+b.phase)*6;
+    const d=b.userData;
+    b.position.x=d.ox+Math.sin(t*d.speed+d.phase)*0.3;
+    b.position.y=d.oy+Math.cos(t*d.speed*0.7+d.phase)*0.25;
+    b.position.z=d.oz+Math.sin(t*d.speed*0.5+d.phase*2)*0.15;
 
     // Mouse repulsion
-    const dx=b.x-mx;
-    const dy=b.y-my;
+    raycaster.setFromCamera(mouse,camera);
+    const mouseWorld=new THREE.Vector3(mouse.x,mouse.y,0).unproject(camera);
+    const dir=new THREE.Vector3().subVectors(mouseWorld,camera.position).normalize();
+    const planeZ=b.position.z;
+    const tParam=(planeZ-camera.position.z)/dir.z;
+    const mx3=camera.position.x+dir.x*tParam;
+    const my3=camera.position.y+dir.y*tParam;
+
+    const dx=b.position.x-mx3;
+    const dy=b.position.y-my3;
     const dist=Math.hypot(dx,dy);
-    const repelR=mDown?200:120;
-    if(dist<repelR&&dist>0){
-      const force=(mDown?15:4)*(1-dist/repelR);
-      b.x+=dx/dist*force;
-      b.y+=dy/dist*force;
+    if(dist<2&&dist>0){
+      const force=0.8*(1-dist/2);
+      b.position.x+=dx/dist*force;
+      b.position.y+=dy/dist*force;
     }
+
+    // Update shader time
+    b.material.uniforms.uTime.value=t;
   }
 
-  // Small bubbles: rise
-  for(const sb of smallBubbles){
-    sb.y+=sb.vy;
-    sb.x+=sb.vx+Math.sin(t*2+sb.phase)*0.3;
-    if(sb.y<-sb.r*2){sb.y=H+sb.r;sb.x=Math.random()*W}
+  // Small bubbles rise
+  for(const s of smalls){
+    s.position.y+=s.userData.vy;
+    s.position.x+=Math.sin(t*2+s.userData.phase)*0.001;
+    if(s.position.y>3){s.position.y=-3;s.position.x=(Math.random()-0.5)*6}
   }
+
+  renderer.render(scene,camera);
 }
 
-/* ======= Burst on click ======= */
-let burstParticles=[];
-function burstAt(px,py){
-  for(let i=0;i<20;i++){
-    const angle=Math.random()*Math.PI*2;
-    const speed=2+Math.random()*6;
-    burstParticles.push({
-      x:px,y:py,
-      vx:Math.cos(angle)*speed,
-      vy:Math.sin(angle)*speed,
-      r:2+Math.random()*5,
-      life:400+Math.random()*300,
-      born:Date.now(),
-    });
-  }
-  // Push blobs away
+/* ======= Resize ======= */
+function onResize(){
+  const w=window.innerWidth,h=window.innerHeight;
+  camera.aspect=w/h;
+  camera.updateProjectionMatrix();
+  renderer.setSize(w,h);
   for(const b of blobs){
-    const dx=b.ox-px;
-    const dy=b.oy-py;
-    const dist=Math.hypot(dx,dy);
-    if(dist<250&&dist>0){
-      const push=40*(1-dist/250);
-      b.ox+=dx/dist*push;
-      b.oy+=dy/dist*push;
-      // Spring back slowly
-      const origX=W*0.15+Math.random()*W*0.7;
-      const origY=H*0.1+Math.random()*H*0.8;
-      setTimeout(()=>{
-        b.ox+=(origX-b.ox)*0.3;
-        b.oy+=(origY-b.oy)*0.3;
-      },800);
-    }
+    b.material.uniforms.uResolution.value.set(w*renderer.getPixelRatio(),h*renderer.getPixelRatio());
   }
 }
-
-function drawBurstParticles(){
-  const now=Date.now();
-  burstParticles=burstParticles.filter(p=>(now-p.born)<p.life);
-  for(const p of burstParticles){
-    const age=(now-p.born)/p.life;
-    p.x+=p.vx*(1-age);
-    p.y+=p.vy*(1-age);
-    const alpha=(1-age)*0.4;
-    const r=p.r*(1-age*0.5);
-    ctx.beginPath();
-    ctx.arc(p.x,p.y,r,0,Math.PI*2);
-    ctx.fillStyle=`rgba(200,210,230,${alpha})`;
-    ctx.fill();
-  }
-}
-
-/* ======= Render ======= */
-function render(){
-  ctx.clearRect(0,0,W,H);
-  const t=Date.now()*0.001;
-
-  update(t);
-
-  // Draw background text (faint)
-  ctx.globalAlpha=0.4;
-  ctx.drawImage(textCanvas,0,0);
-  ctx.globalAlpha=1;
-
-  // Draw blobs (back to front = big to small)
-  for(const b of blobs){
-    drawBlob(b,t);
-  }
-
-  // Small floating bubbles
-  for(const sb of smallBubbles){
-    drawSmallBubble(sb);
-  }
-
-  // Burst particles
-  drawBurstParticles();
-
-  requestAnimationFrame(render);
-}
-
-/* ======= Init ======= */
-function resize(){
-  W=canvas.width=window.innerWidth;
-  H=canvas.height=window.innerHeight;
-  createTextTexture();
-  initBlobs();
-  initSmallBubbles();
-}
-
-window.addEventListener('resize',resize);
-canvas.addEventListener('mousemove',(e)=>{mx=e.clientX;my=e.clientY});
-canvas.addEventListener('mouseleave',()=>{mx=-9999;my=-9999});
-canvas.addEventListener('mousedown',(e)=>{mDown=true;burstAt(e.clientX,e.clientY)});
-window.addEventListener('mouseup',()=>{mDown=false});
-canvas.addEventListener('touchstart',(e)=>{
-  e.preventDefault();const t=e.touches[0];
-  mx=t.clientX;my=t.clientY;mDown=true;burstAt(t.clientX,t.clientY);
-},{passive:false});
-canvas.addEventListener('touchmove',(e)=>{const t=e.touches[0];mx=t.clientX;my=t.clientY},{passive:true});
-canvas.addEventListener('touchend',()=>{mx=-9999;my=-9999;mDown=false});
-
-resize();
-render();
+window.addEventListener('resize',onResize);
+onResize();
+animate();
 </script>
 </body>
 </html>
