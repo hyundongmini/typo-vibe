@@ -14,7 +14,7 @@ body{background:#080810;font-family:'Pretendard',sans-serif}
   align-items:center;justify-content:center;z-index:3;pointer-events:none;
 }
 #bg-text .line{
-  font-weight:700;color:rgba(255,255,255,0.5);
+  font-weight:900;color:rgba(255,255,255,0.5);
   font-size:clamp(60px,14vw,160px);
   letter-spacing:0.08em;line-height:1.15;
 }
@@ -49,7 +49,7 @@ canvas#gl{position:fixed;inset:0;z-index:2}
   <div class="sub">TYPO-VIBE DAY 09</div>
 </div>
 <canvas id="gl"></canvas>
-<div class="hint">MOVE to interact</div>
+<div class="hint">HOVER to push · CLICK to split · DRAG to create · SCROLL to zoom</div>
 <div class="day-tag">day 09 / typo-vibe</div>
 
 <script type="importmap">
@@ -212,13 +212,153 @@ for(let i=0;i<50;i++){
   smalls.push(m);
 }
 
-/* ======= Mouse ======= */
+/* ======= Mouse + interactions ======= */
 const mouse=new THREE.Vector2(-10,-10);
+let isDragging=false;
+let dragTrail=[];
+const raycaster=new THREE.Raycaster();
+
 canvas.addEventListener('mousemove',(e)=>{
   mouse.x=(e.clientX/window.innerWidth)*2-1;
   mouse.y=-(e.clientY/window.innerHeight)*2+1;
+  if(isDragging)dragTrail.push({x:mouse.x,y:mouse.y,t:performance.now()});
 });
 canvas.addEventListener('mouseleave',()=>{mouse.x=-10;mouse.y=-10});
+canvas.addEventListener('mousedown',(e)=>{
+  isDragging=true;dragTrail=[];
+  // Click to split
+  raycaster.setFromCamera(mouse,camera);
+  const hits=raycaster.intersectObjects(blobs);
+  if(hits.length>0)splitBlob(hits[0].object);
+});
+window.addEventListener('mouseup',()=>{
+  if(isDragging&&dragTrail.length>3)spawnTrailBubbles();
+  isDragging=false;dragTrail=[];
+});
+canvas.addEventListener('wheel',(e)=>{
+  e.preventDefault();
+  camera.position.z=Math.max(4,Math.min(14,camera.position.z+e.deltaY*0.01));
+},{passive:false});
+
+/* Touch */
+canvas.addEventListener('touchstart',(e)=>{
+  e.preventDefault();const t=e.touches[0];
+  mouse.x=(t.clientX/window.innerWidth)*2-1;
+  mouse.y=-(t.clientY/window.innerHeight)*2+1;
+  isDragging=true;dragTrail=[];
+  raycaster.setFromCamera(mouse,camera);
+  const hits=raycaster.intersectObjects(blobs);
+  if(hits.length>0)splitBlob(hits[0].object);
+},{passive:false});
+canvas.addEventListener('touchmove',(e)=>{
+  const t=e.touches[0];
+  mouse.x=(t.clientX/window.innerWidth)*2-1;
+  mouse.y=-(t.clientY/window.innerHeight)*2+1;
+  if(isDragging)dragTrail.push({x:mouse.x,y:mouse.y,t:performance.now()});
+},{passive:true});
+canvas.addEventListener('touchend',()=>{
+  if(isDragging&&dragTrail.length>3)spawnTrailBubbles();
+  isDragging=false;dragTrail=[];mouse.x=-10;mouse.y=-10;
+});
+
+/* ======= Split blob on click ======= */
+function splitBlob(mesh){
+  const pos=mesh.position.clone();
+  const origScale=mesh.scale.x;
+  if(origScale<0.15)return; // too small to split
+
+  // Shrink original
+  const newS=origScale*0.6;
+  mesh.scale.set(newS,newS,newS);
+  mesh.userData.ox=pos.x-0.3;
+  mesh.userData.oy=pos.y;
+
+  // Spawn 2 children
+  for(let i=0;i<2;i++){
+    const childS=origScale*0.45;
+    const geo=new THREE.SphereGeometry(1,32,32);
+    const mat=createGlassMat();
+    mat.ior=1.2+Math.random()*0.25;
+    mat.thickness=0.1+Math.random()*0.3;
+    const child=new THREE.Mesh(geo,mat);
+    child.scale.set(childS,childS,childS);
+    const angle=Math.random()*Math.PI*2;
+    const dist=0.5+Math.random()*0.5;
+    child.position.set(pos.x+Math.cos(angle)*dist,pos.y+Math.sin(angle)*dist,pos.z);
+    child.userData={
+      ox:child.position.x,oy:child.position.y,oz:child.position.z,
+      phase:Math.random()*Math.PI*2,speed:0.2+Math.random()*0.4,
+      rotSpeed:new THREE.Vector3((Math.random()-0.5)*0.1,(Math.random()-0.5)*0.1,0),
+      vx:Math.cos(angle)*0.03,vy:Math.sin(angle)*0.03, // initial velocity
+    };
+    if(scene.environment)child.material.envMap=scene.environment;
+    scene.add(child);
+    blobs.push(child);
+  }
+
+  // Cap total blobs
+  while(blobs.length>40){
+    const old=blobs.shift();
+    scene.remove(old);old.geometry.dispose();old.material.dispose();
+  }
+}
+
+/* ======= Spawn bubbles along drag trail ======= */
+function spawnTrailBubbles(){
+  const step=Math.max(1,Math.floor(dragTrail.length/8));
+  for(let i=0;i<dragTrail.length;i+=step){
+    const p=dragTrail[i];
+    const worldPos=new THREE.Vector3(p.x,p.y,0.5).unproject(camera);
+    const dir=worldPos.sub(camera.position).normalize();
+    const tParam=-camera.position.z/dir.z;
+    const wx=camera.position.x+dir.x*tParam;
+    const wy=camera.position.y+dir.y*tParam;
+
+    const s=0.1+Math.random()*0.25;
+    const geo=new THREE.SphereGeometry(1,24,24);
+    const mat=createGlassMat();
+    mat.opacity=0.15;
+    const m=new THREE.Mesh(geo,mat);
+    m.scale.set(s,s,s);
+    m.position.set(wx+(Math.random()-0.5)*0.3,wy+(Math.random()-0.5)*0.3,(Math.random()-0.5)*0.5);
+    m.userData={
+      ox:m.position.x,oy:m.position.y,oz:m.position.z,
+      phase:Math.random()*Math.PI*2,speed:0.3+Math.random()*0.5,
+      rotSpeed:new THREE.Vector3((Math.random()-0.5)*0.1,(Math.random()-0.5)*0.1,0),
+    };
+    if(scene.environment)m.material.envMap=scene.environment;
+    scene.add(m);
+    blobs.push(m);
+  }
+  while(blobs.length>50){
+    const old=blobs.shift();
+    scene.remove(old);old.geometry.dispose();old.material.dispose();
+  }
+}
+
+/* ======= Connection lines between nearby blobs ======= */
+const lineMat=new THREE.LineBasicMaterial({color:0xffffff,transparent:true,opacity:0.06});
+const lineSegments=[];
+function updateConnections(){
+  // Remove old lines
+  for(const l of lineSegments){scene.remove(l);l.geometry.dispose()}
+  lineSegments.length=0;
+
+  for(let i=0;i<blobs.length;i++){
+    for(let j=i+1;j<blobs.length;j++){
+      const a=blobs[i].position,b=blobs[j].position;
+      const d=a.distanceTo(b);
+      if(d<2.5){
+        const geo=new THREE.BufferGeometry().setFromPoints([a.clone(),b.clone()]);
+        const mat=lineMat.clone();
+        mat.opacity=0.06*(1-d/2.5);
+        const line=new THREE.Line(geo,mat);
+        scene.add(line);
+        lineSegments.push(line);
+      }
+    }
+  }
+}
 
 /* ======= Animate ======= */
 function animate(){
@@ -227,13 +367,12 @@ function animate(){
 
   for(const b of blobs){
     const d=b.userData;
-    // Floating upward slowly + gentle sway
-    d.oy-=0.003; // 천천히 위로
-    if(d.oy<-4){d.oy=4;d.ox=(Math.random()-0.5)*4} // 위로 나가면 아래서 재등장
+    // Gentle sway (no upward drift)
+    if(d.vx){d.ox+=d.vx;d.oy+=d.vy;d.vx*=0.98;d.vy*=0.98} // split velocity decay
 
     b.position.x=d.ox+Math.sin(t*d.speed+d.phase)*0.35;
     b.position.y=d.oy+Math.cos(t*d.speed*0.7+d.phase)*0.3;
-    b.position.z=d.oz+Math.sin(t*d.speed*0.4+d.phase*2)*0.15;
+    b.position.z=(d.oz||0)+Math.sin(t*d.speed*0.4+d.phase*2)*0.15;
 
     // Slow rotation
     b.rotation.x+=d.rotSpeed.x*0.01;
@@ -285,6 +424,9 @@ function animate(){
   camera.position.x=Math.sin(t*0.1)*0.15;
   camera.position.y=Math.cos(t*0.08)*0.1;
   camera.lookAt(0,0,0);
+
+  // Update connection lines (every 3rd frame for perf)
+  if(Math.floor(t*60)%3===0)updateConnections();
 
   composer.render();
 }
