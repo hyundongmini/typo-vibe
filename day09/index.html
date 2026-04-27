@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 09 - 거품</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;overflow:hidden}
+body{
+  background:#0a0a0a;
+  display:flex;align-items:center;justify-content:center;
+  font-family:-apple-system,sans-serif;
+}
+canvas{display:block;cursor:crosshair}
+
+/* Back */
+.back-to-archive{
+  position:fixed;top:16px;left:16px;z-index:9999;
+  display:inline-flex;align-items:center;gap:6px;
+  padding:8px 14px 8px 12px;
+  background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.6);
+  font:500 12px/1 -apple-system,sans-serif;
+  text-decoration:none;
+  border:1px solid rgba(255,255,255,0.08);border-radius:100px;
+  backdrop-filter:blur(10px);
+  transition:background .2s,transform .2s;
+}
+.back-to-archive:hover{background:rgba(255,255,255,0.15);transform:translateX(-2px)}
+.back-to-archive svg{flex:none;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.day-tag{position:fixed;bottom:14px;right:18px;font:11px/1 monospace;color:rgba(255,255,255,0.15);pointer-events:none;z-index:99}
+.hint{position:fixed;bottom:40px;left:0;right:0;text-align:center;font:11px/1 monospace;color:rgba(255,255,255,0.2);pointer-events:none;z-index:99;letter-spacing:2px}
+</style>
+</head>
+<body>
+<a href="../" class="back-to-archive">
+  <svg viewBox="0 0 24 24" width="14" height="14"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+  <span>뒤로가기</span>
+</a>
+<canvas id="c"></canvas>
+<div class="hint">HOVER to push · CLICK to pop</div>
+<div class="day-tag">day 09 / typo-vibe</div>
+
+<script>
+/* ================================================================
+   day 09 — "거품"
+   글자 획을 따라 3D 거품 방울이 뭉쳐있는 타이포그래피.
+   마우스 가까이 가면 밀려나고, 클릭하면 터짐.
+   ================================================================ */
+
+const canvas=document.getElementById('c');
+const ctx=canvas.getContext('2d');
+let W,H;
+let mx=-9999,my=-9999,mDown=false;
+let bubbles=[];
+let popping=[];
+
+function resize(){
+  W=canvas.width=window.innerWidth;
+  H=canvas.height=window.innerHeight;
+  generateBubbles();
+}
+
+/* ======= Get text pixel positions ======= */
+function getTextPixels(text,fontSize){
+  const offCanvas=document.createElement('canvas');
+  const offCtx=offCanvas.getContext('2d');
+  offCanvas.width=W;offCanvas.height=H;
+
+  offCtx.fillStyle='#fff';
+  offCtx.font=`900 ${fontSize}px -apple-system,"Noto Sans KR",sans-serif`;
+  offCtx.textAlign='center';
+  offCtx.textBaseline='middle';
+
+  // 두 글자를 세로로 배치
+  const lineH=fontSize*1.1;
+  const chars=text.split('');
+  const totalH=chars.length*lineH;
+  const startY=H/2-totalH/2+lineH/2;
+
+  chars.forEach((ch,i)=>{
+    offCtx.fillText(ch,W/2,startY+i*lineH);
+  });
+
+  const imageData=offCtx.getImageData(0,0,W,H);
+  const pixels=[];
+  const step=4; // sampling density
+  for(let y=0;y<H;y+=step){
+    for(let x=0;x<W;x+=step){
+      const idx=(y*W+x)*4;
+      if(imageData.data[idx+3]>128){
+        pixels.push({x,y});
+      }
+    }
+  }
+  return pixels;
+}
+
+/* ======= Generate bubbles along text ======= */
+function generateBubbles(){
+  bubbles=[];
+  const fontSize=Math.min(W*0.35,H*0.38);
+  const pixels=getTextPixels('거품',fontSize);
+
+  if(pixels.length===0)return;
+
+  // Place bubbles at pixel positions with random sizes
+  // Use Poisson-like distribution: try random pixels, skip if too close to existing
+  const used=new Set();
+  const shuffled=pixels.sort(()=>Math.random()-0.5);
+
+  for(const p of shuffled){
+    if(bubbles.length>800)break;
+
+    // Random size: mostly small, some big
+    const r=3+Math.random()*Math.random()*18;
+
+    // Check overlap (simple grid)
+    const key=Math.floor(p.x/(r*0.8))+'_'+Math.floor(p.y/(r*0.8));
+    if(used.has(key))continue;
+    used.add(key);
+
+    bubbles.push({
+      ox:p.x, oy:p.y, // original position
+      x:p.x, y:p.y,   // current position
+      r,
+      vx:0, vy:0,
+      phase:Math.random()*Math.PI*2,
+      speed:0.3+Math.random()*0.7,
+      brightness:0.85+Math.random()*0.15,
+      alive:true,
+      popTime:0,
+    });
+  }
+}
+
+/* ======= Draw a single foam bubble (3D look) ======= */
+function drawBubble(b){
+  if(!b.alive)return;
+
+  const {x,y,r,brightness}=b;
+
+  // Main sphere
+  const grad=ctx.createRadialGradient(x-r*0.3,y-r*0.35,r*0.1, x,y,r);
+  const base=Math.floor(brightness*255);
+  grad.addColorStop(0,`rgba(${base},${base},${Math.min(255,base+10)},0.95)`);
+  grad.addColorStop(0.5,`rgba(${base-30},${base-25},${base-20},0.9)`);
+  grad.addColorStop(1,`rgba(${base-60},${base-55},${base-50},0.7)`);
+
+  ctx.beginPath();
+  ctx.arc(x,y,r,0,Math.PI*2);
+  ctx.fillStyle=grad;
+  ctx.fill();
+
+  // Highlight (top-left shine)
+  if(r>5){
+    const hlGrad=ctx.createRadialGradient(x-r*0.3,y-r*0.3,0, x-r*0.3,y-r*0.3,r*0.5);
+    hlGrad.addColorStop(0,'rgba(255,255,255,0.7)');
+    hlGrad.addColorStop(1,'rgba(255,255,255,0)');
+    ctx.beginPath();
+    ctx.arc(x-r*0.3,y-r*0.3,r*0.5,0,Math.PI*2);
+    ctx.fillStyle=hlGrad;
+    ctx.fill();
+  }
+
+  // Subtle shadow underneath
+  if(r>4){
+    ctx.beginPath();
+    ctx.ellipse(x+r*0.1,y+r*0.8,r*0.6,r*0.15,0,0,Math.PI*2);
+    ctx.fillStyle='rgba(0,0,0,0.15)';
+    ctx.fill();
+  }
+}
+
+/* ======= Draw popping particles ======= */
+function drawPop(p){
+  const age=(Date.now()-p.time)/p.life;
+  if(age>=1)return;
+  const alpha=1-age;
+  const s=p.r*(0.5+age*0.5);
+  ctx.beginPath();
+  ctx.arc(p.x+p.vx*age*60,p.y+p.vy*age*60,s*(1-age*0.8),0,Math.PI*2);
+  ctx.fillStyle=`rgba(220,220,230,${alpha*0.5})`;
+  ctx.fill();
+}
+
+/* ======= Physics update ======= */
+function update(){
+  const t=Date.now()*0.001;
+
+  for(const b of bubbles){
+    if(!b.alive)continue;
+
+    // Breathing animation
+    // (handled in draw via phase)
+
+    // Mouse repulsion
+    const dx=b.x-mx;
+    const dy=b.y-my;
+    const dist=Math.hypot(dx,dy);
+    const repelRadius=mDown?150:80;
+    const repelForce=mDown?8:2;
+
+    if(dist<repelRadius&&dist>0){
+      const force=repelForce*(1-dist/repelRadius);
+      b.vx+=dx/dist*force;
+      b.vy+=dy/dist*force;
+    }
+
+    // Spring back to original position
+    const springK=0.04;
+    b.vx+=(b.ox-b.x)*springK;
+    b.vy+=(b.oy-b.y)*springK;
+
+    // Damping
+    b.vx*=0.88;
+    b.vy*=0.88;
+
+    b.x+=b.vx;
+    b.y+=b.vy;
+  }
+
+  // Clean up dead pops
+  popping=popping.filter(p=>(Date.now()-p.time)<p.life);
+}
+
+/* ======= Click to pop ======= */
+function popAt(px,py){
+  const popRadius=60;
+  for(const b of bubbles){
+    if(!b.alive)continue;
+    const d=Math.hypot(b.x-px,b.y-py);
+    if(d<popRadius){
+      b.alive=false;
+      // Spawn pop particles
+      for(let i=0;i<3;i++){
+        popping.push({
+          x:b.x,y:b.y,
+          vx:(Math.random()-0.5)*4,
+          vy:(Math.random()-0.5)*4,
+          r:b.r*0.4,
+          time:Date.now(),
+          life:300+Math.random()*200,
+        });
+      }
+    }
+  }
+}
+
+/* ======= Regenerate popped bubbles slowly ======= */
+function regenerate(){
+  for(const b of bubbles){
+    if(!b.alive&&Math.random()<0.003){
+      b.alive=true;
+      b.x=b.ox;b.y=b.oy;
+      b.vx=0;b.vy=0;
+    }
+  }
+}
+
+/* ======= Render loop ======= */
+function render(){
+  ctx.clearRect(0,0,W,H);
+
+  update();
+  regenerate();
+
+  const t=Date.now()*0.001;
+
+  // Sort by size for depth (small behind big)
+  const sorted=[...bubbles].filter(b=>b.alive).sort((a,b)=>a.r-b.r);
+
+  for(const b of sorted){
+    // Breathing: subtle size oscillation
+    const breathe=1+Math.sin(t*b.speed+b.phase)*0.04;
+    const origR=b.r;
+    b.r=origR*breathe;
+    drawBubble(b);
+    b.r=origR;
+  }
+
+  for(const p of popping){
+    drawPop(p);
+  }
+
+  requestAnimationFrame(render);
+}
+
+/* ======= Events ======= */
+window.addEventListener('resize',resize);
+canvas.addEventListener('mousemove',(e)=>{mx=e.clientX;my=e.clientY});
+canvas.addEventListener('mouseleave',()=>{mx=-9999;my=-9999});
+canvas.addEventListener('mousedown',(e)=>{mDown=true;popAt(e.clientX,e.clientY)});
+window.addEventListener('mouseup',()=>{mDown=false});
+canvas.addEventListener('touchstart',(e)=>{
+  e.preventDefault();
+  const t=e.touches[0];
+  mx=t.clientX;my=t.clientY;mDown=true;
+  popAt(t.clientX,t.clientY);
+},{passive:false});
+canvas.addEventListener('touchmove',(e)=>{
+  const t=e.touches[0];mx=t.clientX;my=t.clientY;
+},{passive:true});
+canvas.addEventListener('touchend',()=>{mx=-9999;my=-9999;mDown=false});
+
+resize();
+render();
+</script>
+</body>
+</html>
