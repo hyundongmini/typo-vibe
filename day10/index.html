@@ -1,0 +1,979 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>㈅㈀㈍ Archive — DAY 10</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+  <style>
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+  background: #fff;
+  color: #000;
+  font-family: 'Pretendard', 'Noto Sans KR', sans-serif;
+}
+
+/* ===== Archive: Figma 원본 비율 고정, 뷰포트 높이에 맞추고 우측 정렬 ===== */
+.archive {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  background: #fff;
+  overflow: hidden;
+}
+
+/* ===== Grid lines — Figma SVG 확인: stroke="black" ===== */
+.grid-line-v {
+  position: absolute;
+  width: 1px;
+  background: #000;
+}
+.grid-line-h {
+  position: absolute;
+  height: 1px;
+  background: #000;
+}
+
+/* ===== Title ===== */
+.archive-title {
+  position: absolute;
+  font-family: 'Noto Sans KR', sans-serif;
+  font-weight: 900;
+  line-height: 1;
+  white-space: nowrap;
+  color: #000;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.archive-title:hover {
+  opacity: 0.6;
+}
+
+/* ===== Pencil button ===== */
+.pencil-wrap {
+  position: absolute;
+}
+.pencil-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Noto Sans KR', 'Noto Sans Symbols 2', sans-serif;
+  font-weight: 900;
+  background: none;
+  border: 2px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  color: #000;
+  transform: scaleY(-1) rotate(180deg);
+  transition: all 0.15s;
+  padding: 0;
+  line-height: 1;
+}
+.pencil-btn:hover { background: #f0f0f0; }
+.pencil-btn.active {
+  background: #000;
+  color: #fff;
+  border-color: #000;
+}
+
+/* ===== Description panel ===== */
+.desc-panel {
+  position: absolute;
+  opacity: 0;
+  transition: opacity 0.2s;
+  pointer-events: none;
+  color: #000;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  overflow: hidden;
+}
+.desc-panel.visible { opacity: 1; }
+
+.desc-panel .desc-number,
+.desc-panel .desc-title,
+.desc-panel .desc-body,
+.desc-panel .desc-date {
+  animation: fadeSlideUp 0.35s ease both;
+}
+.desc-panel .desc-title { animation-delay: 0.05s; }
+.desc-panel .desc-body { animation-delay: 0.12s; }
+.desc-panel .desc-date { animation-delay: 0.18s; }
+
+@keyframes fadeSlideUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.desc-number {
+  font-family: 'Pretendard', sans-serif;
+  font-weight: 700;
+  line-height: normal;
+}
+.desc-title {
+  font-family: 'Pretendard', sans-serif;
+  font-weight: 700;
+  line-height: 1.36;
+  word-break: keep-all;
+}
+.desc-body {
+  font-family: 'Pretendard', sans-serif;
+  font-weight: 500;
+  line-height: 1.67;
+  word-break: keep-all;
+}
+.desc-date {
+  font-family: 'Pretendard', sans-serif;
+  font-weight: 400;
+  line-height: normal;
+}
+
+/* ===== Cell number labels ===== */
+.cell-num {
+  position: absolute;
+  font-family: 'Pretendard', sans-serif;
+  font-weight: 700;
+  color: #000;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 3;
+}
+
+/* ===== Cell text ===== */
+.cell-text {
+  position: absolute;
+  font-family: 'Pretendard', sans-serif;
+  font-weight: 700;
+  color: #000;
+  word-break: keep-all;
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* ===== IMG containers ===== */
+.cell-img {
+  position: absolute;
+  overflow: hidden;
+  z-index: 1;
+}
+.cell-img img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+  display: block;
+  transition: transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94), filter 0.4s ease;
+}
+
+/* ===== Interactive cell overlay ===== */
+.cell-hit {
+  position: absolute;
+  z-index: 4;
+  background: transparent;
+}
+.cell-hit:hover {
+  outline: 1.5px solid rgba(0,0,0,0.25);
+  outline-offset: -1px;
+}
+
+/* ===== Drawing canvas ===== */
+.draw-canvas {
+  position: absolute;
+  z-index: 10;
+}
+
+/* ===== User-added content ===== */
+.user-img {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 2;
+}
+.user-text {
+  position: absolute;
+  inset: 0;
+  font-family: 'Pretendard', sans-serif;
+  font-weight: 700;
+  color: #000;
+  word-break: keep-all;
+  overflow: hidden;
+  z-index: 2;
+}
+.user-canvas-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 3;
+  pointer-events: none;
+}
+
+body.drawing-mode .cell-hit { cursor: inherit; }
+
+/* ===== Modal ===== */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.4);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 100;
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.2s;
+}
+.modal-overlay.open { opacity: 1; pointer-events: all; }
+
+.modal {
+  background: #fff; border-radius: 12px;
+  width: 420px; max-height: 85vh; overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.22);
+  font-family: 'Pretendard', sans-serif;
+}
+.modal-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 18px 22px 12px; border-bottom: 1px solid #eee;
+}
+.modal-title { font-size: 16px; font-weight: 700; }
+.modal-close {
+  background: none; border: none; font-size: 22px;
+  cursor: pointer; color: #999; padding: 2px 6px; border-radius: 4px;
+}
+.modal-close:hover { color: #000; background: #f0f0f0; }
+.modal-body { padding: 16px 22px; }
+.modal-tabs { display: flex; gap: 8px; margin-bottom: 14px; }
+.tab-btn {
+  flex: 1; padding: 9px; border: 1px solid #ddd; border-radius: 8px;
+  background: #fafafa; cursor: pointer; font-size: 13px; font-weight: 600;
+  font-family: 'Pretendard', sans-serif; transition: all 0.15s;
+}
+.tab-btn.active { background: #000; color: #fff; border-color: #000; }
+.tab-content.hidden { display: none; }
+.file-input { display: none; }
+.file-upload-btn {
+  display: block; width: 100%; padding: 28px;
+  border: 2px dashed #ccc; border-radius: 8px;
+  text-align: center; cursor: pointer; font-size: 13px; color: #888;
+  transition: all 0.15s;
+}
+.file-upload-btn:hover { border-color: #999; color: #555; }
+.image-preview { margin-top: 10px; }
+.image-preview img { max-width: 100%; border-radius: 8px; max-height: 160px; object-fit: contain; }
+.modal-body textarea, .modal-body input[type="text"] {
+  width: 100%; padding: 9px 11px; border: 1px solid #ddd; border-radius: 8px;
+  font-size: 13px; font-family: 'Pretendard', sans-serif; resize: vertical;
+}
+.modal-body textarea:focus, .modal-body input[type="text"]:focus { outline: none; border-color: #000; }
+.modal-field { margin-top: 10px; margin-bottom: 4px; }
+.modal-field label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px; color: #666; }
+.modal-footer {
+  display: flex; gap: 8px; justify-content: flex-end;
+  padding: 12px 22px 18px; border-top: 1px solid #eee;
+}
+.btn {
+  padding: 9px 22px; border: none; border-radius: 8px;
+  font-size: 13px; font-weight: 600; cursor: pointer;
+  font-family: 'Pretendard', sans-serif; transition: all 0.15s;
+}
+.btn-cancel { background: #f0f0f0; color: #333; }
+.btn-cancel:hover { background: #e0e0e0; }
+.btn-save { background: #000; color: #fff; }
+.btn-save:hover { background: #333; }
+.btn-delete { background: none; color: #d00; margin-right: auto; padding-left: 0; }
+.btn-delete:hover { text-decoration: underline; }
+.hidden { display: none !important; }
+
+/* ===== Custom Cursors ===== */
+/* Arrow cursor SVG — black arrowhead pointing top-left */
+.archive {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpolygon points='2,2 22,12 12,12 12,22' fill='black'/%3E%3C/svg%3E") 2 2, default;
+}
+
+.cell-hit {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpolygon points='2,2 22,12 12,12 12,22' fill='black'/%3E%3C/svg%3E") 2 2, pointer;
+}
+
+/* Drawing mode: ✎ pencil */
+body.drawing-mode .cell-hit {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Ctext x='1' y='20' font-size='20' font-family='sans-serif'%3E✎%3C/text%3E%3C/svg%3E") 2 20, crosshair;
+}
+
+.draw-canvas {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Ctext x='1' y='20' font-size='20' font-family='sans-serif'%3E✎%3C/text%3E%3C/svg%3E") 2 20, crosshair;
+}
+
+/* ===== 1. Film Grain Overlay ===== */
+.archive::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  pointer-events: none;
+  opacity: 0.04;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 180px 180px;
+  mix-blend-mode: multiply;
+  animation: grainShift 0.5s steps(1) infinite;
+}
+
+@keyframes grainShift {
+  0% { transform: translate(0, 0); }
+  25% { transform: translate(-2px, 1px); }
+  50% { transform: translate(1px, -1px); }
+  75% { transform: translate(-1px, 2px); }
+  100% { transform: translate(2px, -2px); }
+}
+
+/* ===== 2. Sequential Cell Entrance ===== */
+.cell-hit {
+  opacity: 0;
+  animation: cellFadeIn 0.4s ease forwards;
+}
+
+.cell-img {
+  opacity: 0;
+  animation: cellFadeIn 0.4s ease forwards;
+}
+
+.cell-num {
+  opacity: 0;
+  animation: cellFadeIn 0.3s ease forwards;
+}
+
+.cell-text {
+  opacity: 0;
+  animation: cellFadeIn 0.4s ease forwards;
+}
+
+@keyframes cellFadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+
+/* ===== Easter Egg ===== */
+.easter-egg {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  animation: eggFadeIn 0.4s ease;
+}
+
+@keyframes eggFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.easter-egg-text {
+  font-family: 'Pretendard', sans-serif;
+  font-weight: 700;
+  font-size: clamp(24px, 4vw, 56px);
+  color: #fff;
+  white-space: nowrap;
+  border-right: 2px solid #fff;
+  animation: blink 0.6s step-end infinite;
+}
+
+@keyframes blink {
+  50% { border-color: transparent; }
+}
+
+.easter-egg.closing {
+  animation: eggFadeOut 0.5s ease forwards;
+}
+
+@keyframes eggFadeOut {
+  to { opacity: 0; }
+}
+
+/* ===== Easter Egg 2: Gravity Drop & Stack ===== */
+.cell-img.dropping {
+  transition: none !important;
+  z-index: 20;
+  pointer-events: none;
+  animation: gravityDrop var(--drop-duration, 1s) cubic-bezier(0.33, 0, 0.67, 0) forwards;
+  animation-delay: var(--drop-delay, 0ms);
+}
+
+.cell-img.dropping img {
+  transition: none !important;
+}
+
+@keyframes gravityDrop {
+  0% {
+    transform: translateY(0) rotate(0deg) scale(1);
+    opacity: 1;
+  }
+  12% {
+    transform: translateY(-12px) rotate(var(--drop-r1, -3deg)) scale(1.01);
+  }
+  100% {
+    transform: translateY(var(--drop-y, 500px)) rotate(var(--drop-r3, 15deg)) scale(1);
+    opacity: 1;
+  }
+}
+
+.cell-text.dropping {
+  transition: none !important;
+  z-index: 20;
+  pointer-events: none;
+  animation: gravityDrop var(--drop-duration, 1.2s) cubic-bezier(0.33, 0, 0.67, 0) forwards;
+  animation-delay: var(--drop-delay, 0ms);
+}
+
+.cell-num.dropping {
+  transition: none !important;
+  z-index: 20;
+  pointer-events: none;
+  animation: numScatter var(--drop-duration, 0.8s) cubic-bezier(0.33, 0, 0.67, 0) forwards;
+  animation-delay: var(--drop-delay, 0ms);
+}
+
+@keyframes numScatter {
+  0% {
+    transform: translate(0, 0) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(var(--scatter-x, 20px), var(--drop-y, 400px)) rotate(var(--drop-r3, 30deg));
+    opacity: 0.7;
+  }
+}
+</style>
+</head>
+<body>
+  <div class="archive" id="archive"></div>
+  <div class="modal-overlay" id="modalOverlay">
+    <div class="modal">
+      <div class="modal-header">
+        <span class="modal-title" id="modalTitle">셀 편집</span>
+        <button class="modal-close" id="modalClose">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-tabs">
+          <button class="tab-btn active" data-tab="image">🖼️ 이미지</button>
+          <button class="tab-btn" data-tab="text">📝 텍스트</button>
+        </div>
+        <div class="tab-content" id="tabImage">
+          <label class="file-upload-label">
+            <input type="file" accept="image/*" id="imageInput" class="file-input">
+            <span class="file-upload-btn">이미지를 선택하거나 여기에 드래그하세요</span>
+          </label>
+          <div class="image-preview" id="imagePreview"></div>
+        </div>
+        <div class="tab-content hidden" id="tabText">
+          <textarea id="textInput" placeholder="텍스트를 입력하세요..." rows="5"></textarea>
+        </div>
+        <div class="modal-field">
+          <label>제목</label>
+          <input type="text" id="cellTitleInput" placeholder="제목을 입력하세요">
+        </div>
+        <div class="modal-field">
+          <label>설명</label>
+          <textarea id="cellDescInput" placeholder="설명을 입력하세요..." rows="4"></textarea>
+        </div>
+        <div class="modal-field">
+          <label>날짜</label>
+          <input type="text" id="cellDateInput" placeholder="2026/03/19 15:28">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-delete hidden" id="modalDelete">삭제</button>
+        <button class="btn btn-cancel" id="modalCancel">취소</button>
+        <button class="btn btn-save" id="modalSave">저장</button>
+      </div>
+    </div>
+  </div>
+  <script>
+// ===== Figma asset URLs (saved locally) =====
+const ASSETS = {
+  photo003: "assets/photo003.png",
+  photo001: "assets/photo001.png",
+  photo0420_001: "assets/photo0420_001.png",
+  photo0408_003: "assets/photo0408_003.png",
+  photo0420_003: "assets/photo0420_003.png",
+  photo0408_010: "assets/photo0408_010.png",
+  image10: "assets/image10.png",
+  photo0408_011: "assets/photo0408_011.png",
+  photo0407_002: "assets/photo0407_002.png",
+  image8: "assets/image8.png",
+  photo0420_002: "assets/photo0420_002.png",
+  photo0408_004: "assets/photo0408_004.png",
+  photo0420_004: "assets/photo0420_004.png",
+  photo0407_1608: "assets/photo0407_1608.png",
+  image12: "assets/image12.png",
+  image13: "assets/image13.png",
+  photo0408_008: "assets/photo0408_008.png",
+  image4: "assets/image4.png",
+  photo0408_005: "assets/photo0408_005.png",
+  photo0407_1601: "assets/photo0407_1601.png",
+  photo0408_002: "assets/photo0408_002.png",
+};
+
+// ===== Figma grid (only the table part) =====
+// Grid spans from x=403.97 to x=1513.97, y=51.74 to y=1065.74 in Figma
+// Grid width = 1110, Grid height = 1014
+const GRID_W = (1513.97 - 403.97) * (8/6); // 6열→8열 확장: 1480
+const GRID_H = 1065.74 - 51.74;  // 1014
+const COLS = 8, ROWS = 6;
+const COL_W_RATIO = 1 / COLS;
+const ROW_H_RATIO = 1 / ROWS;
+
+// Image padding inside cell (Figma: 9px left, 29px top, 9px right, 10px bottom in 185x169 cell)
+const IMG_PAD_L = 9/185, IMG_PAD_T = 29/169, IMG_PAD_R = 9/185, IMG_PAD_B = 10/169;
+
+const CELL_GRID = [
+  [1,2,3,4,5,6,7,8],
+  [9,10,11,12,13,14,15,16],
+  [17,18,19,20,21,22,23,24],
+  [25,26,27,28,29,30,31,32],
+  [33,34,35,36,37,38,39,40],
+  [41,42,43,44,45,46,47,48],
+];
+const NUM_TO_POS = {};
+CELL_GRID.forEach((r,ri) => r.forEach((n,ci) => { NUM_TO_POS[n]={row:ri,col:ci}; }));
+
+const FIGMA_IMAGES = {
+  1:"photo003",3:"photo001",11:"photo0420_001",17:"photo0408_003",
+  26:"photo0420_003",43:"photo0408_010",4:"image10",12:"photo0408_011",
+  20:"photo0407_002",28:"image8",37:"photo0420_002",45:"photo0408_004",
+  5:"photo0420_004",13:"photo0407_1608",21:"image12",29:"image13",
+  46:"photo0408_008",6:"image4",22:"photo0408_005",30:"photo0407_1601",
+  39:"photo0408_002",
+  // New columns (7,8) images
+  7:"photo0420_003",8:"photo0408_003",
+  15:"photo0407_002",16:"image10",
+  23:"photo0420_004",24:"photo0408_005",
+  31:"photo0407_1601",32:"photo0408_002",
+  47:"photo0420_001",48:"photo001",
+};
+const FIGMA_TEXTS = {
+  2:"무언가의 결과물이 나오기 위해서는 서울부산을 몇바퀴 왕복하는가",
+  35:"네모의 여정",
+  9:"어디서든 비누를 마주치는 일상",
+  40:"마지막 한 조각까지",
+};
+
+const DESC_DATA = {
+  1:{title:"Nothing Special\n우리의 매일을 바꿔놓은 아주 사소한 그것",description:"어떻게 해야 비누가 감각적인 굿즈가 될 수 있을까? 답이 보이지 않던 그때, 여기저기에서 비누를 마주칠 때마다 미쳐버릴 것 같았다. 여기저기에서 보이는 만만한 물건이라 비누를 만들겠다고 했는데\n정말 여기저기서 셀 수 없이 보여서\n집에서 잘 쉬다가도 해결되지 않은 일이 불쑥불쑥 떠올랐기 때문이다.\n그래도 잘 고르긴 했네 싶었다.\n우리가 인식하지 못한 사이, 얼마나 많은 곳에서 비누를 만나고 또 신세지고 있는지 궁금했다.",date:"2026/03/19 15:28"},
+  2:{title:"서울부산 왕복의 기록",description:"기차 안에서 노트북을 펴고, 창밖을 보다가, 다시 화면을 보다가. 그 반복 속에서 뭔가가 만들어지고 있었다.",date:"2026/03/22 09:14"},
+  3:{title:"파란 하늘 아래의 약속",description:"그날따라 하늘이 유난히 맑았다. 아무것도 정해진 건 없었지만, 이 하늘 아래서라면 뭐든 될 것 같은 기분이었다.",date:"2026/03/25 14:02"},
+  4:{title:"물방울의 형태",description:"비누 위에 맺힌 물방울을 한참 들여다봤다. 동그란 세계 안에 천장이 비치고, 내 얼굴이 비치고.",date:"2026/03/27 11:33"},
+  5:{title:"포장의 미학",description:"포장지 하나에도 고민이 담긴다. 어떤 색이, 어떤 질감이, 이 물건의 첫인상을 결정하니까.",date:"2026/04/01 16:45"},
+  6:{title:"Vadiva\n이름이 생기던 날",description:"수십 개의 후보 중에서 골랐다. 발음했을 때의 느낌, 글자의 생김새, 의미의 여백.",date:"2026/04/03 20:17"},
+  7:{title:"거품의 밀도",description:"손바닥 위에 올린 거품. 촘촘하고 부드러운 결이 좋은 비누의 첫 번째 조건이었다.",date:"2026/04/04 11:20"},
+  8:{title:"첫 시제품",description:"틀에서 꺼낸 첫 번째 비누. 모서리가 울퉁불퉁했지만, 그래도 비누였다. 시작이었다.",date:"2026/04/05 08:45"},
+  9:{title:"어디서든 비누를 마주치는 일상",description:"화장실에서, 주방에서, 세탁실에서. 비누를 의식하기 시작하니 하루에도 수십 번 마주쳤다.",date:"2026/04/06 14:30"},
+  11:{title:"재료의 첫 만남",description:"택배 상자를 열었을 때의 냄새. 코코넛 오일, 올리브 오일, 시어버터.",date:"2026/04/05 10:22"},
+  12:{title:"실험실의 오후",description:"온도계를 들여다보며 1도 차이에 일희일비했다. 비누 만들기는 과학이면서 동시에 감이었다.",date:"2026/04/08 09:39"},
+  13:{title:"빛이 드는 작업실",description:"오후 네 시쯤, 창문으로 들어오는 빛이 작업대 위를 비췄다.",date:"2026/04/07 16:08"},
+  15:{title:"온도의 기록",description:"38도에서 42도 사이. 그 좁은 범위 안에서 비누의 질감이 결정됐다.",date:"2026/04/09 10:15"},
+  16:{title:"두 번째 실험",description:"이번엔 라벤더를 넣어봤다. 향이 퍼지는 순간, 작업실 공기가 달라졌다.",date:"2026/04/09 15:30"},
+  17:{title:"가족의 응원",description:"엄마가 보내준 사진. '가족이니까'라는 말 한마디에 힘이 났다.",date:"2026/04/08 09:40"},
+  20:{title:"우연한 발견",description:"길을 걷다가 우연히 마주친 장면. 나중에 보니 그게 영감이 되어 있었다.",date:"2026/04/07 15:59"},
+  21:{title:"선반 위의 질서",description:"만들어진 것들을 하나씩 선반에 올렸다. 줄 맞춰 놓으니 비로소 '제품'처럼 보이기 시작했다.",date:"2026/04/10 14:20"},
+  22:{title:"박스 테이프의 소리",description:"찍— 하고 테이프를 당기는 소리. 포장을 마칠 때마다 작은 성취감이 찾아왔다.",date:"2026/04/08 09:41"},
+  23:{title:"색의 조합",description:"파란색과 흰색을 섞었다. 하늘빛도 바다빛도 아닌, 우리만의 색이 나왔다.",date:"2026/04/11 13:20"},
+  24:{title:"라벨 디자인",description:"글씨체 하나를 고르는 데 사흘이 걸렸다. 작은 것 하나가 전체 인상을 바꿨다.",date:"2026/04/12 09:00"},
+  26:{title:"손 세정의 순간",description:"펌프를 누르면 나오는 거품. 매일 반복하는 이 단순한 행위 속에 우리가 만들고 싶은 경험이 담겨 있었다.",date:"2026/04/20 15:30"},
+  28:{title:"SAMCRAFT\n이름표가 붙던 날",description:"스티커를 하나하나 붙이면서 생각했다. 이 작은 라벨 하나가 브랜드의 얼굴이 된다는 것을.",date:"2026/04/12 13:55"},
+  29:{title:"투명한 시간",description:"비누가 굳어가는 시간을 기다렸다. 기다림도 만드는 과정의 일부라는 걸 배웠다.",date:"2026/04/15 17:42"},
+  30:{title:"깊은 밤의 작업",description:"새벽 두 시. 모두가 잠든 시간에 혼자 작업실에 앉아 있었다.",date:"2026/04/07 16:01"},
+  31:{title:"향의 레이어",description:"베이스 노트, 미들 노트, 탑 노트. 향도 시간에 따라 변한다는 걸 처음 알았다.",date:"2026/04/16 11:30"},
+  32:{title:"포장의 완성",description:"리본을 묶는 마지막 동작. 손끝에 힘을 주면서, 받을 사람의 얼굴을 떠올렸다.",date:"2026/04/17 14:00"},
+  35:{title:"네모의 여정",description:"네모난 비누 하나가 세상에 나오기까지의 여정. 각진 모서리 하나하나에 고민의 흔적이 남아 있다.",date:"2026/04/18 11:07"},
+  37:{title:"색의 실험",description:"파란색을 넣어봤다. 하늘색도, 바다색도 아닌 우리만의 파란색.",date:"2026/04/20 15:31"},
+  38:{title:"수분의 균형",description:"너무 건조하면 갈라지고, 너무 촉촉하면 물러진다. 그 사이의 균형을 찾는 일.",date:"2026/04/21 09:15"},
+  39:{title:"원재료의 무게",description:"저울 위에 올려놓은 재료들. 그램 단위의 정밀함이 결과물의 질감을 결정했다.",date:"2026/04/08 09:42"},
+  40:{title:"마지막 한 조각까지",description:"남은 재료를 아껴 쓰며 마지막 한 조각까지 만들었다. 버려지는 것 없이.",date:"2026/04/22 16:40"},
+  43:{title:"완성 직전의 떨림",description:"거의 다 왔다는 느낌. 마지막 공정을 앞두고 손이 떨렸다.",date:"2026/04/22 08:15"},
+  45:{title:"첫 번째 출하",description:"박스를 쌓아올렸다. 처음으로 누군가에게 보내는 우리의 물건.",date:"2026/04/23 14:30"},
+  46:{title:"돌아보는 시간",description:"작업실 한쪽에 쌓인 실패작들. 버리지 못하고 모아둔 건, 그것들이 없었으면 지금의 결과물도 없었을 테니까.",date:"2026/04/25 19:50"},
+  47:{title:"다음 시즌의 스케치",description:"다 끝난 줄 알았는데, 노트에 새로운 아이디어가 적혀 있었다. 끝은 곧 시작이었다.",date:"2026/04/26 10:00"},
+  48:{title:"우리가 만든 것",description:"테이블 위에 나란히 놓인 비누들. 처음과는 완전히 달라진 모습. 그래도 시작점의 마음은 그대로였다.",date:"2026/04/27 18:30"},
+};
+
+// ===== State =====
+let userCells = (() => { try { const s=localStorage.getItem('archive_user_v6'); if(s) return JSON.parse(s); } catch(e){} return {}; })();
+let drawingMode = false, activeDrawCell = null;
+let editingNum = null, selectedTab = 'image', pendingImageDataUrl = null;
+const archiveEl = document.getElementById('archive');
+const modalOverlay = document.getElementById('modalOverlay');
+const modalClose = document.getElementById('modalClose');
+const modalCancel = document.getElementById('modalCancel');
+const modalSave = document.getElementById('modalSave');
+const modalDelete = document.getElementById('modalDelete');
+const modalTitle = document.getElementById('modalTitle');
+const imageInput = document.getElementById('imageInput');
+const imagePreview = document.getElementById('imagePreview');
+const textInput = document.getElementById('textInput');
+const cellTitleInput = document.getElementById('cellTitleInput');
+const cellDescInput = document.getElementById('cellDescInput');
+const cellDateInput = document.getElementById('cellDateInput');
+const tabBtns = document.querySelectorAll('.tab-btn');
+const tabImage = document.getElementById('tabImage');
+const tabText = document.getElementById('tabText');
+function saveUserCells() { try { localStorage.setItem('archive_user_v6', JSON.stringify(userCells)); } catch(e){} }
+
+// ===== Layout: sidebar fixed left, grid scales to fill height, gap stretches =====
+// Grid is scaled to fit viewport height (with padding).
+// Sidebar content stays at fixed left.
+// The gap between sidebar and grid expands with viewport width.
+function getLayout() {
+  const vh = window.innerHeight;
+  const vw = window.innerWidth;
+  const pad = vh * 0.045;
+
+  // Sidebar takes a fixed portion of the left
+  const sidebarPadLeft = Math.max(30, vw * 0.025);
+  const sidebarMinW = 200; // minimum sidebar content width
+  const rightMargin = vw * 0.01;
+
+  // Available width for the grid = viewport - sidebar - margins
+  const availW = vw - sidebarMinW - sidebarPadLeft - rightMargin;
+  const availH = vh - pad * 2;
+
+  // Scale grid to fill available space, constrained by both width and height
+  const scaleByW = availW / GRID_W;
+  const scaleByH = availH / GRID_H;
+  const scale = Math.min(scaleByW, scaleByH);
+
+  const gridW = GRID_W * scale;
+  const gridH = GRID_H * scale;
+  const colW = gridW / COLS;
+  const rowH = gridH / ROWS;
+
+  // Position grid: right-aligned
+  const gridLeft = vw - gridW - rightMargin;
+  const gridTop = (vh - gridH) / 2; // vertically centered
+
+  const sidebarContentW = Math.max(200, gridLeft - sidebarPadLeft - 20);
+
+  return { vh, vw, pad, gridH, gridW, scale, colW, rowH, gridLeft, gridTop, rightMargin, sidebarPadLeft, sidebarContentW };
+}
+
+function buildLayout() {
+  const L = getLayout();
+  let html = '';
+
+  // ===== Sidebar content (absolute, left side) =====
+  // Title
+  const titleSize = Math.min(79, Math.max(40, L.vh * 0.072));
+  html += `<p class="archive-title" style="left:${L.sidebarPadLeft}px;top:${L.gridTop}px;font-size:${titleSize}px;">㈅㈀㈍</p>`;
+
+  // Pencil
+  const pencilTop = L.gridTop + titleSize + 30;
+  const pencilSize = Math.min(47, Math.max(28, L.vh * 0.043));
+  html += `<div class="pencil-wrap" style="left:${L.sidebarPadLeft + 4}px;top:${pencilTop}px;">`;
+  html += `<button class="pencil-btn${drawingMode?' active':''}" id="pencilBtn" style="width:${pencilSize*0.91}px;height:${pencilSize*0.91}px;font-size:${pencilSize}px;" title="그리기 모드 (Esc로 해제)">✎</button>`;
+  html += '</div>';
+
+  // Description panel — bottom-aligned to grid bottom
+  const descTop = L.gridTop + L.gridH * 0.4;
+  const descBottom = L.vh - (L.gridTop + L.gridH);
+  const descW = Math.min(L.sidebarContentW, 340);
+  html += `<div class="desc-panel" id="descPanel" style="left:${L.sidebarPadLeft}px;width:${descW}px;top:${descTop}px;bottom:${descBottom}px;"></div>`;
+
+  // ===== Grid =====
+  // Vertical lines (7 lines for 6 cols)
+  for (let i = 0; i <= COLS; i++) {
+    const x = L.gridLeft + i * L.colW;
+    html += `<div class="grid-line-v" style="left:${x}px;top:${L.gridTop}px;height:${L.gridH}px;"></div>`;
+  }
+  // Horizontal lines (7 lines for 6 rows)
+  for (let i = 0; i <= ROWS; i++) {
+    const y = L.gridTop + i * L.rowH;
+    html += `<div class="grid-line-h" style="left:${L.gridLeft}px;top:${y}px;width:${L.gridW}px;"></div>`;
+  }
+
+  // Cell numbers
+  const numSize = Math.max(9, L.colW * 0.065);
+  for (let row = 0; row < ROWS; row++) {
+    for (let col = 0; col < COLS; col++) {
+      const num = CELL_GRID[row][col];
+      const x = L.gridLeft + col * L.colW + L.colW * 0.04;
+      const y = L.gridTop + row * L.rowH + L.rowH * 0.035;
+      html += `<span class="cell-num" style="left:${x}px;top:${y}px;font-size:${numSize}px;">(${num})</span>`;
+    }
+  }
+
+  // In-grid text blocks
+  const txtSize = Math.max(11, L.colW * 0.097);
+  const txtLH = txtSize * 1.33;
+  for (const [numStr, text] of Object.entries(FIGMA_TEXTS)) {
+    const num = parseInt(numStr);
+    const pos = NUM_TO_POS[num];
+    const x = L.gridLeft + pos.col * L.colW + L.colW * IMG_PAD_L;
+    const y = L.gridTop + pos.row * L.rowH + L.rowH * IMG_PAD_T;
+    const w = L.colW * (1 - IMG_PAD_L - IMG_PAD_R);
+    html += `<div class="cell-text" style="left:${x}px;top:${y}px;width:${w}px;font-size:${txtSize}px;line-height:${txtLH}px;">${escHtml(text)}</div>`;
+  }
+
+  // Figma images (with padding inside cells)
+  for (const [numStr, assetKey] of Object.entries(FIGMA_IMAGES)) {
+    const num = parseInt(numStr);
+    const pos = NUM_TO_POS[num];
+    const cx = L.gridLeft + pos.col * L.colW;
+    const cy = L.gridTop + pos.row * L.rowH;
+    const ix = cx + L.colW * IMG_PAD_L;
+    const iy = cy + L.rowH * IMG_PAD_T;
+    const iw = L.colW * (1 - IMG_PAD_L - IMG_PAD_R);
+    const ih = L.rowH * (1 - IMG_PAD_T - IMG_PAD_B);
+    html += `<div class="cell-img" style="left:${ix}px;top:${iy}px;width:${iw}px;height:${ih}px;"><img src="${ASSETS[assetKey]}" alt=""></div>`;
+  }
+
+  // Interactive hit areas
+  for (let row = 0; row < ROWS; row++) {
+    for (let col = 0; col < COLS; col++) {
+      const num = CELL_GRID[row][col];
+      const x = L.gridLeft + col * L.colW;
+      const y = L.gridTop + row * L.rowH;
+      html += `<div class="cell-hit" data-num="${num}" style="left:${x}px;top:${y}px;width:${L.colW}px;height:${L.rowH}px;">`;
+      const ud = userCells[num];
+      if (ud) {
+        const pl = IMG_PAD_L*100, pt = IMG_PAD_T*100, pw = (1-IMG_PAD_L-IMG_PAD_R)*100, ph = (1-IMG_PAD_T-IMG_PAD_B)*100;
+        if (ud.type==='image' && ud.imageData) html += `<img class="user-img" src="${ud.imageData}" alt="" draggable="false" style="left:${pl}%;top:${pt}%;width:${pw}%;height:${ph}%;position:absolute;">`;
+        else if (ud.type==='text' && ud.text) html += `<div class="user-text" style="padding:${L.rowH*IMG_PAD_T}px ${L.colW*IMG_PAD_L}px ${L.rowH*IMG_PAD_B}px;font-size:${txtSize}px;line-height:${txtLH}px;">${escHtml(ud.text)}</div>`;
+        if (ud.canvasData) html += `<img class="user-canvas-overlay" src="${ud.canvasData}" alt="" draggable="false">`;
+      }
+      html += '</div>';
+    }
+  }
+
+  archiveEl.innerHTML = html;
+  document.getElementById('pencilBtn').addEventListener('click', togglePencil);
+
+  // Sequential entrance animation delays
+  let cellIdx = 0;
+  archiveEl.querySelectorAll('.cell-hit').forEach(el => {
+    const delay = cellIdx * 25; // 25ms stagger per cell
+    el.style.animationDelay = delay + 'ms';
+    cellIdx++;
+  });
+  cellIdx = 0;
+  archiveEl.querySelectorAll('.cell-img').forEach(el => {
+    // Match delay to the cell it belongs to
+    el.style.animationDelay = (cellIdx * 25 + 50) + 'ms';
+    cellIdx++;
+  });
+  cellIdx = 0;
+  archiveEl.querySelectorAll('.cell-num').forEach(el => {
+    el.style.animationDelay = (cellIdx * 25) + 'ms';
+    cellIdx++;
+  });
+  cellIdx = 0;
+  archiveEl.querySelectorAll('.cell-text').forEach(el => {
+    el.style.animationDelay = (cellIdx * 60 + 200) + 'ms';
+    cellIdx++;
+  });
+
+  archiveEl.querySelectorAll('.cell-hit').forEach(el => {
+    const num = parseInt(el.dataset.num);
+    el.addEventListener('mouseenter', () => showDesc(num));
+    el.addEventListener('mouseleave', hideDesc);
+    el.addEventListener('click', () => onCellClick(num, el));
+  });
+}
+
+// ===== Description panel =====
+function showDesc(num) {
+  const panel = document.getElementById('descPanel');
+  const ud = userCells[num], bd = DESC_DATA[num];
+  const data = (ud && (ud.title||ud.description)) ? ud : bd;
+  if (!data || (!data.title && !data.description && !data.date)) { panel.classList.remove('visible'); return; }
+  const L = getLayout();
+  const ts = Math.min(28, Math.max(16, L.vh*0.025));
+  const bs = Math.min(18, Math.max(13, L.vh*0.016));
+  let html = `<div class="desc-number" style="font-size:${Math.max(12,ts*0.57)}px;margin-bottom:${ts*0.5}px;">(${num})</div>`;
+  if (data.title) html += `<div class="desc-title" style="font-size:${ts}px;line-height:${ts*1.36}px;margin-bottom:${ts*0.64}px;">${escHtml(data.title).replace(/\n/g,'<br>')}</div>`;
+  if (data.description) html += `<div class="desc-body" style="font-size:${bs}px;line-height:${bs*1.67}px;margin-bottom:${bs*1.33}px;">${escHtml(data.description).replace(/\n/g,'<br>')}</div>`;
+  if (data.date) html += `<div class="desc-date" style="font-size:${Math.max(12,bs*0.89)}px;">${escHtml(data.date)}</div>`;
+  panel.innerHTML = html;
+  panel.classList.add('visible');
+  zoomCell(num, true);
+}
+function hideDesc() {
+  document.getElementById('descPanel').classList.remove('visible');
+  archiveEl.querySelectorAll('.cell-img img').forEach(img => { img.style.transform=''; img.style.filter=''; });
+}
+function zoomCell(num, on) {
+  const pos = NUM_TO_POS[num]; if (!pos) return;
+  const L = getLayout();
+  const cL=L.gridLeft+pos.col*L.colW, cR=cL+L.colW, cT=L.gridTop+pos.row*L.rowH, cB=cT+L.rowH;
+  archiveEl.querySelectorAll('.cell-img').forEach(el => {
+    const l=parseFloat(el.style.left),t=parseFloat(el.style.top),w=parseFloat(el.style.width),h=parseFloat(el.style.height);
+    if (l<cR&&l+w>cL&&t<cB&&t+h>cT) { const img=el.querySelector('img'); if(img){img.style.transform=on?'scale(1.06)':'';img.style.filter=on?'brightness(1.03)':'';} }
+  });
+}
+
+// ===== Cell click =====
+function onCellClick(num, el) {
+  if (drawingMode) { startDrawing(num,el); return; }
+  if (num === 48) { triggerGravityDrop(); return; }
+  openModal(num);
+}
+
+// ===== Drawing =====
+function togglePencil() { drawingMode=!drawingMode; document.body.classList.toggle('drawing-mode',drawingMode); if(!drawingMode) finishDrawing(); buildLayout(); }
+function startDrawing(num, cellEl) {
+  if (activeDrawCell&&activeDrawCell.num===num) return; finishDrawing();
+  activeDrawCell={num,el:cellEl};
+  const rect=cellEl.getBoundingClientRect(), dpr=window.devicePixelRatio||1;
+  const canvas=document.createElement('canvas'); canvas.className='draw-canvas';
+  canvas.width=rect.width*dpr; canvas.height=rect.height*dpr;
+  canvas.style.width=rect.width+'px'; canvas.style.height=rect.height+'px';
+  canvas.style.left='0'; canvas.style.top='0'; cellEl.appendChild(canvas);
+  const ctx=canvas.getContext('2d'); ctx.scale(dpr,dpr);
+  const ud=userCells[num]; if(ud&&ud.canvasData){const img=new Image();img.onload=()=>ctx.drawImage(img,0,0,rect.width,rect.height);img.src=ud.canvasData;}
+  ctx.strokeStyle='#000';ctx.lineWidth=2.5;ctx.lineCap='round';ctx.lineJoin='round';
+  let isDown=false;
+  const pos=e=>{const r=canvas.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top};};
+  canvas.addEventListener('mousedown',e=>{isDown=true;const p=pos(e);ctx.beginPath();ctx.moveTo(p.x,p.y);e.stopPropagation();e.preventDefault();});
+  canvas.addEventListener('mousemove',e=>{if(!isDown)return;const p=pos(e);ctx.lineTo(p.x,p.y);ctx.stroke();e.stopPropagation();});
+  const stop=()=>{if(!isDown)return;isDown=false;ctx.closePath();saveCanvas(num,canvas);};
+  canvas.addEventListener('mouseup',stop); canvas.addEventListener('mouseleave',stop);
+}
+function saveCanvas(num,canvas){const url=canvas.toDataURL('image/png');if(!userCells[num])userCells[num]={};userCells[num].canvasData=url;saveUserCells();}
+function finishDrawing(){if(!activeDrawCell)return;const c=activeDrawCell.el.querySelector('.draw-canvas');if(c){saveCanvas(activeDrawCell.num,c);c.remove();}activeDrawCell=null;buildLayout();}
+function clearActiveDrawing(){if(!activeDrawCell)return;const num=activeDrawCell.num;const c=activeDrawCell.el.querySelector('.draw-canvas');if(c)c.remove();if(userCells[num]){delete userCells[num].canvasData;saveUserCells();}activeDrawCell=null;buildLayout();}
+
+// ===== Modal =====
+function openModal(num){editingNum=num;const data=userCells[num]||{};modalTitle.textContent=`(${num}) 편집`;pendingImageDataUrl=null;imagePreview.innerHTML='';imageInput.value='';textInput.value=data.text||'';cellTitleInput.value=data.title||'';cellDescInput.value=data.description||'';cellDateInput.value=data.date||formatNow();switchTab(data.type==='text'?'text':'image');if(data.imageData){pendingImageDataUrl=data.imageData;imagePreview.innerHTML=`<img src="${data.imageData}" alt="미리보기">`;}modalDelete.classList.toggle('hidden',!(data.type&&(data.imageData||data.text||data.canvasData)));modalOverlay.classList.add('open');}
+function closeModal(){modalOverlay.classList.remove('open');editingNum=null;}
+function switchTab(tab){selectedTab=tab;tabBtns.forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));tabImage.classList.toggle('hidden',tab!=='image');tabText.classList.toggle('hidden',tab!=='text');}
+tabBtns.forEach(b=>b.addEventListener('click',()=>switchTab(b.dataset.tab)));
+modalClose.addEventListener('click',closeModal);modalCancel.addEventListener('click',closeModal);
+modalOverlay.addEventListener('click',e=>{if(e.target===modalOverlay)closeModal();});
+imageInput.addEventListener('change',e=>{const f=e.target.files[0];if(f)readImg(f);});
+function readImg(file){const r=new FileReader();r.onload=ev=>{pendingImageDataUrl=ev.target.result;imagePreview.innerHTML=`<img src="${pendingImageDataUrl}" alt="미리보기">`;};r.readAsDataURL(file);}
+modalSave.addEventListener('click',()=>{if(editingNum===null)return;const ex=userCells[editingNum]||{};const t=cellTitleInput.value.trim(),d=cellDescInput.value.trim(),dt=cellDateInput.value.trim();if(selectedTab==='image'&&pendingImageDataUrl)userCells[editingNum]={...ex,type:'image',imageData:pendingImageDataUrl,title:t,description:d,date:dt};else if(selectedTab==='text'){const tx=textInput.value.trim();if(tx)userCells[editingNum]={...ex,type:'text',text:tx,title:t,description:d,date:dt};}if(userCells[editingNum]){userCells[editingNum].title=t;userCells[editingNum].description=d;userCells[editingNum].date=dt;}saveUserCells();buildLayout();closeModal();});
+modalDelete.addEventListener('click',()=>{if(editingNum===null)return;delete userCells[editingNum];saveUserCells();buildLayout();closeModal();});
+
+function escHtml(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
+function formatNow(){const d=new Date(),p=n=>String(n).padStart(2,'0');return`${d.getFullYear()}/${p(d.getMonth()+1)}/${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;}
+
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){
+    if(modalOverlay.classList.contains('open')){closeModal();return;}
+    if(drawingMode&&activeDrawCell){clearActiveDrawing();return;}
+    if(drawingMode){drawingMode=false;document.body.classList.remove('drawing-mode');finishDrawing();buildLayout();}
+  }
+});
+
+buildLayout();
+window.addEventListener('resize',buildLayout);
+
+// ===== Easter Egg: click ㈅㈀㈍ =====
+document.addEventListener('click', (e) => {
+  if (e.target.classList.contains('archive-title')) {
+    showEasterEgg();
+  }
+});
+
+// ===== Easter Egg 2: click (48) → gravity drop & stack =====
+let gravityTriggered = false;
+function triggerGravityDrop() {
+  if (gravityTriggered) return;
+  gravityTriggered = true;
+
+  const imgs = [...archiveEl.querySelectorAll('.cell-img')];
+  const texts = [...archiveEl.querySelectorAll('.cell-text')];
+  const nums = [...archiveEl.querySelectorAll('.cell-num')];
+
+  // Shuffle for randomness
+  const shuffled = [...imgs, ...texts].sort(() => Math.random() - 0.5);
+
+  // Calculate how far each element needs to fall to reach the bottom and stack
+  const archiveRect = archiveEl.getBoundingClientRect();
+  const archiveBottom = archiveRect.height;
+  let stackHeight = 0; // accumulated stack from bottom
+
+  shuffled.forEach((el, i) => {
+    const elRect = el.getBoundingClientRect();
+    const elTop = (elRect.top - archiveRect.top) / (archiveRect.height / parseFloat(archiveEl.style.height || 1100));
+    const elH = (elRect.height) / (archiveRect.height / parseFloat(archiveEl.style.height || 1100));
+
+    // Fall distance: to bottom of archive minus stack height minus element height
+    const fallTo = archiveBottom - stackHeight - elH - elTop;
+    stackHeight += elH * 0.3; // stack loosely (overlap a bit)
+
+    const delay = i * 80 + Math.random() * 100;
+    const duration = 0.8 + Math.random() * 0.4;
+    const r1 = (Math.random() - 0.5) * 8;
+    const r2 = (Math.random() - 0.5) * 6;
+    const r3 = (Math.random() - 0.5) * 25;
+
+    el.style.setProperty('--drop-delay', delay + 'ms');
+    el.style.setProperty('--drop-duration', duration + 's');
+    el.style.setProperty('--drop-r1', r1 + 'deg');
+    el.style.setProperty('--drop-r2', r2 + 'deg');
+    el.style.setProperty('--drop-r3', r3 + 'deg');
+    el.style.setProperty('--drop-y', Math.max(50, fallTo) + 'px');
+    el.classList.add('dropping');
+  });
+
+  // Numbers scatter
+  nums.forEach((el, i) => {
+    const delay = i * 40 + Math.random() * 200 + 300;
+    const duration = 0.6 + Math.random() * 0.4;
+    const r3 = (Math.random() - 0.5) * 60;
+    const sx = (Math.random() - 0.5) * 80;
+    el.style.setProperty('--drop-delay', delay + 'ms');
+    el.style.setProperty('--drop-duration', duration + 's');
+    el.style.setProperty('--drop-r3', r3 + 'deg');
+    el.style.setProperty('--scatter-x', sx + 'px');
+    el.style.setProperty('--drop-y', (archiveBottom - 40 + Math.random() * 30) + 'px');
+    el.classList.add('dropping');
+  });
+
+  // Reset after a while
+  const totalTime = shuffled.length * 80 + 4000;
+  setTimeout(() => {
+    gravityTriggered = false;
+    [...imgs, ...texts, ...nums].forEach(el => {
+      el.classList.remove('dropping');
+      ['--drop-delay','--drop-duration','--drop-r1','--drop-r2','--drop-r3','--scatter-x','--drop-y'].forEach(p => el.style.removeProperty(p));
+    });
+  }, totalTime);
+}
+
+function showEasterEgg() {
+  const msg = '안녕하세요, 박건호입니다.';
+  const overlay = document.createElement('div');
+  overlay.className = 'easter-egg';
+  const textEl = document.createElement('span');
+  textEl.className = 'easter-egg-text';
+  textEl.textContent = '';
+  overlay.appendChild(textEl);
+  document.body.appendChild(overlay);
+
+  let i = 0;
+  const type = () => {
+    if (i < msg.length) {
+      textEl.textContent = msg.slice(0, i + 1);
+      i++;
+      setTimeout(type, 80 + Math.random() * 40);
+    }
+  };
+  setTimeout(type, 300);
+
+  overlay.addEventListener('click', () => {
+    overlay.classList.add('closing');
+    overlay.addEventListener('animationend', () => overlay.remove());
+  });
+}
+</script>
+</body>
+</html>
