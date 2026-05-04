@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Day 13 — 혁필화 코모레비</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;touch-action:none}
+body{background:#FFFDF7}
+canvas{position:fixed;inset:0;width:100%;height:100%}
+#main{z-index:1}
+#draw{z-index:2;cursor:crosshair}
+.bar{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);
+  display:flex;gap:8px;padding:8px 16px;align-items:center;
+  background:rgba(255,253,247,.92);backdrop-filter:blur(12px);
+  border-radius:40px;border:1px solid rgba(0,0,0,.05);
+  box-shadow:0 4px 20px rgba(0,0,0,.03);z-index:100}
+.pb{width:36px;height:36px;border-radius:50%;border:2.5px solid transparent;
+  cursor:pointer;transition:transform .15s,border-color .15s;flex-shrink:0}
+.pb:hover{transform:scale(1.12)}.pb.on{border-color:#333;transform:scale(1.12)}
+.sep{width:1px;height:24px;background:rgba(0,0,0,.05);flex-shrink:0}
+.tb{width:32px;height:32px;border-radius:8px;border:none;background:rgba(0,0,0,.03);
+  cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center;
+  transition:background .15s;flex-shrink:0;color:rgba(0,0,0,.35)}
+.tb:hover{background:rgba(0,0,0,.06)}
+.sz{font-size:11px;color:rgba(0,0,0,.2);min-width:26px;text-align:center}
+.bk{position:fixed;top:16px;left:16px;z-index:200;
+  display:inline-flex;align-items:center;gap:6px;padding:8px 14px 8px 12px;
+  background:rgba(255,253,247,.7);color:rgba(0,0,0,.2);
+  font:500 12px/1 'Pretendard',sans-serif;text-decoration:none;
+  border:1px solid rgba(0,0,0,.04);border-radius:100px;backdrop-filter:blur(10px)}
+.bk:hover{background:rgba(255,253,247,.9)}
+.bk svg{stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.tag{position:fixed;bottom:14px;right:18px;font:11px/1 monospace;color:rgba(0,0,0,.06);pointer-events:none;z-index:99}
+.sub{position:fixed;bottom:62px;left:50%;transform:translateX(-50%);
+  font:300 11px/1.4 'Pretendard',sans-serif;color:rgba(0,0,0,.1);
+  pointer-events:none;z-index:50;text-align:center;letter-spacing:2px;
+  transition:opacity 1.5s}.sub.h{opacity:0}
+</style>
+</head>
+<body>
+<canvas id="main"></canvas>
+<canvas id="draw"></canvas>
+<a href="../" class="bk"><svg viewBox="0 0 24 24" width="14" height="14"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>back</a>
+<div class="sub" id="sub">click to bloom · drag to paint</div>
+<div class="bar" id="bar"></div>
+<div class="tag">day 13 / typo-vibe</div>
+
+<script>
+// ═══════════════════════════════════════════════════
+// 혁필화 코모레비 — Ink Bloom + Brush Drawing
+// "먹물이 번지듯 글자가 피어나는 경험"
+// ═══════════════════════════════════════════════════
+
+const mc = document.getElementById('main'), mx = mc.getContext('2d');
+const dc = document.getElementById('draw'), dx = dc.getContext('2d');
+let W, H, D;
+
+// ── Color pairs per character ──
+const COLORS = [
+  ['#FF6600','#FFDD00'], // 코: orange→yellow
+  ['#0066BB','#00BBEE'], // 모: blue→cyan
+  ['#EE1133','#FF8800'], // 레: red→amber
+  ['#228844','#88CC22'], // 비: green→lime
+];
+const PAL = [
+  {a:'#FF6600',b:'#FFDD00'},
+  {a:'#0066BB',b:'#00BBEE'},
+  {a:'#EE1133',b:'#FF8800'},
+  {a:'#228844',b:'#88CC22'},
+  {a:'#9900CC',b:'#FF66AA'},
+];
+let cP = 0, bW = 24;
+
+// ── Helpers ──
+function hR(h){const m=h.replace('#','');return[parseInt(m.slice(0,2),16),parseInt(m.slice(2,4),16),parseInt(m.slice(4,6),16)]}
+function lerp(a,b,t){return a+(b-a)*t}
+function rgbS(r,g,b,a){return a!==undefined?`rgba(${r|0},${g|0},${b|0},${a})`:`rgb(${r|0},${g|0},${b|0})`}
+function mixS(c1,c2,t){const a=hR(c1),b=hR(c2);return rgbS(lerp(a[0],b[0],t),lerp(a[1],b[1],t),lerp(a[2],b[2],t))}
+
+// ═══════════════════════════════════════════════════
+// STROKE DEFINITIONS — 코모레비
+// Each stroke: array of {x,y} points in local coords (0-100 grid per char)
+// + color pair index + draw order
+// ═══════════════════════════════════════════════════
+
+function defineStrokes() {
+  const S = [];
+  let order = 0;
+
+  function add(ci, pts) {
+    S.push({ ci, pts, order: order++, progress: 0, bloomPhase: 0 });
+  }
+
+  // ── 코 (ㅋ+ㅗ) ci:0 ──
+  // ㅋ: continuous path — top horiz → corner → down → corner → tick
+  add(0, [{x:2,y:8},{x:20,y:6},{x:40,y:5},{x:58,y:7},
+          {x:60,y:9},{x:60,y:12},
+          {x:60,y:22},{x:59,y:32},{x:60,y:40},
+          {x:62,y:41},{x:64,y:41},
+          {x:72,y:42}]);
+  // ㅗ vert
+  add(0, [{x:35,y:52},{x:35,y:62},{x:35,y:72},{x:35,y:82}]);
+  // ㅗ horiz
+  add(0, [{x:5,y:82},{x:25,y:80},{x:45,y:80},{x:65,y:82}]);
+
+  // ── 모 (ㅁ+ㅗ) ci:1 ── offset x+90
+  // ㅁ top
+  add(1, [{x:92,y:5},{x:110,y:4},{x:130,y:4},{x:148,y:6}]);
+  // ㅁ right
+  add(1, [{x:150,y:4},{x:150,y:18},{x:150,y:32},{x:150,y:46}]);
+  // ㅁ bottom
+  add(1, [{x:150,y:48},{x:132,y:48},{x:112,y:48},{x:92,y:48}]);
+  // ㅁ left
+  add(1, [{x:90,y:48},{x:90,y:34},{x:90,y:20},{x:90,y:4}]);
+  // ㅗ vert
+  add(1, [{x:120,y:52},{x:120,y:62},{x:120,y:72},{x:120,y:82}]);
+  // ㅗ horiz
+  add(1, [{x:92,y:82},{x:110,y:80},{x:130,y:80},{x:148,y:82}]);
+
+  // ── 레 (ㄹ+ㅔ) ci:2 ── offset x+180
+  // ㄹ continuous Z
+  add(2, [{x:182,y:5},{x:200,y:4},{x:218,y:4},{x:232,y:6},
+          {x:233,y:8},{x:233,y:10},
+          {x:233,y:18},{x:232,y:24},
+          {x:230,y:25},{x:228,y:25},
+          {x:215,y:26},{x:200,y:26},{x:188,y:25},
+          {x:186,y:27},{x:186,y:29},
+          {x:186,y:36},{x:186,y:44},
+          {x:188,y:46},{x:190,y:46},
+          {x:205,y:46},{x:220,y:46},{x:232,y:48}]);
+  // ㅔ vert1
+  add(2, [{x:244,y:0},{x:244,y:20},{x:244,y:40},{x:244,y:60},{x:244,y:82}]);
+  // ㅔ vert2
+  add(2, [{x:264,y:0},{x:264,y:20},{x:264,y:40},{x:264,y:60},{x:264,y:82}]);
+  // ㅔ tick1
+  add(2, [{x:242,y:28},{x:250,y:27},{x:258,y:27},{x:266,y:28}]);
+  // ㅔ tick2
+  add(2, [{x:242,y:52},{x:250,y:51},{x:258,y:51},{x:266,y:52}]);
+
+  // ── 비 (ㅂ+ㅣ) ci:3 ── offset x+280
+  // ㅂ left vert
+  add(3, [{x:288,y:5},{x:288,y:18},{x:288,y:32},{x:288,y:48}]);
+  // ㅂ right vert
+  add(3, [{x:342,y:5},{x:342,y:18},{x:342,y:32},{x:342,y:48}]);
+  // ㅂ upper bridge
+  add(3, [{x:286,y:20},{x:300,y:19},{x:320,y:19},{x:344,y:20}]);
+  // ㅂ lower bridge
+  add(3, [{x:286,y:42},{x:300,y:41},{x:320,y:41},{x:344,y:42}]);
+  // ㅣ
+  add(3, [{x:315,y:56},{x:315,y:66},{x:315,y:76},{x:315,y:88}]);
+
+  return S;
+}
+
+// ═══════════════════════════════════════════════════
+// RIBBON RENDERER — per-segment gradient + ink bleed
+// ═══════════════════════════════════════════════════
+
+function renderRibbon(ctx, points, cA, cB, hw, alpha, bleed) {
+  if (points.length < 2) return;
+  const n = points.length;
+  const norms = [];
+  for (let i = 0; i < n; i++) {
+    const p = points[Math.max(0,i-1)], q = points[Math.min(n-1,i+1)];
+    const dx=q.x-p.x, dy=q.y-p.y, len=Math.hypot(dx,dy)||1;
+    norms.push({nx:-dy/len, ny:dx/len});
+  }
+
+  // Bleed layer (behind, blurred)
+  if (bleed > 0) {
+    ctx.save();
+    ctx.globalAlpha = alpha * 0.25;
+    ctx.filter = `blur(${bleed}px)`;
+    ctx.beginPath();
+    for (let i=0;i<n;i++){
+      const p=points[i],nm=norms[i];
+      i===0?ctx.moveTo(p.x-nm.nx*(hw+2),p.y-nm.ny*(hw+2)):ctx.lineTo(p.x-nm.nx*(hw+2),p.y-nm.ny*(hw+2));
+    }
+    for (let i=n-1;i>=0;i--){
+      const p=points[i],nm=norms[i];
+      ctx.lineTo(p.x+nm.nx*(hw+2),p.y+nm.ny*(hw+2));
+    }
+    ctx.closePath();
+    const mi=n>>1;
+    const gB=ctx.createLinearGradient(
+      points[mi].x-norms[mi].nx*hw,points[mi].y-norms[mi].ny*hw,
+      points[mi].x+norms[mi].nx*hw,points[mi].y+norms[mi].ny*hw);
+    gB.addColorStop(0,cA);gB.addColorStop(1,cB);
+    ctx.fillStyle=gB;
+    ctx.fill();
+    ctx.filter='none';
+    ctx.restore();
+  }
+
+  // Main ribbon — per-segment quads
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  for (let i = 0; i < n-1; i++) {
+    const p0=points[i],p1=points[i+1],n0=norms[i],n1=norms[i+1];
+    const tl={x:p0.x-n0.nx*hw,y:p0.y-n0.ny*hw};
+    const bl={x:p0.x+n0.nx*hw,y:p0.y+n0.ny*hw};
+    const tr={x:p1.x-n1.nx*hw,y:p1.y-n1.ny*hw};
+    const br={x:p1.x+n1.nx*hw,y:p1.y+n1.ny*hw};
+    const mt={x:(tl.x+tr.x)/2,y:(tl.y+tr.y)/2};
+    const mb={x:(bl.x+br.x)/2,y:(bl.y+br.y)/2};
+    const g=ctx.createLinearGradient(mt.x,mt.y,mb.x,mb.y);
+    g.addColorStop(0,cA);
+    g.addColorStop(0.5,mixS(cA,cB,0.5));
+    g.addColorStop(1,cB);
+    ctx.fillStyle=g;
+    ctx.beginPath();
+    ctx.moveTo(tl.x,tl.y);ctx.lineTo(tr.x,tr.y);
+    ctx.lineTo(br.x,br.y);ctx.lineTo(bl.x,bl.y);
+    ctx.closePath();ctx.fill();
+  }
+  ctx.restore();
+}
+
+// ═══════════════════════════════════════════════════
+// ANIMATION — ink bloom reveal
+// ═══════════════════════════════════════════════════
+
+let strokes = [];
+let animStart = 0;
+let mx2=-9e9, my2=-9e9;
+
+function resamplePts(pts, sp) {
+  if(pts.length<2) return pts;
+  const out=[pts[0]];let carry=0;
+  for(let i=1;i<pts.length;i++){
+    const ddx=pts[i].x-pts[i-1].x,ddy=pts[i].y-pts[i-1].y;
+    const seg=Math.hypot(ddx,ddy);if(seg<.001)continue;
+    const ux=ddx/seg,uy=ddy/seg;let d=carry;
+    while(d<seg){out.push({x:pts[i-1].x+ux*d,y:pts[i-1].y+uy*d});d+=sp;}
+    carry=d-seg;}
+  out.push(pts[pts.length-1]);return out;
+}
+
+function initAnim() {
+  strokes = defineStrokes();
+  // Resample all stroke paths
+  strokes.forEach(s => {
+    s.pts = resamplePts(s.pts, 1.5);
+    s.progress = 0;
+    s.bloomPhase = 0;
+  });
+  animStart = performance.now() / 1000;
+}
+
+function renderMain(time) {
+  mx.clearRect(0,0,W,H);
+  mx.fillStyle='#FFFDF7';
+  mx.fillRect(0,0,W,H);
+
+  const elapsed = time - animStart;
+  const sc = Math.min(W/380, H/120, 2.8);
+  const ox = (W - 355*sc)/2;
+  const oy = (H - 90*sc)/2;
+  const hw = 14 * sc;
+
+  // Animate each stroke: staggered reveal
+  const strokeDur = 0.6; // seconds per stroke
+  const stagger = 0.15;  // delay between strokes
+
+  for (let i = 0; i < strokes.length; i++) {
+    const s = strokes[i];
+    const startT = s.order * stagger;
+    const t = Math.max(0, elapsed - startT);
+
+    // Progress: 0→1 over strokeDur
+    s.progress = Math.min(1, t / strokeDur);
+    const eased = 1 - Math.pow(1 - s.progress, 2.5); // ease out
+
+    // Bloom phase: extra bleed that fades after stroke completes
+    if (t > strokeDur) {
+      s.bloomPhase = Math.min(1, (t - strokeDur) / 0.8);
+    }
+
+    if (eased <= 0) continue;
+
+    // Get visible portion of stroke
+    const pts = s.pts;
+    const visCount = Math.max(2, Math.ceil(pts.length * eased));
+    const visPts = pts.slice(0, visCount).map(p => ({x: ox + p.x*sc, y: oy + p.y*sc}));
+
+    const col = COLORS[s.ci];
+
+    // Bloom bleed (stronger at start, fades)
+    const bloomBleed = (1 - s.bloomPhase) * 6 * sc * 0.3 + 2;
+
+    // Mouse hover: slight wobble + extra bleed
+    let hoverBleed = 0;
+    if (mx2 > -9000) {
+      const mid = visPts[visPts.length >> 1];
+      if (mid) {
+        const dist = Math.hypot(mx2 - mid.x, my2 - mid.y);
+        if (dist < 150) {
+          hoverBleed = (1 - dist/150) * 4;
+        }
+      }
+    }
+
+    // Alpha: fade in during reveal
+    const alpha = Math.min(0.92, eased * 1.2);
+
+    renderRibbon(mx, visPts, col[0], col[1], hw, alpha, bloomBleed + hoverBleed);
+  }
+
+  // Small decorative dots at stroke endpoints (like ink drops)
+  if (elapsed > strokes.length * stagger + strokeDur) {
+    const dotAlpha = Math.min(0.3, (elapsed - strokes.length * stagger - strokeDur) * 0.5);
+    mx.globalAlpha = dotAlpha;
+    const dots = [
+      {x:ox-8*sc, y:oy+2*sc, c:COLORS[0][0], r:3*sc},
+      {x:ox+155*sc, y:oy-6*sc, c:COLORS[1][1], r:2.5*sc},
+      {x:ox+270*sc, y:oy-4*sc, c:COLORS[2][0], r:2*sc},
+      {x:ox+350*sc, y:oy+85*sc, c:COLORS[3][1], r:3*sc},
+    ];
+    dots.forEach(d => {
+      mx.beginPath();
+      mx.arc(d.x, d.y, d.r, 0, Math.PI*2);
+      mx.fillStyle = d.c;
+      mx.fill();
+    });
+    mx.globalAlpha = 1;
+  }
+}
+
+// ═══════════════════════════════════════════════════
+// FREE DRAWING — per-segment ribbon
+// ═══════════════════════════════════════════════════
+
+let drw=false, rawD=[], allD=[];
+
+function drawRibbon(ctx, points, cA, cB, width) {
+  renderRibbon(ctx, points, cA, cB, width/2, 0.88, 3);
+}
+
+function interp(raw){
+  if(raw.length<2)return raw;const o=[],e=[raw[0],...raw,raw[raw.length-1]];
+  for(let i=1;i<e.length-2;i++){const a=e[i-1],b=e[i],c=e[i+1],d=e[i+2];
+    const dist=Math.hypot(c.x-b.x,c.y-b.y);const steps=Math.max(1,Math.ceil(dist/3));
+    for(let s=0;s<steps;s++){const t=s/steps;
+      o.push({x:cr(a.x,b.x,c.x,d.x,t),y:cr(a.y,b.y,c.y,d.y,t)});}}
+  o.push(raw[raw.length-1]);return o;
+}
+function cr(a,b,c,d,t){const t2=t*t,t3=t2*t;return.5*((2*b)+(-a+c)*t+(2*a-5*b+4*c-d)*t2+(-a+3*b-3*c+d)*t3)}
+
+function redrawDraw() {
+  dx.clearRect(0,0,W,H);
+  allD.forEach(s => drawRibbon(dx, s.pts, s.a, s.b, s.w));
+  if (rawD.length >= 2) {
+    const p = PAL[cP];
+    drawRibbon(dx, resamplePts(interp(rawD),3), p.a, p.b, bW);
+  }
+}
+
+// ── Events ──
+dc.addEventListener('pointerdown', e => {
+  e.preventDefault(); drw = true;
+  rawD = [{x:e.clientX, y:e.clientY}];
+  document.getElementById('sub').classList.add('h');
+});
+dc.addEventListener('pointermove', e => {
+  mx2 = e.clientX; my2 = e.clientY;
+  if (!drw) return; e.preventDefault();
+  const p = rawD[rawD.length-1];
+  if (Math.hypot(e.clientX-p.x, e.clientY-p.y) < 2) return;
+  rawD.push({x:e.clientX, y:e.clientY});
+  redrawDraw();
+});
+dc.addEventListener('pointerup', () => {
+  if (!drw) return; drw = false;
+  if (rawD.length >= 2) {
+    const p = PAL[cP];
+    allD.push({pts: resamplePts(interp(rawD),3), a:p.a, b:p.b, w:bW});
+  }
+  rawD = []; redrawDraw();
+});
+dc.addEventListener('pointerleave', () => {
+  mx2=-9e9; my2=-9e9;
+  if (drw) {
+    drw = false;
+    if (rawD.length >= 2) {
+      const p = PAL[cP];
+      allD.push({pts: resamplePts(interp(rawD),3), a:p.a, b:p.b, w:bW});
+    }
+    rawD = []; redrawDraw();
+  }
+});
+addEventListener('keydown', e => {
+  if (e.key==='[') {bW=Math.max(8,bW-4);uS();}
+  if (e.key===']') {bW=Math.min(50,bW+4);uS();}
+  if (e.key==='c'||e.key==='C') {allD=[];redrawDraw();}
+  if (e.key==='r'||e.key==='R') {initAnim();} // replay
+});
+
+// ── Main loop ──
+function loop() {
+  const time = performance.now() / 1000;
+  renderMain(time);
+  requestAnimationFrame(loop);
+}
+
+// ── UI ──
+function bUI(){
+  const b=document.getElementById('bar');b.innerHTML='';
+  PAL.forEach((p,i)=>{const d=document.createElement('div');d.className='pb'+(i===cP?' on':'');
+    d.style.background=`linear-gradient(90deg,${p.a} 50%,${p.b} 50%)`;
+    d.onclick=()=>{cP=i;bUI();};b.appendChild(d);});
+  const s=document.createElement('div');s.className='sep';b.appendChild(s);
+  const z=document.createElement('div');z.className='sz';z.id='zI';z.textContent=bW;b.appendChild(z);
+  [['−',()=>{bW=Math.max(8,bW-4);uS();}],['+',()=>{bW=Math.min(50,bW+4);uS();}]]
+    .forEach(([t,f])=>{const d=document.createElement('button');d.className='tb';d.textContent=t;d.onclick=f;b.appendChild(d);});
+  const s2=document.createElement('div');s2.className='sep';b.appendChild(s2);
+  const re=document.createElement('button');re.className='tb';re.title='replay (R)';re.textContent='▶';
+  re.onclick=()=>initAnim();b.appendChild(re);
+  const cl=document.createElement('button');cl.className='tb';cl.title='clear (C)';cl.textContent='↺';
+  cl.onclick=()=>{allD=[];redrawDraw();};b.appendChild(cl);
+}
+function uS(){const e=document.getElementById('zI');if(e)e.textContent=bW;}
+
+function resize(){
+  D=Math.min(devicePixelRatio||1,2);W=innerWidth;H=innerHeight;
+  [mc,dc].forEach(c=>{c.width=W*D;c.height=H*D;c.getContext('2d').setTransform(D,0,0,D,0,0);});
+  initAnim();redrawDraw();
+}
+addEventListener('resize',resize);
+bUI();resize();loop();
+</script>
+</body>
+</html>
