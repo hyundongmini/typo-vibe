@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 14 — 점잇기 어린이날</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Noto+Serif+KR:wght@400;700&family=Noto+Sans+KR:wght@400;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden}
+body{background:#FFFEF8;font-family:'Noto Sans KR',sans-serif;user-select:none}
+.page{position:fixed;inset:0}
+.text-panel{position:absolute;top:0;left:0;padding:clamp(50px,6vw,90px) clamp(40px,5vw,80px) 0;
+  z-index:10;max-width:min(520px,45vw);pointer-events:none}
+.text-panel *{pointer-events:auto}
+.canvas-panel{position:absolute;inset:0;overflow:hidden}
+.sl{font:400 clamp(14px,1.8vw,20px)/2 'Noto Serif KR',Georgia,serif;
+  color:#1a1a1a;opacity:0;transform:translateY(12px);transition:opacity .6s,transform .6s}
+.sl.v{opacity:.75;transform:translateY(0)}
+.sn{display:block;font:900 clamp(42px,7vw,88px)/1 'Pretendard',sans-serif;
+  color:#E63946;margin:14px 0 6px;opacity:0;
+  transition:opacity .5s,transform .5s cubic-bezier(.34,1.56,.64,1)}
+.sn.v{opacity:1}
+.sc{font:400 clamp(11px,1.2vw,14px)/1.6 'Noto Sans KR',sans-serif;
+  color:rgba(0,0,0,.25);margin-top:10px;opacity:0;transition:opacity .8s .3s}
+.sc.v{opacity:1}
+.canvas-panel svg{width:100%;height:100%}
+.dn{font-family:'Playfair Display',serif;font-weight:900;fill:#444;pointer-events:none;font-size:12px}
+.dh{cursor:pointer}.dh.done{pointer-events:none}
+.dh.next .dv{animation:dp .8s ease-in-out infinite}
+@keyframes dp{0%,100%{r:5}50%{r:9}}
+.cs{opacity:0;transform-origin:center;transform:scale(0) rotate(-6deg);
+  transition:opacity .4s,transform .5s cubic-bezier(.34,1.56,.64,1)}
+.cs.v{opacity:1;transform:scale(1) rotate(0)}
+.cs:hover{transform:scale(1.04) rotate(1.5deg);transition:transform .15s}
+/* Rain */
+.rain-drop{position:absolute;background:linear-gradient(180deg,rgba(100,180,255,.5),rgba(100,180,255,0));
+  border-radius:2px;pointer-events:none;animation:rfall linear forwards}
+@keyframes rfall{0%{transform:translateY(-20px);opacity:.7}100%{transform:translateY(var(--rh));opacity:0}}
+.rain-layer{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:0;opacity:0;transition:opacity 1.5s}
+.rain-layer.v{opacity:1}
+.bk{position:fixed;top:16px;left:16px;z-index:200;
+  display:inline-flex;align-items:center;gap:6px;padding:8px 14px 8px 12px;
+  background:rgba(255,254,248,.85);color:rgba(0,0,0,.2);
+  font:500 12px/1 'Noto Sans KR',sans-serif;text-decoration:none;
+  border:1px solid rgba(0,0,0,.04);border-radius:100px;backdrop-filter:blur(8px)}
+.bk:hover{background:rgba(255,254,248,.95)}
+.bk svg{stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.tag{position:fixed;bottom:14px;right:18px;font:11px/1 monospace;color:rgba(0,0,0,.06);pointer-events:none;z-index:99}
+.rb{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:200;
+  padding:10px 20px;background:#E63946;color:#fff;font:700 13px/1 'Noto Sans KR',sans-serif;
+  border:none;border-radius:100px;cursor:pointer;opacity:0;transition:opacity .3s;pointer-events:none}
+.rb.v{opacity:1;pointer-events:auto}.rb:hover{background:#d42d3a}
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="text-panel">
+    <p class="sl" id="s1">내일은 어린이날.</p>
+    <p class="sl" id="s2">올해 평균 선물 비용은</p>
+    <span class="sn" id="sn">₩100,000</span>
+    <p class="sl" id="s3">10년 전엔 5만원이었던 그 마음이,</p>
+    <p class="sl" id="s4">두 배가 되었습니다.</p>
+    <p class="sc" id="sc">1번부터 마우스를 올려보세요 →</p>
+  </div>
+  <div class="canvas-panel" id="cp">
+    <div class="rain-layer" id="rain"></div>
+    <svg id="svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000" preserveAspectRatio="xMidYMid meet">
+      <defs>
+        <filter id="paper" x="-3%" y="-3%" width="106%" height="106%">
+          <feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="4" seed="3" result="n"/>
+          <feDisplacementMap in="SourceGraphic" in2="n" scale="2" xChannelSelector="R" yChannelSelector="G"/>
+        </filter>
+        <filter id="riso" x="-4%" y="-4%" width="108%" height="108%">
+          <feTurbulence type="fractalNoise" baseFrequency="0.7" numOctaves="3" seed="5" result="n"/>
+          <feDisplacementMap in="SourceGraphic" in2="n" scale="2.5" xChannelSelector="R" yChannelSelector="G" result="d"/>
+          <feGaussianBlur in="d" stdDeviation="0.25"/>
+        </filter>
+      </defs>
+    </svg>
+  </div>
+</div>
+<a href="../" class="bk"><svg viewBox="0 0 24 24" width="14" height="14"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>back</a>
+<button class="rb" id="rb" onclick="reset()">다시 그리기</button>
+<div class="tag">day 14 / typo-vibe</div>
+
+<script>
+const SVG=document.getElementById('svg'),NS='http://www.w3.org/2000/svg';
+const VB=1000; // fixed viewBox size — preserves aspect ratio
+let SX=VB,SY=VB,W,H;
+const C={red:'#E63946',yel:'#F4D02E',grn:'#2BA84A',nav:'#2E2A8E',skin:'#F4A261'};
+
+// ═══════════════════════════════════════════════════
+// 아이 + 꽃 점잇기 (매끄러운 머리 원형)
+// ═══════════════════════════════════════════════════
+
+// 머리: 8점 원형 — 실제 얼굴(r:.068) 외곽을 따라감
+function headCircle(cx,cy,r){
+  const pts=[];
+  for(let i=0;i<8;i++){
+    const a = -Math.PI/2 + (i/8)*Math.PI*2;
+    pts.push({x:cx+Math.cos(a)*r, y:cy+Math.sin(a)*r});
+  }
+  return pts;
+}
+
+// 캐릭터 위치 기준
+const CX=.62, CY=.42; // 머리 중심
+
+// 점들이 실제 콜라주 도형의 외곽을 정확히 따라가도록 배치
+const HEAD=headCircle(CX, CY, .070); // 머리 외곽 (실제 r:.068보다 약간 크게)
+
+// 몸통/팔/다리 외곽선 (실제 도형 기준)
+// 몸통: rect .56~.68 × .52~.72
+// 왼팔: rotated rect
+// 다리: rect .56~.61, .63~.68 × .72~.82
+const BODY=[
+  // 9: 목 왼쪽 (머리 바닥에서 몸통 왼쪽 상단으로)
+  {x:.56, y:.52},
+  // 10: 왼어깨 + 왼팔 끝
+  {x:.49, y:.55},
+  // 11: 왼팔 끝 (바깥)
+  {x:.49, y:.60},
+  // 12: 몸통 왼쪽 중간
+  {x:.56, y:.62},
+  // 13: 몸통 왼쪽 하단 (왼다리로)
+  {x:.56, y:.72},
+  // 14: 왼발 바깥
+  {x:.54, y:.83},
+  // 15: 왼발 안쪽
+  {x:.60, y:.83},
+  // 16: 가랑이
+  {x:.61, y:.72},
+  // 17: 오른다리 바깥
+  {x:.64, y:.72},
+  // 18: 오른발 안쪽
+  {x:.64, y:.83},
+  // 19: 오른발 바깥
+  {x:.70, y:.83},
+  // 20: 몸통 오른쪽 하단
+  {x:.68, y:.72},
+  // 21: 몸통 오른쪽 중간
+  {x:.68, y:.62},
+  // 22: 오른팔 끝 바깥
+  {x:.75, y:.60},
+  // 23: 오른팔 끝
+  {x:.75, y:.55},
+  // 24: 오른어깨
+  {x:.68, y:.52},
+];
+// 꽃 외곽 — 둥근 5잎 (캐릭터와 같은 지면, fcy를 발 위치 근처로)
+const FCX=.32, FCY=.58;
+const FLOWER=[];
+{
+  const innerR=.022, outerR=.050;
+  for(let i=0;i<5;i++){
+    const base = (-90 + i*72) * Math.PI/180;
+    const mid = (-90 + i*72 + 36) * Math.PI/180;
+    // 꽃잎 끝 (볼록)
+    FLOWER.push({x:FCX+Math.cos(base)*outerR, y:FCY+Math.sin(base)*outerR});
+    // 꽃잎 사이 (오목)
+    FLOWER.push({x:FCX+Math.cos(mid)*innerR, y:FCY+Math.sin(mid)*innerR});
+  }
+}
+
+const DOTS=[...HEAD,...BODY,...FLOWER];
+const TOTAL=DOTS.length;
+
+// 기본 얼굴 — 처음부터 보이는 큰 도형 (레퍼런스: 남색 원 눈, 빨강 코, 남색 미소)
+const FACE_HINTS=[
+  {t:'circle',cx:.595,cy:.405,r:.007,fill:'#1a1a1a',alpha:.85},
+  {t:'circle',cx:.645,cy:.405,r:.007,fill:'#1a1a1a',alpha:.85},
+  {t:'circle',cx:.62,cy:.43,r:.004,fill:'#1a1a1a',alpha:.7},
+  {t:'smile',cx:.62,cy:.445,r:.012,color:'#1a1a1a',alpha:.7,sw:2},
+];
+
+// 콜라주 도형
+const COLLAGE=[
+  // 아이 (head cx:.62, cy:.42 — matches HEAD dot circle)
+  {t:'circle',cx:.62,cy:.42,r:.068,fill:C.skin,d:0},
+  {t:'poly',pts:[[.62,.32],[.57,.36],[.67,.36]],fill:C.nav,d:60},
+  // 몸통 (rect .56~.68 × .52~.72)
+  {t:'rect',x:.56,y:.52,w:.12,h:.20,fill:C.grn,d:120},
+  // 왼팔
+  {t:'rect',x:.49,y:.56,w:.08,h:.04,fill:C.grn,d:170,angle:-10,ox:.53,oy:.58},
+  // 오른팔
+  {t:'rect',x:.67,y:.56,w:.08,h:.04,fill:C.grn,d:220,angle:10,ox:.71,oy:.58},
+  // 왼다리
+  {t:'rect',x:.56,y:.72,w:.05,h:.11,fill:C.grn,d:270},
+  // 오른다리
+  {t:'rect',x:.63,y:.72,w:.05,h:.11,fill:C.grn,d:320},
+  // 왼발
+  {t:'ellipse',cx:.585,cy:.83,rx:.030,ry:.013,fill:C.nav,d:370},
+  // 오른발
+  {t:'ellipse',cx:.655,cy:.83,rx:.030,ry:.013,fill:C.nav,d:410},
+  // 얼굴
+  {t:'circle',cx:.595,cy:.41,r:.007,fill:'#1a1a1a',d:450},
+  {t:'circle',cx:.645,cy:.41,r:.007,fill:'#1a1a1a',d:470},
+  {t:'circle',cx:.62,cy:.435,r:.004,fill:C.red,d:490},
+  {t:'smile',cx:.62,cy:.45,r:.012,color:'#1a1a1a',d:510},
+  // 풍선 (오른손에서 위로)
+  {t:'line',x1:.75,y1:.58,x2:.86,y2:.28,stroke:C.nav,d:560},
+  {t:'circle',cx:.86,cy:.26,r:.038,fill:C.red,d:600},
+  {t:'circle',cx:.845,cy:.245,r:.008,fill:'#fff',d:630,alpha:.4},
+  // 꽃 (FCX:.32, FCY:.58, 꽃 바닥이 캐릭터 발과 비슷한 높이에 오도록)
+  {t:'petal',cx:.32,cy:.58,r:.047,angle:0,fill:C.yel,d:680},
+  {t:'petal',cx:.32,cy:.58,r:.047,angle:72,fill:C.yel,d:710},
+  {t:'petal',cx:.32,cy:.58,r:.047,angle:144,fill:C.yel,d:740},
+  {t:'petal',cx:.32,cy:.58,r:.047,angle:216,fill:C.yel,d:770},
+  {t:'petal',cx:.32,cy:.58,r:.047,angle:288,fill:C.yel,d:800},
+  {t:'circle',cx:.32,cy:.58,r:.022,fill:C.red,d:840},
+  {t:'circle',cx:.31,cy:.575,r:.004,fill:'#1a1a1a',d:870},
+  {t:'circle',cx:.33,cy:.575,r:.004,fill:'#1a1a1a',d:880},
+  {t:'smile',cx:.32,cy:.59,r:.008,color:'#1a1a1a',d:900},
+  // 줄기 (꽃 아래부터 발 높이까지)
+  {t:'rect',x:.316,y:.63,w:.008,h:.18,fill:C.grn,d:930},
+  {t:'leaf',cx:.295,cy:.70,rx:.025,ry:.009,angle:-35,fill:C.grn,d:960},
+  {t:'leaf',cx:.35,cy:.67,rx:.025,ry:.009,angle:30,fill:C.grn,d:990},
+  // 화분/바닥 (발 높이)
+  {t:'ellipse',cx:.32,cy:.83,rx:.022,ry:.010,fill:C.nav,d:1020},
+];
+
+let dots=[],step=0,lineEls=[],dotEls=[],done=false;
+
+function layout(){
+  W=innerWidth;H=innerHeight;
+  // SX=SY=VB (fixed, no aspect distortion)
+  dots=DOTS.map(d=>({x:d.x*VB,y:d.y*VB}));
+}
+
+function jit(x1,y1,x2,y2){
+  // 거의 직선 (jitter 최소화 — 레퍼런스처럼 깔끔하게)
+  const dx=x2-x1,dy=y2-y1,n=Math.max(2,Math.ceil(Math.hypot(dx,dy)/30));
+  let d=`M${x1.toFixed(1)},${y1.toFixed(1)}`;
+  for(let i=1;i<=n;i++){const t=i/n;
+    d+=` L${(x1+dx*t+(i<n?(Math.random()-.5)*1:0)).toFixed(1)},${(y1+dy*t+(i<n?(Math.random()-.5)*1:0)).toFixed(1)}`;}
+  return d;
+}
+
+function drawLine(i1,i2){
+  const p1=dots[i1],p2=dots[i2],path=document.createElementNS(NS,'path');
+  path.setAttribute('d',jit(p1.x,p1.y,p2.x,p2.y));
+  path.setAttribute('fill','none');path.setAttribute('stroke','#E63475');
+  path.setAttribute('stroke-width','5');path.setAttribute('stroke-linecap','round');
+  path.setAttribute('stroke-linejoin','round');
+  path.style.mixBlendMode='multiply';
+  const dg=SVG.querySelector('.dg');SVG.insertBefore(path,dg);
+  const len=path.getTotalLength();
+  path.setAttribute('stroke-dasharray',len);path.setAttribute('stroke-dashoffset',len);
+  path.style.transition='stroke-dashoffset .25s ease-out';
+  requestAnimationFrame(()=>path.setAttribute('stroke-dashoffset','0'));
+  lineEls.push(path);
+}
+
+// 기본 얼굴 힌트 그리기
+function drawFaceHints(){
+  const fg=document.createElementNS(NS,'g');fg.classList.add('fh');
+  const m=VB;
+  FACE_HINTS.forEach(f=>{
+    if(f.t==='circle'){
+      const el=document.createElementNS(NS,'circle');
+      el.setAttribute('cx',f.cx*VB);el.setAttribute('cy',f.cy*VB);
+      el.setAttribute('r',f.r*m);el.setAttribute('fill',f.fill);
+      el.setAttribute('filter','url(#paper)');
+      el.setAttribute('opacity',f.alpha||.85);fg.appendChild(el);
+    } else if(f.t==='ellipse'){
+      const el=document.createElementNS(NS,'ellipse');
+      el.setAttribute('cx',f.cx*VB);el.setAttribute('cy',f.cy*VB);
+      el.setAttribute('rx',f.rx*m);el.setAttribute('ry',f.ry*m);
+      el.setAttribute('fill',f.fill);el.setAttribute('filter','url(#paper)');
+      el.setAttribute('opacity',f.alpha||.85);fg.appendChild(el);
+    } else if(f.t==='smile'){
+      const el=document.createElementNS(NS,'path');
+      const sx=f.cx*VB,sy=f.cy*VB,sr=f.r*m;
+      el.setAttribute('d',`M${sx-sr},${sy} Q${sx},${sy+sr*1.3} ${sx+sr},${sy}`);
+      el.setAttribute('fill','none');el.setAttribute('stroke',f.color);
+      el.setAttribute('stroke-width',f.sw||3);el.setAttribute('stroke-linecap','round');
+      el.setAttribute('filter','url(#paper)');
+      el.setAttribute('opacity',f.alpha||.7);fg.appendChild(el);
+    }
+  });
+  SVG.appendChild(fg);
+}
+
+function createDots(){
+  ['.dg','.cg','.fh'].forEach(s=>{const e=SVG.querySelector(s);if(e)e.remove();});
+  lineEls.forEach(l=>l.remove());lineEls=[];
+  drawFaceHints();
+  const g=document.createElementNS(NS,'g');g.classList.add('dg');
+  dotEls=[];
+  dots.forEach((p,i)=>{
+    const gr=document.createElementNS(NS,'g');
+    gr.setAttribute('class','dh'+(i===0?' next':''));
+    const hit=document.createElementNS(NS,'circle');
+    hit.setAttribute('cx',p.x);hit.setAttribute('cy',p.y);
+    hit.setAttribute('r',18);hit.setAttribute('fill','transparent');
+    hit.addEventListener('pointerenter',()=>onHover(i));gr.appendChild(hit);
+    const vis=document.createElementNS(NS,'circle');
+    vis.setAttribute('cx',p.x);vis.setAttribute('cy',p.y);vis.setAttribute('r',4.5);
+    vis.setAttribute('fill','#444');vis.setAttribute('class','dv');
+    vis.style.pointerEvents='none';gr.appendChild(vis);
+    const cx2=VB*.5,cy2=VB*.45;
+    const angle=Math.atan2(p.y-cy2,p.x-cx2);
+    const text=document.createElementNS(NS,'text');
+    text.setAttribute('x',p.x+Math.cos(angle)*20);
+    text.setAttribute('y',p.y+Math.sin(angle)*20);
+    text.setAttribute('text-anchor','middle');text.setAttribute('dominant-baseline','central');
+    text.setAttribute('class','dn');text.textContent=String(i+1);
+    gr.appendChild(text);g.appendChild(gr);dotEls.push(gr);
+  });
+  SVG.appendChild(g);
+}
+
+function onHover(idx){
+  if(done||idx!==step)return;
+  dotEls[idx].classList.remove('next');dotEls[idx].classList.add('done');
+  if(step>0)drawLine(step-1,step);
+  step++;
+  if(step<TOTAL)dotEls[step].classList.add('next');
+  // Close sub-shapes
+  if(step===8)drawLine(7,0); // close head (8 dots)
+  if(step===24)drawLine(23,8); // close body (16 dots, 8-23)
+  if(step===TOTAL){drawLine(TOTAL-1,24); // close flower (10 dots, 24-33)
+    setTimeout(showCollage,400);
+    setTimeout(showText,600);
+    setTimeout(startRain,1200);
+    setTimeout(()=>{done=true;document.getElementById('rb').classList.add('v');},2800);
+  }
+}
+
+// ═══════════════════════════════════════════════════
+// 비 내리는 배경 (레퍼런스 스타일)
+// ═══════════════════════════════════════════════════
+
+let rainInterval=null;
+function startRain(){
+  const rl=document.getElementById('rain');
+  rl.classList.add('v');
+  function drop(){
+    const d=document.createElement('div');
+    d.className='rain-drop';
+    const w=6+Math.random()*10;
+    const h=50+Math.random()*90;
+    const x=Math.random()*100;
+    const dur=0.7+Math.random()*1.0;
+    const colors=['rgba(120,180,255,.55)','rgba(160,220,255,.45)','rgba(100,200,200,.4)','rgba(180,210,255,.35)','rgba(100,160,240,.5)'];
+    d.style.cssText=`left:${x}%;width:${w}px;height:${h}px;--rh:${H+50}px;
+      background:${colors[Math.random()*colors.length|0]};
+      animation-duration:${dur}s;animation-delay:0s;border-radius:${w}px`;
+    rl.appendChild(d);
+    setTimeout(()=>d.remove(),dur*1000+100);
+  }
+  // Initial burst
+  for(let i=0;i<25;i++) setTimeout(()=>drop(),i*40);
+  // Continuous
+  rainInterval=setInterval(()=>{for(let i=0;i<3;i++)drop();},100);
+}
+function stopRain(){
+  if(rainInterval){clearInterval(rainInterval);rainInterval=null;}
+  const rl=document.getElementById('rain');rl.classList.remove('v');rl.innerHTML='';
+}
+
+// ═══════════════════════════════════════════════════
+// 콜라주 + 텍스트 reveal
+// ═══════════════════════════════════════════════════
+
+function showCollage(){
+  const dg=SVG.querySelector('.dg'),fh=SVG.querySelector('.fh');
+  // Hide only the numbered dots + numbers, keep the magenta outline
+  if(dg){
+    dg.querySelectorAll('text').forEach(t=>{t.style.transition='opacity .6s';t.style.opacity='0';});
+    dg.querySelectorAll('.dv').forEach(c=>{c.style.transition='opacity .6s';c.style.opacity='0';});
+  }
+  if(fh){fh.style.transition='opacity .6s';fh.style.opacity='0';}
+  // Keep ribbon outlines visible but slightly dimmer
+  lineEls.forEach(l=>{l.style.transition='opacity .8s';l.style.opacity='0.5';});
+
+  const cg=document.createElementNS(NS,'g');cg.classList.add('cg');
+  SVG.insertBefore(cg,dg);
+
+  COLLAGE.forEach(c=>{
+    setTimeout(()=>{
+      let el;
+      if(c.t==='circle'){
+        el=document.createElementNS(NS,'circle');
+        el.setAttribute('cx',c.cx*VB);el.setAttribute('cy',c.cy*VB);
+        el.setAttribute('r',c.r*VB);el.setAttribute('fill',c.fill);
+      }else if(c.t==='ellipse'){
+        el=document.createElementNS(NS,'ellipse');
+        el.setAttribute('cx',c.cx*VB);el.setAttribute('cy',c.cy*VB);
+        el.setAttribute('rx',c.rx*VB);el.setAttribute('ry',c.ry*VB);el.setAttribute('fill',c.fill);
+      }else if(c.t==='rect'){
+        el=document.createElementNS(NS,'rect');
+        el.setAttribute('x',c.x*VB);el.setAttribute('y',c.y*VB);
+        el.setAttribute('width',c.w*VB);el.setAttribute('height',c.h*VB);el.setAttribute('fill',c.fill);
+        if(c.angle)el.setAttribute('transform',`rotate(${c.angle},${c.ox*VB},${c.oy*VB})`);
+      }else if(c.t==='poly'){
+        el=document.createElementNS(NS,'polygon');
+        el.setAttribute('points',c.pts.map(p=>`${p[0]*VB},${p[1]*VB}`).join(' '));el.setAttribute('fill',c.fill);
+      }else if(c.t==='smile'){
+        el=document.createElementNS(NS,'path');
+        const sx=c.cx*VB,sy=c.cy*VB,sr=c.r*VB;
+        el.setAttribute('d',`M${sx-sr},${sy} Q${sx},${sy+sr*1.3} ${sx+sr},${sy}`);
+        el.setAttribute('fill','none');el.setAttribute('stroke',c.color);
+        el.setAttribute('stroke-width','2.5');el.setAttribute('stroke-linecap','round');
+      }else if(c.t==='line'){
+        el=document.createElementNS(NS,'line');
+        el.setAttribute('x1',c.x1*VB);el.setAttribute('y1',c.y1*VB);
+        el.setAttribute('x2',c.x2*VB);el.setAttribute('y2',c.y2*VB);
+        el.setAttribute('stroke',c.stroke);el.setAttribute('stroke-width','2.5');el.setAttribute('stroke-linecap','round');
+      }else if(c.t==='petal'){
+        el=document.createElementNS(NS,'ellipse');
+        const a=c.angle*Math.PI/180,m=VB;
+        const px=c.cx*VB+Math.cos(a-Math.PI/2)*c.r*m*.6;
+        const py=c.cy*VB+Math.sin(a-Math.PI/2)*c.r*m*.6;
+        el.setAttribute('cx',px);el.setAttribute('cy',py);
+        el.setAttribute('rx',c.r*m*.5);el.setAttribute('ry',c.r*m*.35);
+        el.setAttribute('fill',c.fill);el.setAttribute('transform',`rotate(${c.angle},${px},${py})`);
+      }else if(c.t==='leaf'){
+        el=document.createElementNS(NS,'ellipse');
+        el.setAttribute('cx',c.cx*VB);el.setAttribute('cy',c.cy*VB);
+        el.setAttribute('rx',c.rx*VB);el.setAttribute('ry',c.ry*VB);el.setAttribute('fill',c.fill);
+        el.setAttribute('transform',`rotate(${c.angle},${c.cx*VB},${c.cy*VB})`);
+      }
+      if(el){
+        el.setAttribute('class','cs');el.setAttribute('filter','url(#paper)');
+        if(c.alpha)el.style.setProperty('--a',c.alpha);
+        if(c.alpha){el.style.opacity='0';el.dataset.targetAlpha=c.alpha;}
+        cg.appendChild(el);
+        requestAnimationFrame(()=>{el.classList.add('v');if(c.alpha)el.style.opacity=c.alpha;});
+      }
+    },c.d);
+  });
+}
+
+function showText(){
+  ['s1','s2','sn','s3','s4'].forEach((id,i)=>{
+    setTimeout(()=>{const el=document.getElementById(id);if(el)el.classList.add('v');},i*300);
+  });
+}
+
+function confetti(){
+  const colors=[C.red,C.yel,C.grn,C.nav,'#FF9999','#88CCFF'];
+  const c=document.createElement('div');
+  c.style.cssText='position:fixed;inset:0;pointer-events:none;z-index:60;overflow:hidden';
+  document.body.appendChild(c);
+  if(!document.getElementById('cfs')){
+    const s=document.createElement('style');s.id='cfs';
+    s.textContent=`@keyframes cf{0%{transform:translateY(0) rotate(0);opacity:.85}100%{transform:translateY(${H+50}px) rotate(720deg);opacity:0}}`;
+    document.head.appendChild(s);
+  }
+  for(let i=0;i<40;i++){
+    const d=document.createElement('div');const sz=5+Math.random()*7;
+    d.style.cssText=`position:absolute;left:${15+Math.random()*70}%;top:-15px;
+      width:${sz}px;height:${sz*.5}px;background:${colors[i%colors.length]};
+      border-radius:${Math.random()>.5?'50%':'1px'};
+      animation:cf ${1.5+Math.random()*1.5}s ${Math.random()*.5}s ease-in forwards`;
+    c.appendChild(d);
+  }
+  setTimeout(()=>c.remove(),4000);
+}
+
+function reset(){
+  step=0;done=false;stopRain();
+  document.getElementById('rb').classList.remove('v');
+  ['s1','s2','sn','s3','s4','sc'].forEach(id=>{const el=document.getElementById(id);if(el)el.classList.remove('v');});
+  createDots();
+  document.getElementById('sc').classList.add('v');
+}
+
+function init(){layout();createDots();document.getElementById('sc').classList.add('v');}
+addEventListener('resize',()=>{layout();if(!done)createDots();});
+init();
+</script>
+</body>
+</html>
