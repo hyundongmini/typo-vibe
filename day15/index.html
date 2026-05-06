@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 15 — Pixel Notation</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden}
+body{background:#fff;font-family:'Pretendard',sans-serif}
+canvas{position:fixed;inset:0;width:100%;height:100%}
+.title{position:fixed;top:20px;left:20px;z-index:10}
+.title h1{font-size:clamp(18px,3vw,36px);font-weight:900;color:#000;opacity:.85;letter-spacing:-.02em;
+  line-height:1.3}
+.title .chord{font-size:clamp(18px,3vw,36px);font-weight:900;color:#000;opacity:.85;
+  margin-top:8px;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.play-btn{position:fixed;bottom:20px;left:20px;z-index:10;
+  cursor:pointer;font-size:13px;background:none;border:none;
+  color:rgba(0,0,0,.5);font-family:inherit}
+.play-btn:hover{color:#000}
+.bk{position:fixed;top:20px;right:20px;z-index:10;
+  padding:5px 10px;color:rgba(0,0,0,.2);font-size:11px;text-decoration:none;
+  border:1px solid rgba(0,0,0,.08);border-radius:100px}
+.bk:hover{color:rgba(0,0,0,.6)}
+.bk svg{stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.tag{position:fixed;bottom:14px;right:18px;font:10px/1 monospace;color:rgba(0,0,0,.04);z-index:10}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="title">
+  <h1>서로 어울리지 않는<br>두 개 이상의 음의 조합</h1>
+  <p class="chord" id="notes">—</p>
+</div>
+<button class="play-btn" id="btn">Play</button>
+<a href="../" class="bk"><svg viewBox="0 0 24 24" width="12" height="12"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></a>
+<div class="tag">day 15</div>
+
+<script>
+const C=document.getElementById('c'),X=C.getContext('2d');
+let W,H,D;
+let playing=false,ac=null,t0=0,ni=0,tid=null;
+
+// Grid
+const CELL=6; // pixel size
+let cols,rows,grid; // grid[row][col] = 0 (white) or 1 (black)
+
+// Audio
+const FREQ=[];for(let i=0;i<24;i++)FREQ.push(220*Math.pow(2,i/12));
+let score=[];
+
+function gen(){
+  score=[];let t=0;
+  for(let i=0;i<600;i++){
+    const cluster=Math.random()>.35?2+Math.floor(Math.random()*3):1;
+    for(let c=0;c<cluster;c++)score.push({t,n:Math.floor(Math.random()*24),d:0.06+Math.random()*0.25});
+    t+=0.03+Math.random()*0.12;
+  }
+}
+gen();
+
+function resize(){
+  D=Math.min(devicePixelRatio||1,2);
+  W=innerWidth;H=innerHeight;
+  C.width=W*D;C.height=H*D;
+  X.setTransform(D,0,0,D,0,0);
+  cols=Math.ceil(W/CELL);
+  rows=Math.ceil(H/CELL);
+  grid=Array.from({length:rows},()=>new Uint8Array(cols));
+}
+addEventListener('resize',resize);resize();
+
+// Note names
+const NAMES=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+function noteName(idx){return NAMES[idx%12]+(Math.floor(idx/12)+3);}
+let currentNotes=[];
+let shakeX=0,shakeY=0;
+let mouseGX=-1,mouseGY=-1;
+
+// Map note to grid position (circular staff)
+function noteToGrid(noteIdx){
+  const cx=cols/2,cy=rows/2;
+  const r=Math.min(cols,rows)*0.3;
+  const i=ni%120;
+  const a=-Math.PI*0.9+(i/120)*Math.PI*1.8;
+  const off=((noteIdx-12)/12)*r*0.15;
+  const gx=Math.round(cx+Math.cos(a)*(r+off));
+  const gy=Math.round(cy+Math.sin(a)*(r+off));
+  return {gx,gy};
+}
+
+// Spawn dot pattern at position
+function spawn(noteIdx){
+  const {gx,gy}=noteToGrid(noteIdx);
+
+  // Track current cluster for display
+  currentNotes.push(noteName(noteIdx));
+  if(currentNotes.length>4) currentNotes.shift();
+  document.getElementById('notes').textContent=currentNotes.join(' + ');
+
+  // Screen shake
+  shakeX=(Math.random()-0.5)*3;
+  shakeY=(Math.random()-0.5)*3;
+  setTimeout(()=>{shakeX=0;shakeY=0;},60);
+
+  // Erosion: randomly clear some cells to prevent full blackout
+  if(ni%8===0){
+    const erodeCount=Math.floor(cols*rows*0.003);
+    for(let i=0;i<erodeCount;i++){
+      const ex=Math.floor(Math.random()*cols);
+      const ey=Math.floor(Math.random()*rows);
+      grid[ey][ex]=0;
+    }
+  }
+
+  // Different pattern types
+  const type=Math.random();
+
+  if(type<0.3){
+    // Dense block
+    const bw=2+Math.floor(Math.random()*8);
+    const bh=2+Math.floor(Math.random()*8);
+    for(let dy=0;dy<bh;dy++)for(let dx=0;dx<bw;dx++){
+      const x=gx-Math.floor(bw/2)+dx;
+      const y=gy-Math.floor(bh/2)+dy;
+      if(x>=0&&x<cols&&y>=0&&y<rows) grid[y][x]=1;
+    }
+  } else if(type<0.6){
+    // Scattered dots
+    const count=10+Math.floor(Math.random()*30);
+    for(let i=0;i<count;i++){
+      const x=gx+Math.floor((Math.random()-0.5)*14);
+      const y=gy+Math.floor((Math.random()-0.5)*14);
+      if(x>=0&&x<cols&&y>=0&&y<rows) grid[y][x]=1;
+    }
+  } else if(type<0.8){
+    // Checkerboard patch
+    const sz=3+Math.floor(Math.random()*6);
+    for(let dy=0;dy<sz;dy++)for(let dx=0;dx<sz;dx++){
+      if((dx+dy)%2===0){
+        const x=gx-Math.floor(sz/2)+dx;
+        const y=gy-Math.floor(sz/2)+dy;
+        if(x>=0&&x<cols&&y>=0&&y<rows) grid[y][x]=1;
+      }
+    }
+  } else {
+    // Line/stripe
+    const len=4+Math.floor(Math.random()*12);
+    const horiz=Math.random()>0.5;
+    for(let i=0;i<len;i++){
+      const x=horiz?gx-Math.floor(len/2)+i:gx;
+      const y=horiz?gy:gy-Math.floor(len/2)+i;
+      if(x>=0&&x<cols&&y>=0&&y<rows) grid[y][x]=1;
+    }
+  }
+
+  // Randomly flip some existing cells nearby (glitch/noise)
+  for(let i=0;i<5;i++){
+    const x=gx+Math.floor((Math.random()-0.5)*20);
+    const y=gy+Math.floor((Math.random()-0.5)*20);
+    if(x>=0&&x<cols&&y>=0&&y<rows) grid[y][x]=grid[y][x]?0:1;
+  }
+}
+
+// Render grid
+function render(){
+  X.save();
+  X.translate(shakeX,shakeY);
+
+  X.fillStyle='#fff';
+  X.fillRect(-5,-5,W+10,H+10);
+
+  // Mouse repulsion: clear cells near mouse
+  if(mouseGX>=0){
+    const radius=6;
+    for(let dy=-radius;dy<=radius;dy++)for(let dx=-radius;dx<=radius;dx++){
+      if(dx*dx+dy*dy>radius*radius) continue;
+      const mx=mouseGX+dx,my=mouseGY+dy;
+      if(mx>=0&&mx<cols&&my>=0&&my<rows) grid[my][mx]=0;
+    }
+  }
+
+  X.fillStyle='#000';
+  for(let r=0;r<rows;r++){
+    for(let c=0;c<cols;c++){
+      if(grid[r][c]) X.fillRect(c*CELL,r*CELL,CELL-0.5,CELL-0.5);
+    }
+  }
+  X.restore();
+  requestAnimationFrame(render);
+}
+
+// Mouse tracking
+C.addEventListener('mousemove',e=>{
+  mouseGX=Math.floor(e.clientX/CELL);
+  mouseGY=Math.floor(e.clientY/CELL);
+});
+C.addEventListener('mouseleave',()=>{mouseGX=-1;mouseGY=-1;});
+
+// Click to explode: burst of dots + harsh dissonant cluster
+C.addEventListener('click',e=>{
+  const cx=Math.floor(e.clientX/CELL);
+  const cy=Math.floor(e.clientY/CELL);
+  const radius=12+Math.floor(Math.random()*10);
+  for(let i=0;i<200;i++){
+    const a=Math.random()*Math.PI*2;
+    const d=Math.random()*radius;
+    const x=cx+Math.round(Math.cos(a)*d);
+    const y=cy+Math.round(Math.sin(a)*d);
+    if(x>=0&&x<cols&&y>=0&&y<rows) grid[y][x]=1;
+  }
+  // Harsh dissonant cluster: minor 2nds stacked
+  if(ac&&ac.state==='running'){
+    const base=Math.floor(Math.random()*20);
+    const cluster=[base, base+1, base+6, base+7]; // minor 2nd + tritone
+    currentNotes=cluster.map(n=>noteName(n%24));
+    cluster.forEach(n=>tone(FREQ[n%24],0.4));
+    document.getElementById('notes').textContent=currentNotes.join(' + ');
+  }
+  shakeX=(Math.random()-0.5)*6;shakeY=(Math.random()-0.5)*6;
+  setTimeout(()=>{shakeX=0;shakeY=0;},100);
+});
+
+// Spacebar = full reset explosion
+addEventListener('keydown',e=>{
+  if(e.code==='Space'){
+    e.preventDefault();
+    // Flash clear
+    grid=Array.from({length:rows},()=>new Uint8Array(cols));
+    currentNotes=[];
+    document.getElementById('notes').textContent='—';
+    shakeX=(Math.random()-0.5)*8;shakeY=(Math.random()-0.5)*8;
+    setTimeout(()=>{shakeX=0;shakeY=0;},120);
+  }
+});
+
+// Density feedback: calculate fill ratio → adjust note speed
+function getDensity(){
+  let filled=0;
+  for(let r=0;r<rows;r++)for(let c=0;c<cols;c++)if(grid[r][c])filled++;
+  return filled/(rows*cols);
+}
+
+// Audio
+function tone(freq,dur){
+  if(!ac)return;
+  const o=ac.createOscillator(),g=ac.createGain();
+  o.type=['sine','square'][Math.floor(Math.random()*2)];
+  o.frequency.setValueAtTime(freq,ac.currentTime);
+  g.gain.setValueAtTime(0,ac.currentTime);
+  g.gain.linearRampToValueAtTime(0.04,ac.currentTime+0.01);
+  g.gain.exponentialRampToValueAtTime(0.001,ac.currentTime+dur);
+  o.connect(g);g.connect(ac.destination);
+  o.start();o.stop(ac.currentTime+dur+0.02);
+}
+
+function next(){
+  if(!playing||ni>=score.length){if(playing){gen();ni=0;t0=performance.now()/1000;}return;}
+  const note=score[ni];
+  const elapsed=performance.now()/1000-t0;
+  // Density feedback: more dots = faster playback
+  const density=getDensity();
+  const speedMult=1+density*3; // 1x at empty, 4x at full
+  const adjustedTime=note.t/speedMult;
+  const delay=Math.max(0,(adjustedTime-elapsed/speedMult)*1000);
+  tid=setTimeout(()=>{
+    if(!playing)return;
+    tone(FREQ[note.n],note.d);
+    spawn(note.n);
+    ni++;next();
+  },Math.max(10,delay/speedMult));
+}
+
+// Controls
+let pauseTime=0;
+document.getElementById('btn').addEventListener('click',function(){
+  if(!playing){
+    playing=true;this.textContent='Pause';
+    if(!ac){
+      ac=new(window.AudioContext||window.webkitAudioContext)();
+      t0=performance.now()/1000;ni=0;
+      grid=Array.from({length:rows},()=>new Uint8Array(cols));
+      gen();
+    } else {
+      // Resume from where we paused
+      ac.resume();
+      t0+=performance.now()/1000-pauseTime;
+    }
+    next();
+  }else{
+    playing=false;this.textContent='Play';
+    pauseTime=performance.now()/1000;
+    if(tid)clearTimeout(tid);
+    if(ac)ac.suspend();
+  }
+});
+
+render();
+</script>
+</body>
+</html>
