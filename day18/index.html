@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 18 — 온라인 전시회 vol.3</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden}
+body{background:#0a0a0a;font-family:'Pretendard',sans-serif}
+canvas{position:fixed;inset:0;width:100%;height:100%}
+.overlay{position:fixed;inset:0;pointer-events:none;z-index:10}
+.title{position:absolute;top:24px;left:24px}
+.title h1{font-size:clamp(14px,1.6vw,18px);font-weight:400;color:rgba(255,255,255,.3)}
+.title .sub{font-size:11px;color:rgba(255,255,255,.15);margin-top:4px;font-style:italic}
+.bk{position:absolute;top:24px;right:24px;pointer-events:auto;
+  padding:6px 12px;color:rgba(255,255,255,.2);font-size:11px;text-decoration:none;
+  border:1px solid rgba(255,255,255,.08);border-radius:100px}
+.bk:hover{color:rgba(255,255,255,.6)}
+.bk svg{stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.tag{position:absolute;bottom:14px;right:18px;font:10px/1 monospace;color:rgba(255,255,255,.06)}
+.hint{position:absolute;bottom:24px;left:24px;font-size:11px;color:rgba(255,255,255,.12);letter-spacing:1px}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="overlay">
+  <div class="title">
+    <h1>온라인 전시회 vol.3</h1>
+    <div class="sub">Three.js Projection · move mouse to rotate</div>
+  </div>
+  <a href="../" class="bk"><svg viewBox="0 0 24 24" width="12" height="12"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></a>
+  <div class="hint">MOVE MOUSE TO EXPLORE</div>
+  <div class="tag">day 18 / typo-vibe</div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.164.1/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.164.1/examples/jsm/"
+  }
+}
+</script>
+<script type="module">
+import * as THREE from 'three';
+
+const canvas = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0a0a0a);
+
+const camera = new THREE.PerspectiveCamera(50, innerWidth/innerHeight, 0.1, 100);
+camera.position.z = 12;
+
+// ── Lighting ──
+const ambient = new THREE.AmbientLight(0xffffff, 0.6);
+scene.add(ambient);
+const dir = new THREE.DirectionalLight(0xffffff, 0.8);
+dir.position.set(5, 5, 5);
+scene.add(dir);
+
+// ── Load images as textures and create 3D planes ──
+const IMG_COUNT = 40;
+const TOTAL = 73;
+const loader = new THREE.TextureLoader();
+const planes = [];
+
+// Human silhouette in 3D space (x, y, z)
+function humanPositions(count) {
+  const pts = [];
+  // Head
+  for (let i = 0; i < 5; i++) {
+    const a = (i/5)*Math.PI*2;
+    pts.push({ x: Math.cos(a)*0.6, y: 4.5 + Math.sin(a)*0.6, z: (Math.random()-0.5)*0.5 });
+  }
+  // Torso
+  for (let i = 0; i < 10; i++) {
+    const t = i/9;
+    pts.push({ x: (Math.random()-0.5)*1.0, y: 3.8 - t*2.5, z: (Math.random()-0.5)*0.6 });
+  }
+  // Left arm
+  for (let i = 0; i < 5; i++) {
+    const t = i/4;
+    pts.push({ x: -1.2 - t*1.5, y: 3.0 - t*0.8, z: (Math.random()-0.5)*0.4 });
+  }
+  // Right arm
+  for (let i = 0; i < 5; i++) {
+    const t = i/4;
+    pts.push({ x: 1.2 + t*1.2, y: 2.8 - t*1.0, z: (Math.random()-0.5)*0.4 });
+  }
+  // Left leg
+  for (let i = 0; i < 7; i++) {
+    const t = i/6;
+    pts.push({ x: -0.5 - t*1.5, y: 1.0 - t*3.0, z: (Math.random()-0.5)*0.4 });
+  }
+  // Right leg
+  for (let i = 0; i < 7; i++) {
+    const t = i/6;
+    pts.push({ x: 0.5 + t*1.0, y: 1.0 - t*3.2, z: (Math.random()-0.5)*0.4 });
+  }
+  while (pts.length < count) {
+    pts.push({ x: (Math.random()-0.5)*3, y: (Math.random()-0.5)*6, z: (Math.random()-0.5)*1 });
+  }
+  return pts.slice(0, count);
+}
+
+const positions = humanPositions(IMG_COUNT);
+
+// Shuffle image indices
+const indices = Array.from({length:TOTAL},(_,i)=>i+1);
+for(let i=indices.length-1;i>0;i--){const j=Math.random()*i|0;[indices[i],indices[j]]=[indices[j],indices[i]];}
+
+for (let i = 0; i < IMG_COUNT; i++) {
+  const imgPath = `../day17/img/${String(indices[i]).padStart(2,'0')}.png`;
+  const tex = loader.load(imgPath);
+  tex.colorSpace = THREE.SRGBColorSpace;
+
+  const w = 0.8 + Math.random() * 0.8;
+  const h = w * (0.7 + Math.random() * 0.6);
+  const geo = new THREE.PlaneGeometry(w, h);
+  const mat = new THREE.MeshStandardMaterial({
+    map: tex,
+    side: THREE.DoubleSide,
+    roughness: 0.8,
+    metalness: 0.0,
+  });
+  const mesh = new THREE.Mesh(geo, mat);
+
+  const pos = positions[i];
+  mesh.position.set(pos.x, pos.y, pos.z);
+  mesh.rotation.set(
+    (Math.random()-0.5)*0.2,
+    (Math.random()-0.5)*0.3,
+    (Math.random()-0.5)*0.1
+  );
+
+  scene.add(mesh);
+  planes.push({
+    mesh,
+    basePos: { ...pos },
+    baseRot: { x: mesh.rotation.x, y: mesh.rotation.y, z: mesh.rotation.z },
+  });
+}
+
+// ── Mouse tracking ──
+let mx = 0, my = 0;
+let targetRotY = 0, targetRotX = 0;
+let currentRotY = 0, currentRotX = 0;
+
+document.addEventListener('mousemove', e => {
+  mx = (e.clientX / innerWidth - 0.5) * 2;
+  my = (e.clientY / innerHeight - 0.5) * 2;
+  targetRotY = mx * 0.4;
+  targetRotX = -my * 0.3;
+});
+
+// ── Animation ──
+function animate() {
+  requestAnimationFrame(animate);
+
+  // Smooth rotation follow
+  currentRotY += (targetRotY - currentRotY) * 0.05;
+  currentRotX += (targetRotX - currentRotX) * 0.05;
+
+  // Rotate entire scene group
+  scene.rotation.y = currentRotY;
+  scene.rotation.x = currentRotX;
+
+  // Subtle idle float on each plane
+  const t = performance.now() * 0.001;
+  planes.forEach((p, i) => {
+    p.mesh.position.y = p.basePos.y + Math.sin(t * 0.5 + i * 0.7) * 0.05;
+    p.mesh.position.x = p.basePos.x + Math.cos(t * 0.3 + i * 1.1) * 0.03;
+  });
+
+  renderer.render(scene, camera);
+}
+
+// ── Resize ──
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+animate();
+</script>
+</body>
+</html>
