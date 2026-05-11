@@ -9,19 +9,22 @@
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#fff;font-family:'Pretendard',-apple-system,sans-serif;color:#111}
 
-.grid{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid #111;border-left:1px solid #111}
-.cell{border-right:1px solid #111;border-bottom:1px solid #111;aspect-ratio:1;
+.grid{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;border-top:1px solid #111;border-left:1px solid #111}
+.cell{border-right:1px solid #111;border-bottom:1px solid #111;
   position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center}
 
-/* Title cell */
-.cell-title{padding:32px;display:flex;flex-direction:column;justify-content:flex-start;align-items:flex-start}
-.cell-title h1{font-size:clamp(24px,3.5vw,42px);font-weight:900;line-height:1.1;letter-spacing:-0.02em;margin-bottom:24px}
-.cell-title nav{display:flex;flex-direction:column;gap:4px}
-.cell-title nav a{font-size:13px;font-weight:400;color:#111;text-decoration:none;line-height:1.8;transition:opacity .2s}
+/* Title cell — spans full left column */
+.cell-title{grid-column:1;grid-row:1 / -1;aspect-ratio:auto;padding:32px;
+  display:flex;flex-direction:column;justify-content:flex-start;align-items:flex-start;
+  position:sticky;top:0;height:100vh;overflow-y:auto}
+.cell-title h1{font-size:clamp(28px,4vw,48px);font-weight:900;line-height:1.05;letter-spacing:-0.03em;margin-bottom:28px}
+.cell-title nav{display:flex;flex-direction:column;gap:0;border-top:1px solid #ddd;width:100%}
+.cell-title nav a{font-size:14px;font-weight:400;color:#111;text-decoration:none;
+  padding:10px 0;border-bottom:1px solid #eee;transition:opacity .2s}
 .cell-title nav a:hover{opacity:.4}
 
-/* Card cell */
-.cell-card{cursor:pointer;text-decoration:none;color:inherit;transition:background .2s}
+/* Card cells — fill remaining 3 columns */
+.cell-card{aspect-ratio:1;cursor:pointer;text-decoration:none;color:inherit;transition:background .2s}
 .cell-card:hover{background:#f5f5f5}
 .cell-card iframe{width:400%;height:400%;transform:scale(.25);transform-origin:top left;
   border:none;pointer-events:none;position:absolute;top:0;left:0}
@@ -31,10 +34,12 @@ body{background:#fff;font-family:'Pretendard',-apple-system,sans-serif;color:#11
 
 @media(max-width:900px){
   .grid{grid-template-columns:repeat(3,1fr)}
+  .cell-title{grid-column:1/-1;grid-row:auto;position:relative;height:auto;padding:24px 20px}
+  .cell-title h1{font-size:28px}
 }
 @media(max-width:600px){
   .grid{grid-template-columns:repeat(2,1fr)}
-  .cell-title h1{font-size:22px}
+  .cell-title nav a{font-size:13px;padding:8px 0}
 }
 </style>
 </head>
@@ -68,13 +73,32 @@ const items = [
 
 const grid = document.getElementById('grid');
 
-// First cell = title + nav
+// First cell = title + nav (spans full left column)
 const titleCell = document.createElement('div');
 titleCell.className = 'cell cell-title';
 titleCell.innerHTML = `
   <h1>typo<br>vibe</h1>
   <nav>
-    ${items.map(it => `<a href="${it.day}/index.html">${it.title}</a>`).join('')}
+    <a href="day19/index.html">도치학 그리기</a>
+    <a href="day18/index.html">긴축 도미노</a>
+    <a href="day17/index.html">온라인 전시회 vol.2</a>
+    <a href="day16/index.html">온라인 전시회</a>
+    <a href="day15/index.html">서로 어울리지 않는 음의 조합</a>
+    <a href="day14/index.html">내일은 어린이날</a>
+    <a href="day13/index.html">혁필화 코모레비</a>
+    <a href="day12/index.html">등고선으로 만든 산 vol.2</a>
+    <a href="day11/index.html">등고선으로 만든 산</a>
+    <a href="day10/index.html">㈅㈀㈍ 아카이브</a>
+    <a href="day09/index.html">비가 찬란히</a>
+    <a href="day08/index.html">도동이 복복복 쓰다듬기</a>
+    <a href="day07/index.html">아이들이 세상을 바라보는 방법</a>
+    <a href="day06-1/index.html">자신을 믿고 자랑스럽게 여겨라</a>
+    <a href="day05/index.html">BEEF</a>
+    <a href="day04/index.html">대표업무에 쓰임새 있으면 좋겠네</a>
+    <a href="day03/index.html">천재 AI의 위험한 뇌세포</a>
+    <a href="day02/index.html">식탁도 비명</a>
+    <a href="day01-1/index.html">고양이 마음은 고양이가 안다 vol.2</a>
+    <a href="day01/index.html">고양이 마음은 고양이가 안다</a>
   </nav>`;
 grid.appendChild(titleCell);
 
