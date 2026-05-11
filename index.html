@@ -7,138 +7,86 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{background:#fff;font-family:'Pretendard',-apple-system,sans-serif;color:#111;min-height:100vh}
+body{background:#fff;font-family:'Pretendard',-apple-system,sans-serif;color:#111}
 
-.page{display:grid;grid-template-columns:280px 1fr;min-height:100vh}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid #111;border-left:1px solid #111}
+.cell{border-right:1px solid #111;border-bottom:1px solid #111;aspect-ratio:1;
+  position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center}
 
-/* Left sidebar */
-.sidebar{padding:40px 32px;position:sticky;top:0;height:100vh;display:flex;flex-direction:column;justify-content:space-between}
-.site-title{font-size:18px;font-weight:700;line-height:1.4;margin-bottom:48px}
-.nav{display:flex;gap:40px}
-.nav-col{display:flex;flex-direction:column;gap:8px}
-.nav-col a{font-size:15px;font-weight:500;color:#111;text-decoration:none;transition:opacity .2s}
-.nav-col a:hover{opacity:.5}
-.footer-info{font-size:11px;line-height:1.8;color:#888}
+/* Title cell */
+.cell-title{padding:32px;display:flex;flex-direction:column;justify-content:flex-start;align-items:flex-start}
+.cell-title h1{font-size:clamp(24px,3.5vw,42px);font-weight:900;line-height:1.1;letter-spacing:-0.02em;margin-bottom:24px}
+.cell-title nav{display:flex;flex-direction:column;gap:4px}
+.cell-title nav a{font-size:13px;font-weight:400;color:#111;text-decoration:none;line-height:1.8;transition:opacity .2s}
+.cell-title nav a:hover{opacity:.4}
 
-/* Right content — masonry grid */
-.content{padding:0}
-.masonry{display:grid;grid-template-columns:repeat(3,1fr);gap:0}
-
-.card{position:relative;overflow:hidden;cursor:pointer;text-decoration:none;color:inherit;
-  display:block;background:#f0f0f0;border:1px solid #111}
-.card iframe{width:400%;height:400%;transform:scale(.25);transform-origin:top left;
-  border:none;pointer-events:none;display:block}
-.card-overlay{position:absolute;bottom:0;left:0;right:0;padding:10px 12px;
-  background:linear-gradient(transparent,rgba(255,255,255,.95));opacity:0;transition:opacity .3s}
-.card:hover .card-overlay{opacity:1}
-.card-overlay .day{font-size:10px;color:#888;margin-bottom:2px}
-.card-overlay .title{font-size:12px;font-weight:700;line-height:1.3}
-
-/* Index list card (black) */
-.index-card{background:#111;color:#fff;padding:24px 28px;display:flex;flex-direction:column;
-  justify-content:center;font-size:12px;line-height:2;border:1px solid #111}
-.index-card .idx-title{font-size:14px;font-weight:700;margin-bottom:12px;letter-spacing:.02em}
-.index-card a{color:#fff;text-decoration:none;display:flex;justify-content:space-between;
-  transition:opacity .2s;font-weight:400}
-.index-card a:hover{opacity:.5}
-.index-card a span{opacity:.5;font-size:11px}
-
-/* Size variations */
-.card.tall{grid-row:span 2}
-.card.wide{grid-column:span 2}
+/* Card cell */
+.cell-card{cursor:pointer;text-decoration:none;color:inherit;transition:background .2s}
+.cell-card:hover{background:#f5f5f5}
+.cell-card iframe{width:400%;height:400%;transform:scale(.25);transform-origin:top left;
+  border:none;pointer-events:none;position:absolute;top:0;left:0}
+.cell-card .label{position:absolute;bottom:10px;left:12px;right:12px;
+  font-size:10px;color:#999;opacity:0;transition:opacity .2s}
+.cell-card:hover .label{opacity:1}
 
 @media(max-width:900px){
-  .page{grid-template-columns:1fr}
-  .sidebar{position:relative;height:auto;padding:24px 20px 32px}
-  .nav{margin-bottom:24px}
-  .footer-info{display:none}
-  .masonry{grid-template-columns:repeat(2,1fr)}
-  .card.wide{grid-column:span 1}
+  .grid{grid-template-columns:repeat(3,1fr)}
 }
-@media(max-width:500px){
-  .masonry{grid-template-columns:1fr 1fr;gap:1px}
+@media(max-width:600px){
+  .grid{grid-template-columns:repeat(2,1fr)}
+  .cell-title h1{font-size:22px}
 }
 </style>
 </head>
 <body>
 
-<div class="page">
-  <aside class="sidebar">
-    <div>
-      <div class="site-title">typo-vibe<br>바이브코딩 실험</div>
-      <nav class="nav">
-        <div class="nav-col">
-          <a href="#archive">Archive</a>
-          <a href="#about">About</a>
-          <a href="#feed">Feed</a>
-        </div>
-        <div class="nav-col">
-          <a href="#typography">Typography</a>
-          <a href="#interactive">Interactive</a>
-          <a href="#generative">Generative</a>
-        </div>
-      </nav>
-    </div>
-    <div class="footer-info">
-      바이브코딩으로 만드는<br>
-      타이포그래피 실험.<br>
-      매일 하나, 문장에 생명을<br>
-      불어넣는다.<br><br>
-      typo-vibe © 2025
-    </div>
-  </aside>
-
-  <main class="content">
-    <div class="masonry" id="masonry"></div>
-  </main>
-</div>
+<div class="grid" id="grid"></div>
 
 <script>
 const items = [
-  { day:'day19', title:'도치학 그리기', date:'2026.05.12', size:'' },
-  { day:'day18', title:'긴축 도미노', date:'2026.05.07', size:'tall' },
-  { day:'day17', title:'온라인 전시회 vol.2', date:'2026.05.07', size:'' },
-  { day:'day16', title:'온라인 전시회', date:'2026.05.07', size:'wide' },
-  { day:'day15', title:'서로 어울리지 않는 음의 조합', date:'2026.05.07', size:'' },
-  { day:'day14', title:'내일은 어린이날', date:'2026.05.04', size:'tall' },
-  { day:'day13', title:'혁필화 코모레비', date:'2026.04.30', size:'' },
-  { day:'day12', title:'등고선으로 만든 산 vol.2', date:'2026.04.29', size:'' },
-  { day:'day11', title:'등고선으로 만든 산', date:'2026.04.29', size:'wide' },
-  { day:'day10', title:'㈅㈀㈍ 아카이브', date:'2026.04.28', size:'' },
-  { day:'day09', title:'비가 찬란히', date:'2026.04.28', size:'tall' },
-  { day:'day08', title:'도동이 복복복 쓰다듬기', date:'2026.04.24', size:'' },
-  { day:'day07', title:'아이들이 세상을 바라보는 방법', date:'2026.04.23', size:'' },
-  { day:'day06-1', title:'자신을 믿고 자랑스럽게 여겨라', date:'2026.04.22', size:'wide' },
-  { day:'day05', title:'BEEF', date:'2026.02.26', size:'' },
-  { day:'day04', title:'대표업무에 쓰임새 있으면 좋겠네', date:'2025.04.19', size:'tall' },
-  { day:'day03', title:'천재 AI의 위험한 뇌세포', date:'2025.04.18', size:'' },
-  { day:'day02', title:'식탁도 비명', date:'2025.04.17', size:'' },
-  { day:'day01-1', title:'고양이 마음은 고양이가 안다 vol.2', date:'2025.04.16', size:'' },
-  { day:'day01', title:'고양이 마음은 고양이가 안다', date:'2025.04.16', size:'' },
+  { day:'day19', title:'도치학 그리기', date:'2026.05.12' },
+  { day:'day18', title:'긴축 도미노', date:'2026.05.07' },
+  { day:'day17', title:'온라인 전시회 vol.2', date:'2026.05.07' },
+  { day:'day16', title:'온라인 전시회', date:'2026.05.07' },
+  { day:'day15', title:'서로 어울리지 않는 음의 조합', date:'2026.05.07' },
+  { day:'day14', title:'내일은 어린이날', date:'2026.05.04' },
+  { day:'day13', title:'혁필화 코모레비', date:'2026.04.30' },
+  { day:'day12', title:'등고선으로 만든 산 vol.2', date:'2026.04.29' },
+  { day:'day11', title:'등고선으로 만든 산', date:'2026.04.29' },
+  { day:'day10', title:'㈅㈀㈍ 아카이브', date:'2026.04.28' },
+  { day:'day09', title:'비가 찬란히', date:'2026.04.28' },
+  { day:'day08', title:'도동이 복복복 쓰다듬기', date:'2026.04.24' },
+  { day:'day07', title:'아이들이 세상을 바라보는 방법', date:'2026.04.23' },
+  { day:'day06-1', title:'자신을 믿고 자랑스럽게 여겨라', date:'2026.04.22' },
+  { day:'day05', title:'BEEF', date:'2026.02.26' },
+  { day:'day04', title:'대표업무에 쓰임새 있으면 좋겠네', date:'2025.04.19' },
+  { day:'day03', title:'천재 AI의 위험한 뇌세포', date:'2025.04.18' },
+  { day:'day02', title:'식탁도 비명', date:'2025.04.17' },
+  { day:'day01-1', title:'고양이 마음은 고양이가 안다 vol.2', date:'2025.04.16' },
+  { day:'day01', title:'고양이 마음은 고양이가 안다', date:'2025.04.16' },
 ];
 
-const masonry = document.getElementById('masonry');
+const grid = document.getElementById('grid');
 
-items.forEach((item, i) => {
-  // Insert index list card after 4th item
-  if (i === 4) {
-    const idx = document.createElement('div');
-    idx.className = 'index-card';
-    idx.innerHTML = '<div class="idx-title">typo-vibe 2025–2026</div>' +
-      items.map((it,j) => `<a href="${it.day}/index.html">${it.title} <span>${String(j+1).padStart(2,'0')}</span></a>`).join('');
-    masonry.appendChild(idx);
-  }
+// First cell = title + nav
+const titleCell = document.createElement('div');
+titleCell.className = 'cell cell-title';
+titleCell.innerHTML = `
+  <h1>typo<br>vibe</h1>
+  <nav>
+    ${items.map(it => `<a href="${it.day}/index.html">${it.title}</a>`).join('')}
+  </nav>`;
+grid.appendChild(titleCell);
 
+// Rest = card cells
+items.forEach(item => {
   const card = document.createElement('a');
-  card.className = 'card' + (item.size ? ' ' + item.size : '');
+  card.className = 'cell cell-card';
   card.href = item.day + '/index.html';
   card.innerHTML = `
     <iframe src="${item.day}/index.html" loading="lazy" tabindex="-1" aria-hidden="true"></iframe>
-    <div class="card-overlay">
-      <div class="day">${item.date} — ${item.day}</div>
-      <div class="title">${item.title}</div>
-    </div>`;
-  masonry.appendChild(card);
+    <div class="label">${item.day} — ${item.title}</div>`;
+  grid.appendChild(card);
 });
 </script>
 </body>
