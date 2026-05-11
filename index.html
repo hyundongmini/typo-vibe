@@ -9,84 +9,96 @@
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#fff;font-family:'Pretendard',-apple-system,sans-serif;color:#111}
 
-.grid{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid #111;border-left:1px solid #111}
-.cell{border-right:1px solid #111;border-bottom:1px solid #111;aspect-ratio:1;
-  position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center}
+.layout{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;border-left:1px solid #111;border-top:1px solid #111}
 
-/* Title cell */
-.cell-title{padding:32px;display:flex;flex-direction:column;justify-content:flex-start;align-items:flex-start}
-.cell-title h1{font-size:clamp(24px,3.5vw,42px);font-weight:900;line-height:1.1;letter-spacing:-0.02em;margin-bottom:24px}
-.cell-title nav{display:flex;flex-direction:column;gap:4px}
-.cell-title nav a{font-size:13px;font-weight:400;color:#111;text-decoration:none;line-height:1.8;transition:opacity .2s}
-.cell-title nav a:hover{opacity:.4}
+/* Left menu column */
+.menu-col{grid-column:1;grid-row:1/-1;border-right:1px solid #111;border-bottom:1px solid #111;
+  padding:36px 28px}
+.menu-col h1{font-size:32px;font-weight:900;line-height:1.05;letter-spacing:-0.03em;margin-bottom:32px}
+.menu-col nav{display:flex;flex-direction:column;gap:0}
+.menu-col nav a{font-size:13px;font-weight:400;color:#111;text-decoration:none;
+  padding:8px 0;transition:opacity .2s;display:block}
+.menu-col nav a:hover{opacity:.4}
 
-/* Card cell */
-.cell-card{cursor:pointer;text-decoration:none;color:inherit;transition:background .2s}
-.cell-card:hover{background:#f5f5f5}
-.cell-card iframe{width:400%;height:400%;transform:scale(.25);transform-origin:top left;
+/* Right 3 columns grid */
+.card{border-right:1px solid #111;border-bottom:1px solid #111;
+  position:relative;overflow:hidden;display:block;text-decoration:none;color:inherit;
+  cursor:pointer;transition:background .2s}
+.card:hover{background:#f8f8f8}
+.card iframe{width:400%;height:400%;transform:scale(.25);transform-origin:top left;
   border:none;pointer-events:none;position:absolute;top:0;left:0}
-.cell-card .label{position:absolute;bottom:10px;left:12px;right:12px;
-  font-size:10px;color:#999;opacity:0;transition:opacity .2s}
-.cell-card:hover .label{opacity:1}
+.card .label{position:absolute;bottom:8px;left:10px;right:10px;
+  font-size:9px;color:#999;opacity:0;transition:opacity .2s}
+.card:hover .label{opacity:1}
+
+/* Rows: 3 cards per row across columns 2-4 */
+.cards-row{display:contents}
 
 @media(max-width:900px){
-  .grid{grid-template-columns:repeat(3,1fr)}
-}
-@media(max-width:600px){
-  .grid{grid-template-columns:repeat(2,1fr)}
-  .cell-title h1{font-size:22px}
+  .layout{grid-template-columns:1fr}
+  .menu-col{grid-row:auto;padding:24px 20px}
+  .menu-col h1{font-size:26px;margin-bottom:20px}
+  .cards-grid{grid-template-columns:repeat(2,1fr)}
 }
 </style>
 </head>
 <body>
 
-<div class="grid" id="grid"></div>
+<div class="layout" id="layout"></div>
 
 <script>
 const items = [
-  { day:'day19', title:'도치학 그리기', date:'2026.05.12' },
-  { day:'day18', title:'긴축 도미노', date:'2026.05.07' },
-  { day:'day17', title:'온라인 전시회 vol.2', date:'2026.05.07' },
-  { day:'day16', title:'온라인 전시회', date:'2026.05.07' },
-  { day:'day15', title:'서로 어울리지 않는 음의 조합', date:'2026.05.07' },
-  { day:'day14', title:'내일은 어린이날', date:'2026.05.04' },
-  { day:'day13', title:'혁필화 코모레비', date:'2026.04.30' },
-  { day:'day12', title:'등고선으로 만든 산 vol.2', date:'2026.04.29' },
-  { day:'day11', title:'등고선으로 만든 산', date:'2026.04.29' },
-  { day:'day10', title:'㈅㈀㈍ 아카이브', date:'2026.04.28' },
-  { day:'day09', title:'비가 찬란히', date:'2026.04.28' },
-  { day:'day08', title:'도동이 복복복 쓰다듬기', date:'2026.04.24' },
-  { day:'day07', title:'아이들이 세상을 바라보는 방법', date:'2026.04.23' },
-  { day:'day06-1', title:'자신을 믿고 자랑스럽게 여겨라', date:'2026.04.22' },
-  { day:'day05', title:'BEEF', date:'2026.02.26' },
-  { day:'day04', title:'대표업무에 쓰임새 있으면 좋겠네', date:'2025.04.19' },
-  { day:'day03', title:'천재 AI의 위험한 뇌세포', date:'2025.04.18' },
-  { day:'day02', title:'식탁도 비명', date:'2025.04.17' },
-  { day:'day01-1', title:'고양이 마음은 고양이가 안다 vol.2', date:'2025.04.16' },
-  { day:'day01', title:'고양이 마음은 고양이가 안다', date:'2025.04.16' },
+  { day:'day19', title:'도치학 그리기' },
+  { day:'day18', title:'긴축 도미노' },
+  { day:'day17', title:'온라인 전시회 vol.2' },
+  { day:'day16', title:'온라인 전시회' },
+  { day:'day15', title:'서로 어울리지 않는 음의 조합' },
+  { day:'day14', title:'내일은 어린이날' },
+  { day:'day13', title:'혁필화 코모레비' },
+  { day:'day12', title:'등고선으로 만든 산 vol.2' },
+  { day:'day11', title:'등고선으로 만든 산' },
+  { day:'day10', title:'㈅㈀㈍ 아카이브' },
+  { day:'day09', title:'비가 찬란히' },
+  { day:'day08', title:'도동이 복복복 쓰다듬기' },
+  { day:'day07', title:'아이들이 세상을 바라보는 방법' },
+  { day:'day06-1', title:'자신을 믿고 자랑스럽게 여겨라' },
+  { day:'day05', title:'BEEF' },
+  { day:'day04', title:'대표업무에 쓰임새 있으면 좋겠네' },
+  { day:'day03', title:'천재 AI의 위험한 뇌세포' },
+  { day:'day02', title:'식탁도 비명' },
+  { day:'day01-1', title:'고양이 마음은 고양이가 안다 vol.2' },
+  { day:'day01', title:'고양이 마음은 고양이가 안다' },
 ];
 
-const grid = document.getElementById('grid');
+const layout = document.getElementById('layout');
 
-// First cell = title + nav
-const titleCell = document.createElement('div');
-titleCell.className = 'cell cell-title';
-titleCell.innerHTML = `
-  <h1>typo<br>vibe</h1>
-  <nav>
-    ${items.map(it => `<a href="${it.day}/index.html">${it.title}</a>`).join('')}
-  </nav>`;
-grid.appendChild(titleCell);
+// Calculate rows needed (3 cards per row)
+const rows = Math.ceil(items.length / 3);
 
-// Rest = card cells
-items.forEach(item => {
+// Menu column spanning all rows
+const menu = document.createElement('div');
+menu.className = 'menu-col';
+menu.style.gridRow = '1 / ' + (rows + 1);
+menu.innerHTML = `<h1>typo<br>vibe</h1><nav>${items.map(it => 
+  `<a href="${it.day}/index.html">${it.title}</a>`).join('')}</nav>`;
+layout.appendChild(menu);
+
+// Set grid rows
+layout.style.gridTemplateRows = `repeat(${rows}, 240px)`;
+
+// Cards fill columns 2-4
+items.forEach((item, i) => {
   const card = document.createElement('a');
-  card.className = 'cell cell-card';
+  card.className = 'card';
   card.href = item.day + '/index.html';
+  const row = Math.floor(i / 3) + 1;
+  const col = (i % 3) + 2;
+  card.style.gridRow = row;
+  card.style.gridColumn = col;
   card.innerHTML = `
     <iframe src="${item.day}/index.html" loading="lazy" tabindex="-1" aria-hidden="true"></iframe>
     <div class="label">${item.day} — ${item.title}</div>`;
-  grid.appendChild(card);
+  layout.appendChild(card);
 });
 </script>
 </body>
