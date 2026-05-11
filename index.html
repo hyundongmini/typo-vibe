@@ -1,267 +1,145 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>typo—vibe</title>
-  <link rel="preconnect" href="https://cdn.jsdelivr.net">
-  <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css" rel="stylesheet">
-  <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>typo-vibe</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#fff;font-family:'Pretendard',-apple-system,sans-serif;color:#111;min-height:100vh}
 
-    body {
-      background: #000;
-      font-family: 'Pretendard', -apple-system, sans-serif;
-      color: #111;
-      min-height: 100vh;
-      overflow-x: hidden;
-    }
+.page{display:grid;grid-template-columns:280px 1fr;min-height:100vh}
 
-    .page-wrapper {
-      max-width: 1400px;
-      margin: 0 auto;
-      padding: 40px 24px;
-    }
+/* Left sidebar */
+.sidebar{padding:40px 32px;position:sticky;top:0;height:100vh;display:flex;flex-direction:column;justify-content:space-between}
+.site-title{font-size:18px;font-weight:700;line-height:1.4;margin-bottom:48px}
+.nav{display:flex;gap:40px}
+.nav-col{display:flex;flex-direction:column;gap:8px}
+.nav-col a{font-size:15px;font-weight:500;color:#111;text-decoration:none;transition:opacity .2s}
+.nav-col a:hover{opacity:.5}
+.footer-info{font-size:11px;line-height:1.8;color:#888}
 
-    /* Hero */
-    .hero {
-      background: #fff;
-      padding: 80px 48px 60px;
-      margin-bottom: 2px;
-      position: relative;
-      overflow: hidden;
-    }
+/* Right content — masonry grid */
+.content{padding:0}
+.masonry{display:grid;grid-template-columns:repeat(3,1fr);gap:2px}
 
-    .hero-title {
-      font-size: clamp(80px, 18vw, 260px);
-      font-weight: 900;
-      line-height: 0.85;
-      letter-spacing: -0.04em;
-      color: #000;
-      transform: rotate(-1.5deg);
-      margin-left: -8px;
-      white-space: nowrap;
-    }
+.card{position:relative;overflow:hidden;cursor:pointer;text-decoration:none;color:inherit;
+  display:block;background:#f0f0f0}
+.card iframe{width:400%;height:400%;transform:scale(.25);transform-origin:top left;
+  border:none;pointer-events:none;display:block}
+.card-overlay{position:absolute;bottom:0;left:0;right:0;padding:10px 12px;
+  background:linear-gradient(transparent,rgba(255,255,255,.95));opacity:0;transition:opacity .3s}
+.card:hover .card-overlay{opacity:1}
+.card-overlay .day{font-size:10px;color:#888;margin-bottom:2px}
+.card-overlay .title{font-size:12px;font-weight:700;line-height:1.3}
 
-    .hero-title span.dash {
-      display: inline-block;
-      transform: translateY(-8px);
-      opacity: 0.4;
-    }
+/* Index list card (black) */
+.index-card{background:#111;color:#fff;padding:24px 28px;display:flex;flex-direction:column;
+  justify-content:center;font-size:12px;line-height:2}
+.index-card .idx-title{font-size:14px;font-weight:700;margin-bottom:12px;letter-spacing:.02em}
+.index-card a{color:#fff;text-decoration:none;display:flex;justify-content:space-between;
+  transition:opacity .2s;font-weight:400}
+.index-card a:hover{opacity:.5}
+.index-card a span{opacity:.5;font-size:11px}
 
-    .hero-desc {
-      margin-top: 40px;
-      font-size: 15px;
-      line-height: 1.8;
-      color: #555;
-      max-width: 480px;
-      font-style: italic;
-      font-family: 'Georgia', serif;
-      transform: rotate(-1.5deg);
-    }
+/* Size variations */
+.card.tall{grid-row:span 2}
+.card.wide{grid-column:span 2}
 
-    /* Grid */
-    .grid-container {
-      background: #fff;
-      padding: 48px;
-    }
-
-    .masonry {
-      columns: 5;
-      column-gap: 12px;
-    }
-
-    .card {
-      break-inside: avoid;
-      margin-bottom: 12px;
-      background: #f8f8f8;
-      border: 1px solid #eee;
-      cursor: pointer;
-      transition: transform 0.3s ease, box-shadow 0.3s ease;
-      opacity: 0;
-      transform: translateY(30px);
-      text-decoration: none;
-      color: inherit;
-      display: block;
-    }
-
-    .card.visible {
-      opacity: 1;
-      transform: translateY(0);
-      transition: opacity 0.6s ease, transform 0.6s ease, box-shadow 0.3s ease;
-    }
-
-    .card:hover {
-      transform: translateY(-4px) scale(1.02);
-      box-shadow: 0 12px 40px rgba(0,0,0,0.12);
-      z-index: 10;
-      position: relative;
-    }
-
-    .card-iframe-wrap {
-      width: 100%;
-      overflow: hidden;
-      position: relative;
-      background: #eee;
-    }
-
-    .card-iframe-wrap iframe {
-      width: 400%;
-      height: 400%;
-      transform: scale(0.25);
-      transform-origin: top left;
-      border: none;
-      pointer-events: none;
-      display: block;
-    }
-
-    .card-info {
-      padding: 12px 14px 14px;
-    }
-
-    .card-date {
-      font-size: 10px;
-      color: #999;
-      letter-spacing: 0.05em;
-      text-transform: uppercase;
-      margin-bottom: 4px;
-      font-family: 'Pretendard', monospace;
-    }
-
-    .card-title {
-      font-size: 12px;
-      font-weight: 700;
-      line-height: 1.4;
-      color: #111;
-      margin-bottom: 4px;
-    }
-
-    .card-tags {
-      font-size: 9px;
-      color: #aaa;
-      letter-spacing: 0.02em;
-    }
-
-    /* Size variations for masonry */
-    .card.size-s .card-iframe-wrap { height: 120px; }
-    .card.size-m .card-iframe-wrap { height: 180px; }
-    .card.size-l .card-iframe-wrap { height: 240px; }
-
-    /* Footer */
-    .footer {
-      background: #fff;
-      margin-top: 2px;
-      padding: 40px 48px;
-      text-align: center;
-      font-size: 11px;
-      color: #bbb;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-    }
-
-    /* Responsive */
-    @media (max-width: 1200px) {
-      .masonry { columns: 4; }
-    }
-
-    @media (max-width: 900px) {
-      .masonry { columns: 3; }
-      .hero { padding: 60px 32px 48px; }
-      .grid-container { padding: 32px; }
-    }
-
-    @media (max-width: 600px) {
-      .masonry { columns: 2; column-gap: 8px; }
-      .card { margin-bottom: 8px; }
-      .hero { padding: 48px 20px 36px; }
-      .hero-title { transform: rotate(-1deg); }
-      .hero-desc { transform: rotate(-1deg); font-size: 13px; }
-      .grid-container { padding: 16px; }
-      .page-wrapper { padding: 16px 8px; }
-      .footer { padding: 32px 20px; }
-    }
-  </style>
+@media(max-width:900px){
+  .page{grid-template-columns:1fr}
+  .sidebar{position:relative;height:auto;padding:24px 20px 32px}
+  .nav{margin-bottom:24px}
+  .footer-info{display:none}
+  .masonry{grid-template-columns:repeat(2,1fr)}
+  .card.wide{grid-column:span 1}
+}
+@media(max-width:500px){
+  .masonry{grid-template-columns:1fr 1fr;gap:1px}
+}
+</style>
 </head>
 <body>
-  <div class="page-wrapper">
-    <header class="hero">
-      <h1 class="hero-title">typo<span class="dash">—</span>vibe</h1>
-      <p class="hero-desc">
-        바이브코딩으로 만드는 타이포그래피 실험.<br>
-        매일 하나씩, 글자와 코드가 만나는 순간들을 기록합니다.
-      </p>
-    </header>
 
-    <main class="grid-container">
-      <div class="masonry" id="masonry"></div>
-    </main>
-
-    <footer class="footer">
+<div class="page">
+  <aside class="sidebar">
+    <div>
+      <div class="site-title">typo-vibe<br>바이브코딩 실험</div>
+      <nav class="nav">
+        <div class="nav-col">
+          <a href="#archive">Archive</a>
+          <a href="#about">About</a>
+          <a href="#feed">Feed</a>
+        </div>
+        <div class="nav-col">
+          <a href="#typography">Typography</a>
+          <a href="#interactive">Interactive</a>
+          <a href="#generative">Generative</a>
+        </div>
+      </nav>
+    </div>
+    <div class="footer-info">
+      바이브코딩으로 만드는<br>
+      타이포그래피 실험.<br>
+      매일 하나, 문장에 생명을<br>
+      불어넣는다.<br><br>
       typo-vibe © 2025
-    </footer>
-  </div>
+    </div>
+  </aside>
 
-  <script>
-    const items = [
-      { day: 'day19', title: '도치학 그리기', tags: 'drawing, canvas, interactive, mascot', date: '2026.05.12', size: 'l' },
-      { day: 'day18', title: '긴축 도미노', tags: 'domino, physics, interactive', date: '2026.05.07', size: 'm' },
-      { day: 'day17', title: '온라인 전시회 vol.2', tags: 'collage, silhouette, spring-physics', date: '2026.05.07', size: 's' },
-      { day: 'day16', title: '온라인 전시회', tags: 'parallax, typography, portfolio', date: '2026.05.07', size: 'l' },
-      { day: 'day15', title: '서로 어울리지 않는 음의 조합', tags: 'generative, audio, pixel', date: '2026.05.07', size: 'm' },
-      { day: 'day14', title: '내일은 어린이날', tags: 'connect-dots, collage, risograph', date: '2026.05.04', size: 's' },
-      { day: 'day13', title: '혁필화 코모레비', tags: 'calligraphy, ink-bloom, interactive', date: '2026.04.30', size: 'l' },
-      { day: 'day12', title: '등고선으로 만든 산 vol.2', tags: 'contour, SDF, interactive', date: '2026.04.29', size: 'm' },
-      { day: 'day11', title: '등고선으로 만든 산', tags: 'contour, SDF, terrain', date: '2026.04.29', size: 's' },
-      { day: 'day10', title: '㈅㈀㈍ 아카이브', tags: 'archive, interactive, figma', date: '2026.04.28', size: 'm' },
-      { day: 'day09', title: '비가 찬란히', tags: 'foam, 3d, interactive', date: '2026.04.28', size: 'l' },
-      { day: 'day08', title: '도동이 복복복 쓰다듬기', tags: 'game, interactive, cat', date: '2026.04.24', size: 's' },
-      { day: 'day07', title: '아이들이 세상을 바라보는 방법에 대한 탐색', tags: 'highlight, physics, audio', date: '2026.04.23', size: 'm' },
-      { day: 'day06-1', title: '자신을 믿고 자랑스럽게 여겨라', tags: 'mirror, svg-art, old-poster', date: '2026.04.22', size: 'l' },
-      { day: 'day05', title: 'BEEF', tags: 'telescope, interactive, hidden-message', date: '2026.02.26', size: 's' },
-      { day: 'day04', title: '대표업무에 쓰임새 있으면 좋겠네', tags: '3d-stack, interactive, gallery', date: '2025.04.19', size: 'm' },
-      { day: 'day03', title: '천재 AI의 위험한 뇌세포', tags: 'ascii, minesweeper, interactive', date: '2025.04.18', size: 'l' },
-      { day: 'day02', title: '식탁도 비명', tags: 'glitch, interactive, scream', date: '2025.04.17', size: 's' },
-      { day: 'day01-1', title: '고양이 마음은 고양이가 안다 vol.2', tags: 'physics, interactive, matter.js', date: '2025.04.16', size: 'm' },
-      { day: 'day01', title: '고양이 마음은 고양이가 안다', tags: 'embroidery, interactive, canvas', date: '2025.04.16', size: 's' },
-    ];
+  <main class="content">
+    <div class="masonry" id="masonry"></div>
+  </main>
+</div>
 
-    const masonry = document.getElementById('masonry');
+<script>
+const items = [
+  { day:'day19', title:'도치학 그리기', date:'2026.05.12', size:'' },
+  { day:'day18', title:'긴축 도미노', date:'2026.05.07', size:'tall' },
+  { day:'day17', title:'온라인 전시회 vol.2', date:'2026.05.07', size:'' },
+  { day:'day16', title:'온라인 전시회', date:'2026.05.07', size:'wide' },
+  { day:'day15', title:'서로 어울리지 않는 음의 조합', date:'2026.05.07', size:'' },
+  { day:'day14', title:'내일은 어린이날', date:'2026.05.04', size:'tall' },
+  { day:'day13', title:'혁필화 코모레비', date:'2026.04.30', size:'' },
+  { day:'day12', title:'등고선으로 만든 산 vol.2', date:'2026.04.29', size:'' },
+  { day:'day11', title:'등고선으로 만든 산', date:'2026.04.29', size:'wide' },
+  { day:'day10', title:'㈅㈀㈍ 아카이브', date:'2026.04.28', size:'' },
+  { day:'day09', title:'비가 찬란히', date:'2026.04.28', size:'tall' },
+  { day:'day08', title:'도동이 복복복 쓰다듬기', date:'2026.04.24', size:'' },
+  { day:'day07', title:'아이들이 세상을 바라보는 방법', date:'2026.04.23', size:'' },
+  { day:'day06-1', title:'자신을 믿고 자랑스럽게 여겨라', date:'2026.04.22', size:'wide' },
+  { day:'day05', title:'BEEF', date:'2026.02.26', size:'' },
+  { day:'day04', title:'대표업무에 쓰임새 있으면 좋겠네', date:'2025.04.19', size:'tall' },
+  { day:'day03', title:'천재 AI의 위험한 뇌세포', date:'2025.04.18', size:'' },
+  { day:'day02', title:'식탁도 비명', date:'2025.04.17', size:'' },
+  { day:'day01-1', title:'고양이 마음은 고양이가 안다 vol.2', date:'2025.04.16', size:'' },
+  { day:'day01', title:'고양이 마음은 고양이가 안다', date:'2025.04.16', size:'' },
+];
 
-    items.forEach((item, i) => {
-      const card = document.createElement('a');
-      card.className = `card size-${item.size}`;
-      card.href = `${item.day}/index.html`;
-      card.innerHTML = `
-        <div class="card-iframe-wrap">
-          <iframe src="${item.day}/index.html" loading="lazy" tabindex="-1" aria-hidden="true"></iframe>
-        </div>
-        <div class="card-info">
-          <div class="card-date">${item.date} — ${item.day}</div>
-          <div class="card-title">${item.title}</div>
-          <div class="card-tags">${item.tags}</div>
-        </div>
-      `;
-      masonry.appendChild(card);
-    });
+const masonry = document.getElementById('masonry');
 
-    // Scroll fade-in
-    const observer = new IntersectionObserver((entries) => {
-      entries.forEach(entry => {
-        if (entry.isIntersecting) {
-          entry.target.classList.add('visible');
-          observer.unobserve(entry.target);
-        }
-      });
-    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+items.forEach((item, i) => {
+  // Insert index list card after 4th item
+  if (i === 4) {
+    const idx = document.createElement('div');
+    idx.className = 'index-card';
+    idx.innerHTML = '<div class="idx-title">typo-vibe 2025–2026</div>' +
+      items.map((it,j) => `<a href="${it.day}/index.html">${it.title} <span>${String(j+1).padStart(2,'0')}</span></a>`).join('');
+    masonry.appendChild(idx);
+  }
 
-    document.querySelectorAll('.card').forEach((card, i) => {
-      card.style.transitionDelay = `${(i % 5) * 80}ms`;
-      observer.observe(card);
-    });
-  </script>
+  const card = document.createElement('a');
+  card.className = 'card' + (item.size ? ' ' + item.size : '');
+  card.href = item.day + '/index.html';
+  card.innerHTML = `
+    <iframe src="${item.day}/index.html" loading="lazy" tabindex="-1" aria-hidden="true"></iframe>
+    <div class="card-overlay">
+      <div class="day">${item.date} — ${item.day}</div>
+      <div class="title">${item.title}</div>
+    </div>`;
+  masonry.appendChild(card);
+});
+</script>
 </body>
 </html>
