@@ -213,6 +213,8 @@ function render() {
 // ── Scoring ──
 function calculateScore() {
   if (!guideImg || userPoints.length < 10) return 0;
+
+  // Render user drawing to offscreen canvas
   const userCanvas = document.createElement('canvas');
   userCanvas.width = W; userCanvas.height = H;
   const uc = userCanvas.getContext('2d');
@@ -222,26 +224,36 @@ function calculateScore() {
     const p = userPoints[i];
     uc.fillRect(p.x - brushSize/2, p.y - brushSize/2, brushSize, brushSize);
   }
+
   const guideData = guideImg.getContext('2d').getImageData(0, 0, W, H).data;
   const userData = uc.getImageData(0, 0, W, H).data;
+
   let guidePixels = 0, coveredPixels = 0, userPixels = 0, overflowPixels = 0;
-  const tolerance = 6;
+  const tolerance = 4; // very strict
+
   for (let y = 0; y < H; y += 2) {
     for (let x = 0; x < W; x += 2) {
       const idx = (y * W + x) * 4;
       const gAlpha = guideData[idx + 3], uAlpha = userData[idx + 3];
+
       if (gAlpha > 128) guidePixels++;
       if (uAlpha > 128) userPixels++;
-      if (gAlpha > 128 && uAlpha > 128) { coveredPixels++; }
-      else if (gAlpha > 128) {
-        let found = false;
-        for (let dy = -tolerance; dy <= tolerance && !found; dy += 2)
-          for (let dx = -tolerance; dx <= tolerance && !found; dx += 2) {
-            const nx = x+dx, ny = y+dy;
-            if (nx<0||nx>=W||ny<0||ny>=H) continue;
-            if (userData[(ny*W+nx)*4+3] > 128) { found=true; coveredPixels++; }
-          }
+
+      // Coverage: user drew on or very near guide
+      if (gAlpha > 128) {
+        if (uAlpha > 128) { coveredPixels++; }
+        else {
+          let found = false;
+          for (let dy = -tolerance; dy <= tolerance && !found; dy += 2)
+            for (let dx = -tolerance; dx <= tolerance && !found; dx += 2) {
+              const nx = x+dx, ny = y+dy;
+              if (nx<0||nx>=W||ny<0||ny>=H) continue;
+              if (userData[(ny*W+nx)*4+3] > 128) { found=true; coveredPixels++; }
+            }
+        }
       }
+
+      // Overflow: user drew far from guide
       if (uAlpha > 128 && gAlpha <= 128) {
         let nearGuide = false;
         for (let dy = -tolerance; dy <= tolerance && !nearGuide; dy += 2)
@@ -254,13 +266,32 @@ function calculateScore() {
       }
     }
   }
+
   if (guidePixels === 0) return 0;
-  const coverage = Math.min(1, coveredPixels / guidePixels);
+
+  // 1. Coverage: how much of the guide was actually traced (strict)
+  const coverage = coveredPixels / guidePixels;
+
+  // 2. Precision: heavily penalize drawing outside the guide
+  // overflowPixels / total user pixels = how much is "wasted"
   const overflowRatio = userPixels > 0 ? overflowPixels / userPixels : 0;
-  const precision = Math.max(0, 1 - overflowRatio * 2);
-  const completeness = Math.min(1, userPixels / (guidePixels * 0.4));
-  const raw = coverage * 0.5 + precision * 0.3 + completeness * 0.2;
-  return Math.min(99, Math.max(0, Math.pow(raw, 1.4) * 100));
+  const precision = Math.max(0, 1 - overflowRatio * 3); // 33% overflow = 0 precision
+
+  // 3. Size ratio penalty: if user drew way more than guide, penalize
+  // Ideal: userPixels ≈ guidePixels. Drawing 3x more = penalty
+  const sizeRatio = userPixels / guidePixels;
+  const sizePenalty = sizeRatio > 1.5 ? Math.max(0, 1 - (sizeRatio - 1.5) * 0.5) : 1;
+
+  // Combined score
+  const raw = coverage * 0.45 + precision * 0.35 + sizePenalty * 0.2;
+
+  // Apply steep curve: makes 80+ very hard to achieve
+  const curved = Math.pow(raw, 1.8) * 100;
+
+  // Mode bonus: hard mode is harder so give slight bonus
+  const modeMultiplier = currentMode === 'hard' ? 1.15 : 1.0;
+
+  return Math.min(99, Math.max(0, curved * modeMultiplier));
 }
 
 function getMessage(score) {
