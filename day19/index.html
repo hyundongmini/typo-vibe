@@ -372,7 +372,7 @@ function submitScore() {
   const rc = document.getElementById('resultCanvas');
   const rctx = rc.getContext('2d');
   rctx.clearRect(0, 0, 400, 400);
-  // Draw guide faintly
+  // Always draw guide faintly in result (regardless of mode)
   if (guideImg) {
     rctx.globalAlpha = 0.1;
     rctx.drawImage(guideImg, 0, 0);
