@@ -360,6 +360,7 @@ function submitScore() {
   document.getElementById('msgText').textContent = getMessage(rounded);
 
   // Set score color
+  const WIN_THRESHOLD = 80;
   const scoreEl = document.getElementById('scoreText');
   if (rounded >= WIN_THRESHOLD) {
     scoreEl.classList.add('win');
@@ -381,7 +382,6 @@ function submitScore() {
   rctx.drawImage(canvas, 0, 0);
 
   // Set mascot image based on score
-  const WIN_THRESHOLD = 80;
   if (rounded >= WIN_THRESHOLD) {
     document.getElementById('barCharImg').src = '성공학.png';
   } else {
