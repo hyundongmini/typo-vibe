@@ -55,15 +55,15 @@ canvas.fail-shake{animation:failShake .5s ease-in-out}
 
 /* Result overlay */
 .result{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;
-  justify-content:flex-start;background:#fff;z-index:100;
-  opacity:0;pointer-events:none;transition:opacity .4s;padding:60px 20px 40px;overflow-y:auto}
+  justify-content:center;background:#f5f5f5;z-index:100;
+  opacity:0;pointer-events:none;transition:opacity .4s;padding:20px}
 .result.show{opacity:1;pointer-events:auto}
 .result .label{font-size:15px;font-weight:500;color:rgba(0,0,0,.5)}
 .result .score{font-family:'BaeminLove','Pretendard',sans-serif;font-size:clamp(44px,12vw,72px);font-weight:900;color:#E63946;margin:4px 0 16px}
 .result .score.win{color:#6FEECE}
-.result .drawing-area{position:relative;width:min(320px,85vw);margin:0 auto 20px;
+.result .drawing-area{position:relative;width:min(280px,75vw);margin:0 auto 16px;
   border-radius:12px;overflow:hidden;box-shadow:0 2px 16px rgba(0,0,0,.06)}
-.result .drawing-area canvas{width:100%;aspect-ratio:1;display:block;background:#fafafa}
+.result .drawing-area canvas{width:100%;aspect-ratio:1;display:block;background:#fff}
 .result .score-bar{display:flex;align-items:center;justify-content:space-between;
   padding:10px 16px;background:#6FEECE}
 .result .score-bar .mode-label{font-size:13px;font-weight:700;color:#111}
