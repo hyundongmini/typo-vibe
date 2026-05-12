@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 20 — HELP</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden}
+body{background:#fff}
+canvas{display:block;width:100%;height:100%}
+.tag{position:fixed;bottom:14px;right:18px;font:10px/1 monospace;color:rgba(0,0,0,.1);z-index:10}
+.hint{position:fixed;top:20px;left:50%;transform:translateX(-50%);
+  font:400 13px/1 'system-ui',sans-serif;color:rgba(0,0,0,.4);z-index:10;
+  background:rgba(255,255,255,.8);padding:6px 14px;border-radius:20px}
+</style>
+</head>
+<body>
+<div class="hint">click: push · dblclick: bomb · drag letters · G: gravity · SPACE: drain · V: vortex · R: rain · W: wave</div>
+<div class="tag">day 20 / typo-vibe</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.162.0/examples/jsm/"
+  }
+}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GPUComputationRenderer } from 'three/addons/misc/GPUComputationRenderer.js';
+import { TTFLoader } from 'three/addons/loaders/TTFLoader.js';
+import { Font } from 'three/addons/loaders/FontLoader.js';
+import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
+
+// ── Config ──
+const WATER_RES = 256; // heightfield resolution
+const POOL_SIZE = 12;
+const POOL_DEPTH = 5;
+
+// ── Scene ──
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xffffff);
+
+const camera = new THREE.PerspectiveCamera(45, innerWidth/innerHeight, 0.1, 200);
+camera.position.set(0, 20, 12);
+camera.lookAt(0, -1, 0);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
+document.body.appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.05;
+controls.maxPolarAngle = Math.PI * 0.48;
+controls.minPolarAngle = Math.PI * 0.05;
+controls.minDistance = 8;
+controls.maxDistance = 35;
+
+// ── Lighting ──
+scene.add(new THREE.AmbientLight(0x5080a0, 0.6));
+const sun = new THREE.DirectionalLight(0xffffff, 2.0);
+sun.position.set(5, 15, 8);
+scene.add(sun);
+
+// ── GPU Computation (ping-pong water simulation) ──
+const gpuCompute = new GPUComputationRenderer(WATER_RES, WATER_RES, renderer);
+
+// Height texture (R = height, G = velocity)
+const heightTex0 = gpuCompute.createTexture();
+const data = heightTex0.image.data;
+for (let i = 0; i < data.length; i += 4) {
+  data[i] = 0;     // height
+  data[i+1] = 0;   // velocity
+  data[i+2] = 0;
+  data[i+3] = 1;
+}
+
+// Water simulation shader (wave equation)
+const waterSimShader = `
+  uniform float uDamping;
+  uniform float uSpeed;
+  uniform vec2 uDropPos;
+  uniform float uDropRadius;
+  uniform float uDropStrength;
+
+  void main() {
+    vec2 uv = gl_FragCoord.xy / resolution.xy;
+    vec4 data = texture2D(textureHeight, uv);
+    float h = data.r;
+    float v = data.g;
+
+    // Sample neighbors
+    float texel = 1.0 / resolution.x;
+    float hL = texture2D(textureHeight, uv + vec2(-texel, 0)).r;
+    float hR = texture2D(textureHeight, uv + vec2(texel, 0)).r;
+    float hU = texture2D(textureHeight, uv + vec2(0, texel)).r;
+    float hD = texture2D(textureHeight, uv + vec2(0, -texel)).r;
+
+    // Wave equation: laplacian drives velocity
+    float laplacian = (hL + hR + hU + hD) - 4.0 * h;
+    v += laplacian * uSpeed;
+    v *= uDamping;
+    h += v;
+
+    // Mouse drop injection
+    if (uDropStrength > 0.0) {
+      float dist = length(uv - uDropPos);
+      if (dist < uDropRadius) {
+        float falloff = exp(-dist * dist / (uDropRadius * uDropRadius * 0.25));
+        h -= uDropStrength * falloff;
+      }
+    }
+
+    gl_FragColor = vec4(h, v, 0.0, 1.0);
+  }
+`;
+
+const heightVar = gpuCompute.addVariable('textureHeight', waterSimShader, heightTex0);
+gpuCompute.setVariableDependencies(heightVar, [heightVar]);
+heightVar.material.uniforms.uDamping = { value: 0.985 };
+heightVar.material.uniforms.uSpeed = { value: 0.4 };
+heightVar.material.uniforms.uDropPos = { value: new THREE.Vector2(-1, -1) };
+heightVar.material.uniforms.uDropRadius = { value: 0.03 };
+heightVar.material.uniforms.uDropStrength = { value: 0.0 };
+
+const err = gpuCompute.init();
+if (err) console.error(err);
+
+// ── Pool geometry ──
+function createTileTexture() {
+  const size = 256, c = document.createElement('canvas');
+  c.width = size; c.height = size;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#3db8cc';
+  ctx.fillRect(0, 0, size, size);
+  ctx.strokeStyle = '#2a9aad';
+  ctx.lineWidth = 2;
+  const ts = size / 6;
+  for (let i = 0; i <= 6; i++) {
+    ctx.beginPath(); ctx.moveTo(i*ts, 0); ctx.lineTo(i*ts, size); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, i*ts); ctx.lineTo(size, i*ts); ctx.stroke();
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  return tex;
+}
+
+const tileTex = createTileTexture();
+tileTex.repeat.set(8, 8);
+
+// Floor with caustics shader
+const floorCausticVert = `
+  varying vec2 vUv;
+  varying vec3 vWorldPos;
+  void main() {
+    vUv = uv;
+    vec4 wp = modelMatrix * vec4(position, 1.0);
+    vWorldPos = wp.xyz;
+    gl_Position = projectionMatrix * viewMatrix * wp;
+  }
+`;
+const floorCausticFrag = `
+  uniform sampler2D uTileMap;
+  uniform sampler2D uHeightMap;
+  uniform float uTime;
+  varying vec2 vUv;
+  varying vec3 vWorldPos;
+
+  // Procedural caustics based on water heightmap normals
+  float caustics(vec2 uv, float t) {
+    float texel = 1.0 / ${WATER_RES}.0;
+    float hL = texture2D(uHeightMap, uv + vec2(-texel, 0)).r;
+    float hR = texture2D(uHeightMap, uv + vec2(texel, 0)).r;
+    float hU = texture2D(uHeightMap, uv + vec2(0, texel)).r;
+    float hD = texture2D(uHeightMap, uv + vec2(0, -texel)).r;
+
+    // Refracted light direction based on surface normal
+    vec2 refract = vec2(hL - hR, hD - hU) * 8.0;
+
+    // Sample displaced position — light convergence
+    vec2 displaced = uv + refract * 0.05;
+    float hL2 = texture2D(uHeightMap, displaced + vec2(-texel, 0)).r;
+    float hR2 = texture2D(uHeightMap, displaced + vec2(texel, 0)).r;
+    float hU2 = texture2D(uHeightMap, displaced + vec2(0, texel)).r;
+    float hD2 = texture2D(uHeightMap, displaced + vec2(0, -texel)).r;
+
+    // Divergence of refracted rays = caustic intensity
+    float dx = (hR2 - hL2);
+    float dy = (hU2 - hD2);
+    float divergence = abs(dx + dy) * 40.0;
+
+    return clamp(divergence, 0.0, 1.5);
+  }
+
+  void main() {
+    vec4 tileColor = texture2D(uTileMap, vUv * 8.0);
+
+    // Map world position to heightmap UV
+    vec2 waterUV = vWorldPos.xz / ${POOL_SIZE * 2}.0 + 0.5;
+    waterUV = clamp(waterUV, 0.0, 1.0);
+
+    float c = caustics(waterUV, uTime);
+
+    // Bright caustic lines on tile
+    vec3 color = tileColor.rgb + vec3(c * 0.8, c * 0.9, c * 1.0);
+
+    // Slight depth darkening
+    color *= 0.85;
+
+    gl_FragColor = vec4(color, 1.0);
+  }
+`;
+
+const floorMat = new THREE.ShaderMaterial({
+  vertexShader: floorCausticVert,
+  fragmentShader: floorCausticFrag,
+  uniforms: {
+    uTileMap: { value: tileTex },
+    uHeightMap: { value: null },
+    uTime: { value: 0 }
+  }
+});
+
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(POOL_SIZE*2, POOL_SIZE*2), floorMat);
+floor.rotation.x = -Math.PI/2;
+floor.position.y = -POOL_DEPTH;
+scene.add(floor);
+
+// Walls with caustics too
+const wallCausticFrag = `
+  uniform sampler2D uTileMap;
+  uniform sampler2D uHeightMap;
+  uniform float uTime;
+  varying vec2 vUv;
+  varying vec3 vWorldPos;
+
+  float caustics(vec2 uv) {
+    float texel = 1.0 / ${WATER_RES}.0;
+    float hL = texture2D(uHeightMap, uv + vec2(-texel, 0)).r;
+    float hR = texture2D(uHeightMap, uv + vec2(texel, 0)).r;
+    float hU = texture2D(uHeightMap, uv + vec2(0, texel)).r;
+    float hD = texture2D(uHeightMap, uv + vec2(0, -texel)).r;
+    vec2 refract = vec2(hL - hR, hD - hU) * 6.0;
+    vec2 displaced = uv + refract * 0.04;
+    float hL2 = texture2D(uHeightMap, displaced + vec2(-texel, 0)).r;
+    float hR2 = texture2D(uHeightMap, displaced + vec2(texel, 0)).r;
+    float divergence = abs(hR2 - hL2) * 30.0;
+    return clamp(divergence, 0.0, 1.2);
+  }
+
+  void main() {
+    vec4 tileColor = texture2D(uTileMap, vUv * vec2(8.0, 3.0));
+    // Approximate water UV from wall position
+    vec2 waterUV = vec2(vWorldPos.x / ${POOL_SIZE * 2}.0 + 0.5, vWorldPos.z / ${POOL_SIZE * 2}.0 + 0.5);
+    waterUV = clamp(waterUV, 0.0, 1.0);
+    // Caustics fade with height (stronger near water surface)
+    float heightFade = smoothstep(-${POOL_DEPTH}.0, 0.0, vWorldPos.y);
+    float c = caustics(waterUV) * heightFade;
+    vec3 color = tileColor.rgb + vec3(c * 0.6, c * 0.7, c * 0.8);
+    color *= 0.8;
+    gl_FragColor = vec4(color, 1.0);
+  }
+`;
+
+const wallTex = createTileTexture(); wallTex.repeat.set(8, 3);
+const wallMat = new THREE.ShaderMaterial({
+  vertexShader: floorCausticVert,
+  fragmentShader: wallCausticFrag,
+  uniforms: {
+    uTileMap: { value: wallTex },
+    uHeightMap: { value: null },
+    uTime: { value: 0 }
+  }
+});
+
+const wallGeo = new THREE.PlaneGeometry(POOL_SIZE*2, POOL_DEPTH);
+[[0, -POOL_DEPTH/2, -POOL_SIZE, 0, 0, 0],
+ [0, -POOL_DEPTH/2, POOL_SIZE, 0, Math.PI, 0],
+ [-POOL_SIZE, -POOL_DEPTH/2, 0, 0, Math.PI/2, 0],
+ [POOL_SIZE, -POOL_DEPTH/2, 0, 0, -Math.PI/2, 0]].forEach(([px,py,pz,rx,ry,rz]) => {
+  const w = new THREE.Mesh(wallGeo, wallMat.clone());
+  w.material.uniforms = { uTileMap: { value: wallTex }, uHeightMap: { value: null }, uTime: { value: 0 } };
+  w.position.set(px,py,pz); w.rotation.set(rx,ry,rz);
+  scene.add(w);
+});
+
+// ── Water surface mesh with custom shader ──
+const waterGeo = new THREE.PlaneGeometry(POOL_SIZE*2, POOL_SIZE*2, WATER_RES-1, WATER_RES-1);
+
+const waterVertShader = `
+  uniform sampler2D uHeightMap;
+  varying vec2 vUv;
+  varying vec3 vWorldPos;
+  varying vec3 vNormal;
+
+  void main() {
+    vUv = uv;
+    vec4 hData = texture2D(uHeightMap, uv);
+    float h = hData.r;
+
+    vec3 pos = position;
+    pos.z = h * 3.0; // visible wave height
+
+    // Compute normal from neighbors
+    float texel = 1.0 / ${WATER_RES}.0;
+    float hL = texture2D(uHeightMap, uv + vec2(-texel, 0)).r;
+    float hR = texture2D(uHeightMap, uv + vec2(texel, 0)).r;
+    float hU = texture2D(uHeightMap, uv + vec2(0, texel)).r;
+    float hD = texture2D(uHeightMap, uv + vec2(0, -texel)).r;
+    vec3 normal = normalize(vec3((hL - hR) * 3.0, (hD - hU) * 3.0, 0.15));
+
+    vNormal = normalMatrix * normal;
+    vec4 worldPos = modelMatrix * vec4(pos, 1.0);
+    vWorldPos = worldPos.xyz;
+    gl_Position = projectionMatrix * viewMatrix * worldPos;
+  }
+`;
+
+const waterFragShader = `
+  uniform vec3 uCameraPos;
+  uniform vec3 uSunDir;
+  varying vec2 vUv;
+  varying vec3 vWorldPos;
+  varying vec3 vNormal;
+
+  void main() {
+    vec3 normal = normalize(vNormal);
+    vec3 viewDir = normalize(uCameraPos - vWorldPos);
+
+    // Fresnel — less extreme
+    float fresnel = pow(1.0 - max(dot(viewDir, normal), 0.0), 3.0);
+    fresnel = clamp(fresnel, 0.02, 0.8);
+
+    // Reflection (sky)
+    vec3 reflDir = reflect(-viewDir, normal);
+    float skyGrad = reflDir.y * 0.5 + 0.5;
+    vec3 reflColor = mix(vec3(0.15, 0.35, 0.55), vec3(0.5, 0.7, 0.9), skyGrad);
+
+    // Refraction (pool water color with depth)
+    vec3 shallowColor = vec3(0.1, 0.6, 0.7);
+    vec3 deepColor = vec3(0.0, 0.2, 0.4);
+    vec3 refrColor = mix(shallowColor, deepColor, 0.4);
+
+    // Caustics approximation (based on normal distortion)
+    float caustic = pow(max(dot(normal, vec3(0,0,1)), 0.0), 8.0) * 0.3;
+    refrColor += vec3(caustic);
+
+    // Specular
+    vec3 halfDir = normalize(viewDir + uSunDir);
+    float spec = pow(max(dot(normal, halfDir), 0.0), 512.0) * 2.0;
+
+    vec3 color = mix(refrColor, reflColor, fresnel) + vec3(spec);
+    gl_FragColor = vec4(color, 0.75);
+  }
+`;
+
+const waterMat = new THREE.ShaderMaterial({
+  vertexShader: waterVertShader,
+  fragmentShader: waterFragShader,
+  uniforms: {
+    uHeightMap: { value: null },
+    uCameraPos: { value: camera.position },
+    uSunDir: { value: new THREE.Vector3(0.3, 0.8, 0.5).normalize() }
+  },
+  transparent: true,
+  side: THREE.DoubleSide
+});
+
+const waterMesh = new THREE.Mesh(waterGeo, waterMat);
+waterMesh.rotation.x = -Math.PI/2;
+waterMesh.position.y = 0;
+scene.add(waterMesh);
+
+// ── HELP Letters ──
+const letters = [];
+const letterBodies = [];
+
+const ttfLoader = new TTFLoader();
+ttfLoader.load('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/packages/pretendard/dist/public/static/Pretendard-Black.otf', (fontData) => {
+  const font = new Font(fontData);
+  const text = 'HELP';
+  
+  // Random initial positions spread across pool
+  const positions = [
+    { x: -4, z: -2 },
+    { x: 2, z: -3 },
+    { x: -1, z: 3 },
+    { x: 3, z: 1 },
+  ];
+
+  for (let i = 0; i < text.length; i++) {
+    const shapes = font.generateShapes(text[i], 2.8);
+    const geo = new THREE.ExtrudeGeometry(shapes, { 
+      depth: 0.3, 
+      bevelEnabled: true,
+      bevelThickness: 0.02,
+      bevelSize: 0.02,
+      bevelSegments: 1
+    });
+    geo.computeBoundingBox();
+    const bb = geo.boundingBox;
+    geo.translate(-(bb.max.x+bb.min.x)/2, -(bb.max.y+bb.min.y)/2, -(bb.max.z+bb.min.z)/2);
+    geo.rotateX(-Math.PI/2);
+
+    const mat = new THREE.MeshPhysicalMaterial({
+      color: 0xffffff, metalness: 0, roughness: 0.1,
+      clearcoat: 1, clearcoatRoughness: 0.05, envMapIntensity: 2
+    });
+
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(positions[i].x, -POOL_DEPTH+1, positions[i].z);
+    scene.add(mesh);
+    letters.push(mesh);
+
+    // Random drift velocity for XZ movement
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 0.3 + Math.random() * 0.4;
+    letterBodies.push({
+      y: -POOL_DEPTH+1, vy: 0, targetY: -0.05,
+      phase: Math.random()*Math.PI*2,
+      delay: 0.2 + i*0.3, risen: false,
+      // XZ drift
+      vx: Math.cos(angle) * speed,
+      vz: Math.sin(angle) * speed,
+      rotY: Math.random() * Math.PI * 2,
+      rotYSpeed: (Math.random() - 0.5) * 0.3
+    });
+  }
+});
+
+// ── Physics ──
+let time = 0;
+function updatePhysics(dt) {
+  time += dt;
+
+  // Water drain/fill
+  if (draining) {
+    waterLevelOffset -= dt * 1.5;
+    if (waterLevelOffset < -POOL_DEPTH + 0.5) waterLevelOffset = -POOL_DEPTH + 0.5;
+  } else {
+    waterLevelOffset += dt * 2.0;
+    if (waterLevelOffset > 0) waterLevelOffset = 0;
+  }
+  // Move water mesh
+  waterMesh.position.y = waterLevelOffset;
+
+  for (let i = 0; i < letters.length; i++) {
+    const body = letterBodies[i], mesh = letters[i];
+    if (time < body.delay) continue;
+
+    // ── Y axis: buoyancy with wave response ──
+    const waveOffset = Math.sin(time*0.8 + body.phase)*0.04 + Math.cos(time*1.2 + body.phase*0.7)*0.02;
+    const waterLevel = body.targetY + waveOffset + waterLevelOffset;
+    const submerged = waterLevel - body.y;
+
+    if (gravityOn) {
+      if (body.y < waterLevel) {
+        body.vy += 22 * Math.max(0, submerged) * dt;
+      } else {
+        body.vy -= 12 * dt;
+      }
+    } else {
+      // No gravity — slowly sink
+      body.vy -= 1.5 * dt;
+      body.vy *= 0.98;
+    }
+    body.vy *= 0.90;
+    body.y += body.vy * dt;
+    if (gravityOn && body.y > waterLevel + 0.25) { body.y = waterLevel + 0.25; body.vy *= -0.3; }
+    if (body.y < -POOL_DEPTH) { body.y = -POOL_DEPTH; body.vy = 0; }
+
+    // Ripple on surface break
+    if (!body.risen && body.y > waterLevelOffset - 0.1) {
+      body.risen = true;
+      dropWater((mesh.position.x / (POOL_SIZE*2)) + 0.5, (mesh.position.z / (POOL_SIZE*2)) + 0.5, 0.6);
+    }
+
+    // ── XZ drift ──
+    body.vx += Math.sin(time * 0.2 + i) * 0.02 * dt;
+    body.vz += Math.cos(time * 0.15 + i * 0.5) * 0.02 * dt;
+    body.vx *= 0.998;
+    body.vz *= 0.998;
+
+    mesh.position.x += body.vx * dt;
+    mesh.position.z += body.vz * dt;
+
+    // Bounce off pool walls
+    const wallLimit = POOL_SIZE - 2;
+    if (mesh.position.x > wallLimit) { body.vx = -Math.abs(body.vx) * 0.7; mesh.position.x = wallLimit; }
+    if (mesh.position.x < -wallLimit) { body.vx = Math.abs(body.vx) * 0.7; mesh.position.x = -wallLimit; }
+    if (mesh.position.z > wallLimit) { body.vz = -Math.abs(body.vz) * 0.7; mesh.position.z = wallLimit; }
+    if (mesh.position.z < -wallLimit) { body.vz = Math.abs(body.vz) * 0.7; mesh.position.z = -wallLimit; }
+
+    // Drift ripple
+    if (body.risen && Math.random() < 0.02) {
+      dropWater((mesh.position.x / (POOL_SIZE*2)) + 0.5, (mesh.position.z / (POOL_SIZE*2)) + 0.5, 0.05);
+    }
+
+    // Rotation
+    body.rotY += body.rotYSpeed * dt;
+
+    // Color: blue tint when submerged
+    const depth = Math.max(0, waterLevel - body.y);
+    const tint = Math.min(1, depth * 2);
+    mesh.material.color.setRGB(1 - tint*0.4, 1 - tint*0.2, 1);
+
+    // Apply
+    mesh.position.y = body.y;
+    // Flip animation
+    let flipRot = 0;
+    if (body.flipTime && time - body.flipTime < 1.0) {
+      flipRot = Math.sin((time - body.flipTime) * Math.PI) * Math.PI;
+    }
+    mesh.rotation.x = Math.sin(time*0.6 + body.phase) * 0.025 + body.vy * 0.05 + flipRot;
+    mesh.rotation.y = body.rotY;
+    mesh.rotation.z = Math.cos(time*0.5 + body.phase*1.3) * 0.02;
+  }
+
+  // Letter-to-letter collision
+  for (let i = 0; i < letters.length; i++) {
+    for (let j = i+1; j < letters.length; j++) {
+      const a = letters[i].position, b = letters[j].position;
+      const dx = b.x - a.x, dz = b.z - a.z;
+      const dist = Math.sqrt(dx*dx + dz*dz);
+      const minDist = 3.0; // collision radius
+      if (dist < minDist && dist > 0.01) {
+        const overlap = (minDist - dist) * 0.5;
+        const nx = dx/dist, nz = dz/dist;
+        letterBodies[i].vx -= nx * overlap * 2;
+        letterBodies[i].vz -= nz * overlap * 2;
+        letterBodies[j].vx += nx * overlap * 2;
+        letterBodies[j].vz += nz * overlap * 2;
+        // Ripple at collision point
+        const mx = (a.x+b.x)/2, mz = (a.z+b.z)/2;
+        dropWater(mx/(POOL_SIZE*2)+0.5, mz/(POOL_SIZE*2)+0.5, 0.15);
+      }
+    }
+  }
+}
+
+// ── Mouse interaction ──
+let pendingDrop = null;
+let pendingDrops = [];
+function dropWater(u, v, strength) {
+  pendingDrops.push({ u, v, strength });
+}
+
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+let draggedLetter = -1;
+let dragPlane = new THREE.Plane(new THREE.Vector3(0,1,0), 0);
+
+renderer.domElement.addEventListener('pointerdown', (e) => {
+  mouse.x = (e.clientX / innerWidth) * 2 - 1;
+  mouse.y = -(e.clientY / innerHeight) * 2 + 1;
+  raycaster.setFromCamera(mouse, camera);
+
+  // Check if clicking a letter
+  const hits = raycaster.intersectObjects(letters);
+  if (hits.length > 0) {
+    draggedLetter = letters.indexOf(hits[0].object);
+    controls.enabled = false;
+    return;
+  }
+
+  // Otherwise push water + letters
+  const hit = new THREE.Vector3();
+  raycaster.ray.intersectPlane(dragPlane, hit);
+  if (hit && Math.abs(hit.x) < POOL_SIZE && Math.abs(hit.z) < POOL_SIZE) {
+    dropWater(hit.x/(POOL_SIZE*2)+0.5, hit.z/(POOL_SIZE*2)+0.5, 0.4);
+    for (let i = 0; i < letters.length; i++) {
+      const lp = letters[i].position;
+      const dx = lp.x - hit.x, dz = lp.z - hit.z;
+      const d = Math.sqrt(dx*dx + dz*dz);
+      if (d < 5 && d > 0.1) {
+        const force = (5-d)*0.8;
+        letterBodies[i].vx += (dx/d)*force;
+        letterBodies[i].vz += (dz/d)*force;
+        letterBodies[i].vy -= force*0.3;
+      }
+    }
+  }
+});
+
+renderer.domElement.addEventListener('pointermove', (e) => {
+  mouse.x = (e.clientX / innerWidth) * 2 - 1;
+  mouse.y = -(e.clientY / innerHeight) * 2 + 1;
+  raycaster.setFromCamera(mouse, camera);
+  const hit = new THREE.Vector3();
+  raycaster.ray.intersectPlane(dragPlane, hit);
+
+  // Dragging a letter
+  if (draggedLetter >= 0 && hit) {
+    const mesh = letters[draggedLetter];
+    const body = letterBodies[draggedLetter];
+    body.vx = (hit.x - mesh.position.x) * 5;
+    body.vz = (hit.z - mesh.position.z) * 5;
+    mesh.position.x = hit.x;
+    mesh.position.z = hit.z;
+    // Create wake ripple
+    dropWater(hit.x/(POOL_SIZE*2)+0.5, hit.z/(POOL_SIZE*2)+0.5, 0.15);
+    return;
+  }
+
+  // Hover ripples
+  if (hit && Math.abs(hit.x) < POOL_SIZE && Math.abs(hit.z) < POOL_SIZE) {
+    dropWater(hit.x/(POOL_SIZE*2)+0.5, hit.z/(POOL_SIZE*2)+0.5, 0.05);
+  }
+});
+
+renderer.domElement.addEventListener('pointerup', () => {
+  if (draggedLetter >= 0) {
+    // Release with momentum — letter keeps sliding
+    draggedLetter = -1;
+    controls.enabled = true;
+  }
+});
+
+// Double-click bomb + flip nearest letter
+renderer.domElement.addEventListener('dblclick', (e) => {
+  mouse.x = (e.clientX / innerWidth) * 2 - 1;
+  mouse.y = -(e.clientY / innerHeight) * 2 + 1;
+  raycaster.setFromCamera(mouse, camera);
+  const hit = new THREE.Vector3();
+  raycaster.ray.intersectPlane(dragPlane, hit);
+  if (hit) {
+    // Big splash
+    dropWater(hit.x/(POOL_SIZE*2)+0.5, hit.z/(POOL_SIZE*2)+0.5, 1.5);
+    // Find nearest letter and flip it
+    let nearest = -1, minD = Infinity;
+    for (let i = 0; i < letters.length; i++) {
+      const d = letters[i].position.distanceTo(hit);
+      if (d < minD) { minD = d; nearest = i; }
+    }
+    if (nearest >= 0 && minD < 5) {
+      // Flip animation via velocity
+      letterBodies[nearest].vy += 5;
+      letterBodies[nearest].flipTime = time;
+    }
+    // Scatter all letters
+    for (let i = 0; i < letters.length; i++) {
+      const lp = letters[i].position;
+      const dx = lp.x - hit.x, dz = lp.z - hit.z;
+      const d = Math.sqrt(dx*dx + dz*dz) + 0.1;
+      const force = Math.max(0, 12 - d) * 1.5;
+      letterBodies[i].vx += (dx/d) * force;
+      letterBodies[i].vz += (dz/d) * force;
+      letterBodies[i].vy += 3;
+    }
+  }
+});
+
+// ── Keyboard controls ──
+let gravityOn = true;
+let draining = false;
+let waterLevelOffset = 0;
+let vortexOn = false;
+let rainOn = false;
+
+addEventListener('keydown', (e) => {
+  if (e.code === 'KeyG') gravityOn = !gravityOn;
+  if (e.code === 'Space') { e.preventDefault(); draining = !draining; }
+  if (e.code === 'KeyV') vortexOn = !vortexOn;
+  if (e.code === 'KeyR') rainOn = !rainOn;
+  if (e.code === 'KeyW') triggerWave();
+});
+
+// ── Wave function ──
+function triggerWave() {
+  // Inject a line of drops along one wall
+  const side = Math.floor(Math.random() * 4);
+  for (let t = 0.1; t < 0.9; t += 0.03) {
+    let u, v;
+    if (side === 0) { u = t; v = 0.05; }
+    else if (side === 1) { u = t; v = 0.95; }
+    else if (side === 2) { u = 0.05; v = t; }
+    else { u = 0.95; v = t; }
+    dropWater(u, v, 0.6);
+  }
+  // Push all letters away from that wall
+  for (let i = 0; i < letters.length; i++) {
+    if (side === 0) letterBodies[i].vz += 3;
+    else if (side === 1) letterBodies[i].vz -= 3;
+    else if (side === 2) letterBodies[i].vx += 3;
+    else letterBodies[i].vx -= 3;
+  }
+}
+
+// ── Animation ──
+const clock = new THREE.Clock();
+let frameCount = 0;
+
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.03);
+  frameCount++;
+
+  // Inject drops into simulation
+  const uniforms = heightVar.material.uniforms;
+  if (pendingDrops.length > 0) {
+    const drop = pendingDrops.shift();
+    uniforms.uDropPos.value.set(drop.u, drop.v);
+    uniforms.uDropStrength.value = drop.strength;
+  } else {
+    uniforms.uDropStrength.value = 0;
+  }
+
+  // Ambient ripples — random small drops to keep water alive
+  if (frameCount % 60 === 0) {
+    const rx = 0.15 + Math.random() * 0.7;
+    const rz = 0.15 + Math.random() * 0.7;
+    dropWater(rx, rz, 0.15 + Math.random() * 0.1);
+  }
+
+  // Rain mode — lots of small random drops
+  if (rainOn && frameCount % 3 === 0) {
+    dropWater(0.1 + Math.random()*0.8, 0.1 + Math.random()*0.8, 0.12);
+  }
+
+  // Vortex mode — circular force on letters + spiral ripples
+  if (vortexOn) {
+    const vortexStrength = 15;
+    for (let i = 0; i < letters.length; i++) {
+      const lp = letters[i].position;
+      const dx = -lp.z, dz = lp.x; // perpendicular = circular
+      const dist = Math.sqrt(lp.x*lp.x + lp.z*lp.z) + 0.1;
+      letterBodies[i].vx += (dx/dist) * vortexStrength * dt;
+      letterBodies[i].vz += (dz/dist) * vortexStrength * dt;
+      // Pull toward center
+      letterBodies[i].vx -= lp.x * 1.5 * dt;
+      letterBodies[i].vz -= lp.z * 1.5 * dt;
+    }
+    // Spiral ripple
+    if (frameCount % 5 === 0) {
+      const angle = time * 4;
+      const r = 0.1 + (frameCount % 20) * 0.015;
+      dropWater(0.5 + Math.cos(angle)*r, 0.5 + Math.sin(angle)*r, 0.3);
+    }
+  }
+
+  // Run simulation (2 steps for stability)
+  gpuCompute.compute();
+  gpuCompute.compute();
+
+  // Update water mesh
+  const heightTexture = gpuCompute.getCurrentRenderTarget(heightVar).texture;
+  waterMat.uniforms.uHeightMap.value = heightTexture;
+  waterMat.uniforms.uCameraPos.value.copy(camera.position);
+
+  // Update floor/wall caustics
+  floorMat.uniforms.uHeightMap.value = heightTexture;
+  floorMat.uniforms.uTime.value = time;
+  scene.traverse(obj => {
+    if (obj.material && obj.material.uniforms && obj.material.uniforms.uHeightMap && obj !== waterMesh && obj !== floor) {
+      obj.material.uniforms.uHeightMap.value = heightTexture;
+      obj.material.uniforms.uTime.value = time;
+    }
+  });
+
+  // Physics — letters react to water height beneath them
+  updatePhysics(dt);
+
+  controls.update();
+  renderer.render(scene, camera);
+}
+animate();
+
+// ── Resize ──
+addEventListener('resize', () => {
+  camera.aspect = innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+</script>
+</body>
+</html>
