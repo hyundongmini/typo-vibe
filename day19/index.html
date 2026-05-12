@@ -26,7 +26,7 @@ body{background:#fff;font-family:'Pretendard',sans-serif;display:flex;flex-direc
 .canvas-wrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
   width:100%;position:relative;padding:0 20px;gap:12px}
 .title-area{text-align:center}
-.title-area h1{font-size:22px;font-weight:800;color:#111;letter-spacing:-0.3px}
+.title-area h1{font-family:'BaeminLove','Pretendard',sans-serif;font-size:24px;font-weight:800;color:#111;letter-spacing:-0.3px}
 .title-area .sub{font-size:13px;color:rgba(0,0,0,.3);margin-top:6px}
 .char-select{display:flex;gap:10px}
 .char-select button{padding:10px 24px;border-radius:100px;border:2px solid rgba(0,0,0,.06);
@@ -61,9 +61,9 @@ canvas.fail-shake{animation:failShake .5s ease-in-out}
 .result .label{font-size:15px;font-weight:500;color:rgba(0,0,0,.5)}
 .result .score{font-family:'BaeminLove','Pretendard',sans-serif;font-size:clamp(44px,12vw,72px);font-weight:900;color:#E63946;margin:4px 0 16px}
 .result .score.win{color:#6FEECE}
-.result .drawing-area{position:relative;width:min(320px,85vw);margin:0 auto 20px;
+.result .drawing-area{position:relative;width:min(320px,85vw);aspect-ratio:1;margin:0 auto 20px;
   border-radius:12px;overflow:hidden;box-shadow:0 2px 16px rgba(0,0,0,.06)}
-.result .drawing-area canvas{width:100%;display:block;background:#fafafa}
+.result .drawing-area canvas{width:100%;height:100%;display:block;background:#fafafa}
 .result .score-bar{display:flex;align-items:center;justify-content:space-between;
   padding:10px 16px;background:#6FEECE}
 .result .score-bar .mode-label{font-size:13px;font-weight:700;color:#111}
