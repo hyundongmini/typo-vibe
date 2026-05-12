@@ -62,11 +62,11 @@ canvas.fail-shake{animation:failShake .5s ease-in-out}
 .result .score{font-family:'BaeminLove','Pretendard',sans-serif;font-size:clamp(44px,12vw,72px);font-weight:900;color:#E63946;margin:4px 0 16px}
 .result .score.win{color:#6FEECE}
 .result .drawing-area{position:relative;width:min(280px,75vw);margin:0 auto 16px;
-  border-radius:12px;overflow:hidden;box-shadow:0 2px 16px rgba(0,0,0,.06)}
+  overflow:hidden;box-shadow:0 2px 16px rgba(0,0,0,.06)}
 .result .drawing-area .canvas-square{width:100%;padding-bottom:100%;position:relative}
 .result .drawing-area canvas{position:absolute;top:0;left:0;width:100%;height:100%;display:block;background:#fff}
 .result .score-bar{display:flex;align-items:center;justify-content:space-between;
-  padding:10px 16px;background:#6FEECE}
+  padding:10px 16px;background:#6FEECE;border-radius:0 0 12px 12px}
 .result .score-bar .mode-label{font-size:13px;font-weight:700;color:#111}
 .result .score-bar .score-right{display:flex;align-items:center;gap:8px}
 .result .score-bar .score-right img{width:36px;height:36px;object-fit:contain}
@@ -420,17 +420,17 @@ function downloadResult() {
   const dW = 600, dH = 720;
   dc.width = dW; dc.height = dH;
 
-  // Rounded rect background
+  // White background with rounded corners
   dctx.fillStyle = '#fff';
   dctx.beginPath();
   dctx.roundRect(0, 0, dW, dH, 24);
   dctx.fill();
   dctx.clip();
 
-  // Draw user artwork area (centered, with padding)
+  // Draw user artwork area (white, no gray)
   const pad = 40;
   const artSize = dW - pad*2;
-  dctx.fillStyle = '#fafafa';
+  dctx.fillStyle = '#fff';
   dctx.fillRect(pad, pad, artSize, artSize);
 
   // Draw guide faintly
@@ -442,7 +442,7 @@ function downloadResult() {
   // Draw user strokes
   dctx.drawImage(canvas, pad, pad, artSize, artSize);
 
-  // Bottom bar (mint)
+  // Bottom bar (mint) with bottom rounded corners
   const barY = dH - 100;
   const barH = 100;
   dctx.fillStyle = '#6FEECE';
@@ -457,16 +457,17 @@ function downloadResult() {
   dctx.textBaseline = 'middle';
   dctx.fillText(window._lastMode + ' 부문', 28, barY + barH/2);
 
-  // Score (right)
-  dctx.font = '900 32px "Work Sans", sans-serif';
-  dctx.textAlign = 'right';
-  dctx.fillText(window._lastScore + '점', dW - 28, barY + barH/2);
-
-  // Mascot icon next to score
+  // Mascot icon (middle-right, before score)
   const mascotImg = document.getElementById('barCharImg');
   if (mascotImg.complete) {
-    dctx.drawImage(mascotImg, dW - 130, barY + barH/2 - 18, 36, 36);
+    dctx.drawImage(mascotImg, dW - 160, barY + barH/2 - 18, 36, 36);
   }
+
+  // Score (right)
+  dctx.fillStyle = '#111';
+  dctx.font = '900 28px Pretendard, sans-serif';
+  dctx.textAlign = 'right';
+  dctx.fillText(window._lastScore + '점', dW - 28, barY + barH/2);
 
   // Download
   const link = document.createElement('a');
