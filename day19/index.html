@@ -66,6 +66,11 @@ canvas.fail-shake{animation:failShake .5s ease-in-out}
 .result .btn-retry{margin-top:28px;padding:16px 40px;border-radius:14px;border:none;background:#111;color:#fff;
   font:700 15px/1 'Pretendard',sans-serif;cursor:pointer;width:100%;max-width:280px}
 .result .btn-retry:hover{background:#333}
+.result .btn-download{margin-top:10px;padding:14px 40px;border-radius:14px;border:1.5px solid #111;background:#fff;color:#111;
+  font:600 14px/1 'Pretendard',sans-serif;cursor:pointer;width:100%;max-width:280px}
+.result .btn-download:hover{background:#f5f5f5}
+.result-drawing-wrap{margin:20px 0;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.06)}
+.result-drawing-wrap canvas{display:block;width:min(240px,60vw);height:auto}
 
 .tag{position:fixed;bottom:8px;right:12px;font:10px/1 monospace;color:rgba(0,0,0,.06);z-index:10}
 
@@ -96,7 +101,7 @@ canvas.fail-shake{animation:failShake .5s ease-in-out}
   <a href="../" class="back">← 뒤로</a>
   <div class="mode-toggle">
     <button id="btnEasy" class="active" onclick="selectMode('easy')">따라 그리기</button>
-    <button id="btnHard" onclick="selectMode('hard')">안보고 그리기</button>
+    <button id="btnHard" onclick="selectMode('hard')">보고 그리기</button>
   </div>
 </div>
 
@@ -122,9 +127,13 @@ canvas.fail-shake{animation:failShake .5s ease-in-out}
 <div class="result" id="result">
   <div class="label">당신의 <span id="charLabel">도치</span>는</div>
   <div class="score" id="scoreText">0점</div>
+  <div class="result-drawing-wrap">
+    <canvas id="resultCanvas" width="400" height="480"></canvas>
+  </div>
   <img id="resultImg" class="result-img" src="" alt="result" style="display:none">
   <div class="msg" id="msgText"></div>
   <button class="btn-retry" onclick="retry()">다시 그리기</button>
+  <button class="btn-download" onclick="downloadResult()">이미지 저장</button>
 </div>
 
 <div class="tag">day 19 / typo-vibe</div>
@@ -327,9 +336,16 @@ function clearCanvas() {
 function submitScore() {
   const score = calculateScore();
   const rounded = Math.round(score * 10) / 10;
-  document.getElementById('charLabel').textContent = currentChar === 'dochi' ? '도치' : '학';
+  const charName = currentChar === 'dochi' ? '도치' : '학';
+  const modeName = currentMode === 'easy' ? '따라 그리기' : '보고 그리기';
+
+  document.getElementById('charLabel').textContent = charName;
   document.getElementById('scoreText').textContent = rounded + '점';
   document.getElementById('msgText').textContent = getMessage(rounded);
+
+  // Generate result canvas with drawing + score text
+  renderResultCanvas(rounded, modeName);
+
   const resultImg = document.getElementById('resultImg');
   const WIN_THRESHOLD = 80;
   if (rounded >= WIN_THRESHOLD) {
@@ -351,6 +367,47 @@ function submitScore() {
     document.getElementById('result').classList.add('show');
     if (rounded >= WIN_THRESHOLD) spawnConfetti();
   }, 500);
+}
+
+function renderResultCanvas(score, modeName) {
+  const rc = document.getElementById('resultCanvas');
+  const rctx = rc.getContext('2d');
+  const rW = 400, rH = 480;
+  rc.width = rW; rc.height = rH;
+
+  // White background
+  rctx.fillStyle = '#fff';
+  rctx.fillRect(0, 0, rW, rH);
+
+  // Draw user's artwork (copy from main canvas)
+  rctx.drawImage(canvas, 0, 0, rW, rW);
+
+  // Bottom bar with score info
+  rctx.fillStyle = '#fafafa';
+  rctx.fillRect(0, rW, rW, rH - rW);
+  rctx.strokeStyle = '#eee';
+  rctx.lineWidth = 1;
+  rctx.beginPath(); rctx.moveTo(0, rW); rctx.lineTo(rW, rW); rctx.stroke();
+
+  // Mode + score text
+  rctx.fillStyle = '#111';
+  rctx.font = '700 22px Pretendard, sans-serif';
+  rctx.textAlign = 'left';
+  rctx.fillText(`${modeName} ${score}점`, 20, rW + 48);
+
+  // Watermark
+  rctx.fillStyle = '#ccc';
+  rctx.font = '400 11px Pretendard, sans-serif';
+  rctx.textAlign = 'right';
+  rctx.fillText('typo-vibe / day19', rW - 16, rH - 12);
+}
+
+function downloadResult() {
+  const rc = document.getElementById('resultCanvas');
+  const link = document.createElement('a');
+  link.download = 'dochihak-drawing.png';
+  link.href = rc.toDataURL('image/png');
+  link.click();
 }
 function retry() {
   document.getElementById('result').classList.remove('show');
