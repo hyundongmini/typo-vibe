@@ -54,23 +54,26 @@ canvas.fail-shake{animation:failShake .5s ease-in-out}
 
 /* Result overlay */
 .result{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;
-  justify-content:center;background:#fff;z-index:100;
-  opacity:0;pointer-events:none;transition:opacity .4s;padding:40px 20px}
+  justify-content:flex-start;background:#fff;z-index:100;
+  opacity:0;pointer-events:none;transition:opacity .4s;padding:60px 20px 40px;overflow-y:auto}
 .result.show{opacity:1;pointer-events:auto}
-.result .label{font-size:15px;font-weight:500;color:rgba(0,0,0,.35)}
-.result .score{font-size:clamp(60px,18vw,100px);font-weight:900;color:#4ECDC4;margin:8px 0 0}
-.result .result-img{max-width:min(220px,55vw);max-height:30vh;object-fit:contain;margin:28px 0;border-radius:16px;
-  animation:popIn .4s cubic-bezier(.34,1.56,.64,1)}
-@keyframes popIn{0%{transform:scale(0);opacity:0}100%{transform:scale(1);opacity:1}}
-.result .msg{font-size:15px;color:rgba(0,0,0,.45);text-align:center;line-height:1.6;max-width:280px}
-.result .btn-retry{margin-top:28px;padding:16px 40px;border-radius:14px;border:none;background:#111;color:#fff;
-  font:700 15px/1 'Pretendard',sans-serif;cursor:pointer;width:100%;max-width:280px}
+.result .label{font-size:15px;font-weight:500;color:rgba(0,0,0,.5)}
+.result .score{font-size:clamp(56px,16vw,90px);font-weight:900;color:#E63946;margin:4px 0 16px}
+.result .score.win{color:#4ECDC4}
+.result .drawing-area{position:relative;width:min(300px,80vw);margin:0 auto 16px}
+.result .drawing-area canvas{width:100%;border-radius:12px;display:block;background:#fafafa;box-shadow:0 2px 12px rgba(0,0,0,.05)}
+.result .drawing-area .result-lose{position:absolute;bottom:-10px;left:-20px;width:80px;height:auto}
+.result .drawing-area .result-mascot{position:absolute;bottom:-5px;right:10px;width:48px;height:auto}
+.result .result-img{display:none}
+.result .msg{font-size:14px;color:rgba(0,0,0,.4);text-align:center;margin:16px 0 24px}
+.result .btn-retry{padding:16px 40px;border-radius:14px;border:none;background:#111;color:#fff;
+  font:700 15px/1 'Pretendard',sans-serif;cursor:pointer;width:100%;max-width:300px}
 .result .btn-retry:hover{background:#333}
 .result .btn-download{margin-top:10px;padding:14px 40px;border-radius:14px;border:1.5px solid #111;background:#fff;color:#111;
-  font:600 14px/1 'Pretendard',sans-serif;cursor:pointer;width:100%;max-width:280px}
+  font:600 14px/1 'Pretendard',sans-serif;cursor:pointer;width:100%;max-width:300px}
 .result .btn-download:hover{background:#f5f5f5}
-.result-drawing-wrap{margin:20px 0;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.06)}
-.result-drawing-wrap canvas{display:block;width:min(240px,60vw);height:auto}
+/* Hidden canvas for download image generation */
+#downloadCanvas{display:none}
 
 .tag{position:fixed;bottom:8px;right:12px;font:10px/1 monospace;color:rgba(0,0,0,.06);z-index:10}
 
@@ -127,14 +130,17 @@ canvas.fail-shake{animation:failShake .5s ease-in-out}
 <div class="result" id="result">
   <div class="label">당신의 <span id="charLabel">도치</span>는</div>
   <div class="score" id="scoreText">0점</div>
-  <div class="result-drawing-wrap">
-    <canvas id="resultCanvas" width="400" height="480"></canvas>
+  <div class="drawing-area">
+    <canvas id="resultCanvas" width="400" height="400"></canvas>
+    <img id="resultLose" class="result-lose" src="" alt="" style="display:none">
+    <img class="result-mascot" id="resultMascot" src="도치.png" alt="도치">
   </div>
-  <img id="resultImg" class="result-img" src="" alt="result" style="display:none">
+  <img id="resultImg" class="result-img" src="" alt="result">
   <div class="msg" id="msgText"></div>
   <button class="btn-retry" onclick="retry()">다시 그리기</button>
   <button class="btn-download" onclick="downloadResult()">이미지 저장</button>
 </div>
+<canvas id="downloadCanvas" width="600" height="720"></canvas>
 
 <div class="tag">day 19 / typo-vibe</div>
 
@@ -337,25 +343,51 @@ function submitScore() {
   const score = calculateScore();
   const rounded = Math.round(score * 10) / 10;
   const charName = currentChar === 'dochi' ? '도치' : '학';
-  const modeName = currentMode === 'easy' ? '따라 그리기' : '보고 그리기';
+  const modeName = currentMode === 'easy' ? '따라그리기' : '보고 그리기';
 
   document.getElementById('charLabel').textContent = charName;
   document.getElementById('scoreText').textContent = rounded + '점';
   document.getElementById('msgText').textContent = getMessage(rounded);
 
-  // Generate result canvas with drawing + score text
-  renderResultCanvas(rounded, modeName);
-
-  const resultImg = document.getElementById('resultImg');
+  // Set score color
   const WIN_THRESHOLD = 80;
+  const scoreEl = document.getElementById('scoreText');
   if (rounded >= WIN_THRESHOLD) {
-    resultImg.src = 'win.png'; resultImg.style.display = 'block';
-    document.getElementById('scoreText').style.color = '#4ECDC4';
+    scoreEl.classList.add('win');
+    scoreEl.classList.remove('lose');
   } else {
-    resultImg.src = ['lose.png','lose2.png'][Math.floor(Math.random()*2)];
-    resultImg.style.display = 'block';
-    document.getElementById('scoreText').style.color = '#E63946';
+    scoreEl.classList.remove('win');
   }
+
+  // Draw user's artwork onto result canvas
+  const rc = document.getElementById('resultCanvas');
+  const rctx = rc.getContext('2d');
+  rctx.clearRect(0, 0, 400, 400);
+  // Draw guide faintly
+  if (guideImg) {
+    rctx.globalAlpha = 0.1;
+    rctx.drawImage(guideImg, 0, 0);
+    rctx.globalAlpha = 1;
+  }
+  // Copy user drawing
+  rctx.drawImage(canvas, 0, 0);
+
+  // Show lose image or not
+  const loseEl = document.getElementById('resultLose');
+  if (rounded < WIN_THRESHOLD) {
+    loseEl.src = ['lose.png','lose2.png'][Math.floor(Math.random()*2)];
+    loseEl.style.display = 'block';
+  } else {
+    loseEl.style.display = 'none';
+  }
+
+  // Set mascot image based on character
+  document.getElementById('resultMascot').src = currentChar === 'dochi' ? '도치.png' : '학.png';
+
+  // Store for download
+  window._lastScore = rounded;
+  window._lastMode = modeName;
+
   if (rounded >= WIN_THRESHOLD) {
     canvas.classList.add('celebrate');
     setTimeout(() => canvas.classList.remove('celebrate'), 1200);
@@ -369,49 +401,71 @@ function submitScore() {
   }, 500);
 }
 
-function renderResultCanvas(score, modeName) {
-  const rc = document.getElementById('resultCanvas');
-  const rctx = rc.getContext('2d');
-  const rW = 400, rH = 480;
-  rc.width = rW; rc.height = rH;
-
-  // White background
-  rctx.fillStyle = '#fff';
-  rctx.fillRect(0, 0, rW, rH);
-
-  // Draw user's artwork (copy from main canvas)
-  rctx.drawImage(canvas, 0, 0, rW, rW);
-
-  // Bottom bar with score info
-  rctx.fillStyle = '#fafafa';
-  rctx.fillRect(0, rW, rW, rH - rW);
-  rctx.strokeStyle = '#eee';
-  rctx.lineWidth = 1;
-  rctx.beginPath(); rctx.moveTo(0, rW); rctx.lineTo(rW, rW); rctx.stroke();
-
-  // Mode + score text
-  rctx.fillStyle = '#111';
-  rctx.font = '700 22px Pretendard, sans-serif';
-  rctx.textAlign = 'left';
-  rctx.fillText(`${modeName} ${score}점`, 20, rW + 48);
-
-  // Watermark
-  rctx.fillStyle = '#ccc';
-  rctx.font = '400 11px Pretendard, sans-serif';
-  rctx.textAlign = 'right';
-  rctx.fillText('typo-vibe / day19', rW - 16, rH - 12);
-}
+function renderResultCanvas(rounded, modeName) {}
 
 function downloadResult() {
-  const rc = document.getElementById('resultCanvas');
+  const dc = document.getElementById('downloadCanvas');
+  const dctx = dc.getContext('2d');
+  const dW = 600, dH = 720;
+  dc.width = dW; dc.height = dH;
+
+  // Rounded rect background
+  dctx.fillStyle = '#fff';
+  dctx.beginPath();
+  dctx.roundRect(0, 0, dW, dH, 24);
+  dctx.fill();
+  dctx.clip();
+
+  // Draw user artwork area (centered, with padding)
+  const pad = 40;
+  const artSize = dW - pad*2;
+  dctx.fillStyle = '#fafafa';
+  dctx.fillRect(pad, pad, artSize, artSize);
+
+  // Draw guide faintly
+  if (guideImg) {
+    dctx.globalAlpha = 0.1;
+    dctx.drawImage(guideImg, pad, pad, artSize, artSize);
+    dctx.globalAlpha = 1;
+  }
+  // Draw user strokes
+  dctx.drawImage(canvas, pad, pad, artSize, artSize);
+
+  // Bottom bar (mint)
+  const barY = dH - 100;
+  const barH = 100;
+  dctx.fillStyle = '#4ECDC4';
+  dctx.beginPath();
+  dctx.roundRect(0, barY, dW, barH, [0, 0, 24, 24]);
+  dctx.fill();
+
+  // Mode text (left)
+  dctx.fillStyle = '#111';
+  dctx.font = '700 20px Pretendard, sans-serif';
+  dctx.textAlign = 'left';
+  dctx.textBaseline = 'middle';
+  dctx.fillText(window._lastMode + ' 부문', 28, barY + barH/2);
+
+  // Score (right)
+  dctx.font = '900 32px Pretendard, sans-serif';
+  dctx.textAlign = 'right';
+  dctx.fillText(window._lastScore + '점', dW - 28, barY + barH/2);
+
+  // Mascot icon next to score
+  const mascotImg = document.getElementById('resultMascot');
+  if (mascotImg.complete) {
+    dctx.drawImage(mascotImg, dW - 130, barY + barH/2 - 18, 36, 36);
+  }
+
+  // Download
   const link = document.createElement('a');
   link.download = 'dochihak-drawing.png';
-  link.href = rc.toDataURL('image/png');
+  link.href = dc.toDataURL('image/png');
   link.click();
 }
 function retry() {
   document.getElementById('result').classList.remove('show');
-  document.getElementById('resultImg').style.display = 'none';
+  document.getElementById('resultLose').style.display = 'none';
   clearCanvas();
 }
 
