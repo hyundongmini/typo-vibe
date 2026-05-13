@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 21 — 마늘하늘 얼음폭탄 주의보</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;overflow:hidden}
+body{background:#000;font-family:'Pretendard',sans-serif}
+
+/* 3D 배경 캔버스 */
+canvas#bg{position:fixed;inset:0;z-index:1;cursor:none}
+
+/* 마우스 따라다니는 태양 */
+.sun-cursor{
+  position:fixed;z-index:100;pointer-events:none;
+  width:48px;height:48px;
+  transform:translate(-50%,-50%);
+  border-radius:50%;
+  background:radial-gradient(circle, #fff 0%, #ffdd00 20%, #ff8800 50%, #ff4400 70%, transparent 100%);
+  box-shadow:0 0 20px 8px rgba(255,150,0,0.5), 0 0 40px 16px rgba(255,100,0,0.2);
+  animation:sunPulse 1.5s ease-in-out infinite;
+}
+@keyframes sunPulse{
+  0%,100%{transform:translate(-50%,-50%) scale(1);box-shadow:0 0 20px 8px rgba(255,150,0,0.5),0 0 40px 16px rgba(255,100,0,0.2)}
+  50%{transform:translate(-50%,-50%) scale(1.1);box-shadow:0 0 30px 12px rgba(255,150,0,0.6),0 0 60px 24px rgba(255,100,0,0.3)}
+}
+
+/* 서리 퍼짐 오버레이 */
+.frost-overlay{
+  position:fixed;inset:0;z-index:3;pointer-events:none;
+  border:0px solid rgba(200,230,255,0);
+  box-shadow:inset 0 0 0 0 rgba(200,230,255,0);
+  animation:frostGrow 8s ease-in forwards;
+}
+@keyframes frostGrow{
+  0%{box-shadow:inset 0 0 0 0 rgba(200,230,255,0)}
+  100%{box-shadow:inset 0 0 80px 40px rgba(200,230,255,0.3)}
+}
+
+/* 트리거 버튼 */
+.trigger-btn{
+  position:fixed;bottom:30px;left:50%;transform:translateX(-50%);z-index:20;
+  padding:12px 32px;border:1px solid rgba(255,255,255,0.2);border-radius:100px;
+  background:rgba(255,255,255,0.05);color:rgba(255,255,255,0.6);
+  font:600 13px/1 'Pretendard',sans-serif;cursor:pointer;
+  backdrop-filter:blur(10px);transition:all 0.2s;
+}
+.trigger-btn:hover{background:rgba(255,255,255,0.12);color:#fff}
+
+.day-tag{position:fixed;bottom:14px;right:18px;font:11px/1 monospace;color:rgba(255,255,255,0.12);z-index:99}
+</style>
+</head>
+<body>
+
+<canvas id="bg"></canvas>
+<div class="sun-cursor" id="sunCursor"></div>
+<div class="frost-overlay"></div>
+<div class="text-layer" style="display:none"></div>
+<button class="trigger-btn" id="triggerBtn">💥 얼음폭탄 투하</button>
+<div class="day-tag">day 21 / typo-vibe</div>
+
+<script type="importmap">
+{"imports":{
+  "three":"https://cdn.jsdelivr.net/npm/three@0.164.1/build/three.module.js",
+  "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.164.1/examples/jsm/"
+}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import {EffectComposer} from 'three/addons/postprocessing/EffectComposer.js';
+import {RenderPass} from 'three/addons/postprocessing/RenderPass.js';
+import {UnrealBloomPass} from 'three/addons/postprocessing/UnrealBloomPass.js';
+import {RGBELoader} from 'three/addons/loaders/RGBELoader.js';
+
+// ===== 렌더러 =====
+const canvas = document.getElementById('bg');
+const renderer = new THREE.WebGLRenderer({canvas, antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.1;
+renderer.setSize(innerWidth, innerHeight);
+
+// ===== 씬 =====
+const scene = new THREE.Scene();
+scene.background = null;
+scene.fog = null;
+
+const camera = new THREE.PerspectiveCamera(35, innerWidth/innerHeight, 0.1, 100);
+camera.position.z = 10;
+
+// ===== 포스트프로세싱 =====
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+composer.addPass(new UnrealBloomPass(
+  new THREE.Vector2(innerWidth, innerHeight), 0.5, 0.3, 1.2
+));
+
+// ===== 조명 =====
+scene.add(new THREE.DirectionalLight(0xaaccff, 2).translateZ(5).translateY(4).translateX(3));
+const dLight2 = new THREE.DirectionalLight(0x6688bb, 1);
+dLight2.position.set(-3, 2, 4); scene.add(dLight2);
+const pLight = new THREE.PointLight(0xffffff, 1.5, 20);
+pLight.position.set(0, 0, 5); scene.add(pLight);
+scene.add(new THREE.AmbientLight(0x223344, 0.5));
+
+// ===== HDRI 환경맵 — 얼음에 환경이 반사/굴절되게 =====
+const pmrem = new THREE.PMREMGenerator(renderer);
+pmrem.compileEquirectangularShader();
+new RGBELoader().load(
+  'https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/kloofendal_48d_partly_cloudy_puresky_1k.hdr',
+  (hdrTexture) => {
+    const envMap = pmrem.fromEquirectangular(hdrTexture).texture;
+    scene.environment = envMap;
+    scene.background = envMap;
+    hdrTexture.dispose();
+    pmrem.dispose();
+  }
+);
+
+// 텍스트 평면 — HDRI 배경과 얼음 사이에 배치
+function makeTextTexture() {
+  const c = document.createElement('canvas');
+  const x = c.getContext('2d');
+  c.width = 2048; c.height = 2048;
+  // 투명 배경
+  x.clearRect(0, 0, 2048, 2048);
+  x.textAlign = 'center';
+  x.textBaseline = 'middle';
+  x.font = '900 210px Pretendard, sans-serif';
+  x.fillStyle = '#ffffff';
+  x.fillText('마른 하늘의', 1024, 900);
+  x.fillText('얼음폭탄 주의보', 1024, 1150);
+  return new THREE.CanvasTexture(c);
+}
+const textPlane = new THREE.Mesh(
+  new THREE.PlaneGeometry(14, 14),
+  new THREE.MeshBasicMaterial({map: makeTextTexture(), transparent: true, depthWrite: false})
+);
+textPlane.position.z = -2;
+scene.add(textPlane);
+
+// ===== 얼음 재질 =====
+// ===== 프로시저럴 서리/기포 노멀맵 생성 =====
+function makeFrostNormalMap() {
+  const size = 256;
+  const c = document.createElement('canvas');
+  c.width = size; c.height = size;
+  const ctx = c.getContext('2d');
+  // 기본 중립 노멀 (128,128,255 = 평평한 표면)
+  ctx.fillStyle = 'rgb(128,128,255)';
+  ctx.fillRect(0, 0, size, size);
+  // 랜덤 기포/서리 패턴
+  for (let i = 0; i < 300; i++) {
+    const x = Math.random() * size;
+    const y = Math.random() * size;
+    const r = 1 + Math.random() * 4;
+    const nx = 128 + (Math.random() - 0.5) * 60;
+    const ny = 128 + (Math.random() - 0.5) * 60;
+    ctx.fillStyle = `rgb(${nx|0},${ny|0},220)`;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // 크랙 라인
+  ctx.strokeStyle = 'rgb(100,100,200)';
+  ctx.lineWidth = 0.5;
+  for (let i = 0; i < 15; i++) {
+    ctx.beginPath();
+    let lx = Math.random() * size, ly = Math.random() * size;
+    ctx.moveTo(lx, ly);
+    for (let j = 0; j < 5; j++) {
+      lx += (Math.random() - 0.5) * 40;
+      ly += (Math.random() - 0.5) * 40;
+      ctx.lineTo(lx, ly);
+    }
+    ctx.stroke();
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  return tex;
+}
+
+const frostNormal = makeFrostNormalMap();
+
+function iceMaterial() {
+  return new THREE.MeshPhysicalMaterial({
+    color: 0xffffff,
+    emissive: 0x000000,
+    metalness: 0.0,
+    roughness: 0.1,
+    transmission: 0.95,
+    thickness: 2.5,
+    ior: 1.31,
+    envMapIntensity: 4.0,
+    clearcoat: 1.0,
+    clearcoatRoughness: 0.0,
+    transparent: true,
+    side: THREE.DoubleSide,
+    attenuationColor: new THREE.Color(0xe0f0f8),
+    attenuationDistance: 1.0,
+    specularIntensity: 2.5,
+    specularColor: new THREE.Color(1, 1, 1),
+    normalMap: frostNormal,
+    normalScale: new THREE.Vector2(0.3, 0.3),
+  });
+}
+
+// ===== 얼음 결정 생성 =====
+const crystals = [];
+const configs = [
+  [-2.0,-1.5,0,0.9], [1.8,0.8,0.3,0.7], [-0.5,1.6,-0.2,0.6],
+  [1.2,-1.0,0.1,0.8], [-1.5,0.3,0.2,0.5], [2.2,-0.6,-0.1,0.55],
+  [0.0,0.0,0.5,1.1], [-0.8,-2.0,0,0.4], [0.8,2.0,-0.1,0.45],
+  [-2.5,1.0,0.3,0.35], [2.5,1.5,0.1,0.3], [0.4,-0.8,0.7,0.5],
+];
+
+for (const [px,py,pz,s] of configs) {
+  // 8~14면 랜덤
+  const geoType = Math.floor(Math.random() * 3);
+  let geo;
+  if (geoType === 0) geo = new THREE.OctahedronGeometry(s, 0);        // 8면
+  else if (geoType === 1) geo = new THREE.DodecahedronGeometry(s, 0); // 12면
+  else geo = new THREE.IcosahedronGeometry(s, 0);                     // 20면 (가장 가까운 14면 대체)
+  const mat = iceMaterial();
+  mat.ior = 1.28 + Math.random()*0.06;
+  mat.thickness = 1.0 + Math.random()*2.0;
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.position.set(px, py, pz);
+  mesh.rotation.set(Math.random()*Math.PI, Math.random()*Math.PI, Math.random()*Math.PI);
+  mesh.userData = {
+    ox:px, oy:py, oz:pz,
+    phase: Math.random()*Math.PI*2,
+    speed: 0.1+Math.random()*0.25,
+    rotSpd: new THREE.Vector3((Math.random()-.5)*.04,(Math.random()-.5)*.04,(Math.random()-.5)*.02),
+    falling:false, fallVy:0,
+  };
+  scene.add(mesh);
+  crystals.push(mesh);
+}
+
+// 작은 파편
+for (let i=0; i<20; i++) {
+  const s = 0.06+Math.random()*0.12;
+  // 작은 파편: 4~8면
+  const geo = Math.random() > 0.5
+    ? new THREE.TetrahedronGeometry(s, 0)  // 4면
+    : new THREE.OctahedronGeometry(s, 0);  // 8면
+  const mat = iceMaterial(); mat.thickness=0.3;
+  const m = new THREE.Mesh(geo, mat);
+  m.position.set((Math.random()-.5)*8,(Math.random()-.5)*6,(Math.random()-.5)*2);
+  m.rotation.set(Math.random()*Math.PI,Math.random()*Math.PI,0);
+  m.userData = {
+    ox:m.position.x, oy:m.position.y, oz:m.position.z,
+    phase:Math.random()*Math.PI*2, speed:0.2+Math.random()*0.4,
+    rotSpd:new THREE.Vector3(0.02,0.02,0), small:true, falling:false, fallVy:0,
+  };
+  scene.add(m); crystals.push(m);
+}
+
+// ===== 마우스 =====
+const mouse = new THREE.Vector2(-10,-10);
+const raycaster = new THREE.Raycaster();
+const sunCursor = document.getElementById('sunCursor');
+
+canvas.addEventListener('mousemove', e=>{
+  mouse.x=(e.clientX/innerWidth)*2-1;
+  mouse.y=-(e.clientY/innerHeight)*2+1;
+  sunCursor.style.left = e.clientX + 'px';
+  sunCursor.style.top = e.clientY + 'px';
+});
+canvas.addEventListener('mouseenter', ()=>{ sunCursor.style.opacity='1'; });
+canvas.addEventListener('mouseleave',()=>{mouse.x=-10;mouse.y=-10; sunCursor.style.opacity='0';});
+
+// ===== 클릭 시 결정 깨짐 =====
+canvas.addEventListener('click', e=>{
+  if (isFalling) return;
+  raycaster.setFromCamera(mouse, camera);
+  const hits = raycaster.intersectObjects(crystals.filter(c=>!c.userData.small));
+  if (hits.length > 0) splitCrystal(hits[0].object);
+});
+
+// ===== 마우스 오래 대면 녹음 (온도계) =====
+let hoverTarget = null;
+let hoverTime = 0;
+
+canvas.addEventListener('mousemove', e => {
+  raycaster.setFromCamera(mouse, camera);
+  const hits = raycaster.intersectObjects(crystals.filter(c=>!c.userData.small && c.scale.x > 0.2));
+  if (hits.length > 0) {
+    if (hoverTarget !== hits[0].object) {
+      hoverTarget = hits[0].object;
+      hoverTime = 0;
+    }
+  } else {
+    hoverTarget = null;
+    hoverTime = 0;
+  }
+});
+
+function splitCrystal(mesh) {
+  const pos = mesh.position.clone();
+  const s = mesh.scale.x;
+  if (s < 0.3) return;
+  mesh.scale.multiplyScalar(0.6);
+  for (let i = 0; i < 3; i++) {
+    const angle = Math.random()*Math.PI*2;
+    const childS = s * 0.35;
+    const geo = new THREE.TetrahedronGeometry(childS, 0);
+    const mat = iceMaterial();
+    mat.thickness = 0.5;
+    const child = new THREE.Mesh(geo, mat);
+    child.scale.set(1,1,1);
+    child.position.copy(pos).add(new THREE.Vector3(Math.cos(angle)*0.6, Math.sin(angle)*0.6, (Math.random()-0.5)*0.4));
+    child.rotation.set(Math.random()*Math.PI, Math.random()*Math.PI, 0);
+    child.userData = {
+      ox:child.position.x, oy:child.position.y, oz:child.position.z,
+      phase:Math.random()*Math.PI*2, speed:0.3+Math.random()*0.5,
+      rotSpd:new THREE.Vector3((Math.random()-.5)*0.1,(Math.random()-.5)*0.1,0),
+      small:true, falling:false, fallVy:0,
+      vx:Math.cos(angle)*0.02, vy:Math.sin(angle)*0.02,
+    };
+    scene.add(child);
+    crystals.push(child);
+  }
+  // 파편 수 제한
+  while(crystals.length > 60) {
+    const old = crystals.shift();
+    scene.remove(old); old.geometry.dispose(); old.material.dispose();
+  }
+}
+
+// ===== 눈 파티클 =====
+const snowParticles = [];
+const snowGeo = new THREE.BufferGeometry();
+const snowCount = 200;
+const snowPositions = new Float32Array(snowCount * 3);
+for (let i = 0; i < snowCount; i++) {
+  snowPositions[i*3] = (Math.random()-0.5) * 16;
+  snowPositions[i*3+1] = Math.random() * 12 - 2;
+  snowPositions[i*3+2] = (Math.random()-0.5) * 8;
+}
+snowGeo.setAttribute('position', new THREE.BufferAttribute(snowPositions, 3));
+const snowMat = new THREE.PointsMaterial({color:0xffffff, size:0.04, transparent:true, opacity:0.6});
+const snow = new THREE.Points(snowGeo, snowMat);
+scene.add(snow);
+
+// ===== 물방울 파티클 (녹을 때 생성) =====
+const droplets = [];
+function spawnDroplet(pos) {
+  const geo = new THREE.SphereGeometry(0.03, 6, 6);
+  const mat = new THREE.MeshPhysicalMaterial({
+    color: 0xaaddff, transmission: 0.8, thickness: 0.5,
+    roughness: 0, transparent: true, opacity: 0.8
+  });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.position.copy(pos);
+  mesh.position.x += (Math.random()-0.5)*0.3;
+  mesh.position.z += (Math.random()-0.5)*0.3;
+  scene.add(mesh);
+  droplets.push({
+    mesh,
+    vy: -0.01 - Math.random()*0.01,
+    vx: (Math.random()-0.5)*0.005,
+    life: 1.5 + Math.random()
+  });
+}
+
+// ===== 낙하 트리거 =====
+let isFalling = false;
+document.getElementById('triggerBtn').addEventListener('click', triggerFall);
+
+function triggerFall() {
+  if (isFalling) return;
+  isFalling = true;
+  crystals.forEach((mesh,i) => {
+    setTimeout(()=>{ mesh.userData.falling=true; mesh.userData.fallVy=0; }, i*50);
+  });
+  document.getElementById('triggerBtn').style.opacity='0';
+  document.getElementById('triggerBtn').style.pointerEvents='none';
+  setTimeout(resetAll, 3500);
+}
+
+function resetAll() {
+  isFalling = false;
+  crystals.forEach(mesh => {
+    mesh.userData.falling=false; mesh.userData.fallVy=0;
+    mesh.position.set(mesh.userData.ox, mesh.userData.oy, mesh.userData.oz);
+  });
+  document.getElementById('triggerBtn').style.opacity='1';
+  document.getElementById('triggerBtn').style.pointerEvents='auto';
+}
+
+// ===== 애니메이션 =====
+function animate() {
+  requestAnimationFrame(animate);
+  const t = performance.now()*0.001;
+
+  for (const m of crystals) {
+    const d = m.userData;
+    if (d.falling) {
+      d.fallVy += 0.15;
+      m.position.y -= d.fallVy*0.016*10;
+      m.rotation.x += d.rotSpd.x*3;
+      m.rotation.y += d.rotSpd.y*3;
+    } else {
+      if(d.vx){d.ox+=d.vx;d.oy+=d.vy;d.vx*=0.98;d.vy*=0.98;}
+      m.position.x = d.ox + Math.sin(t*d.speed+d.phase)*0.3;
+      m.position.y = d.oy + Math.cos(t*d.speed*0.7+d.phase)*0.25;
+      m.position.z = (d.oz||0) + Math.sin(t*d.speed*0.4+d.phase*2)*0.1;
+      m.rotation.x += d.rotSpd.x;
+      m.rotation.y += d.rotSpd.y;
+    }
+    // 마우스 밀어내기 + 호버 시 빛남
+    if (mouse.x>-5 && !d.falling) {
+      const mw = new THREE.Vector3(mouse.x,mouse.y,0.5).unproject(camera);
+      const dir = mw.sub(camera.position).normalize();
+      const tp = (m.position.z-camera.position.z)/dir.z;
+      const mx3 = camera.position.x+dir.x*tp;
+      const my3 = camera.position.y+dir.y*tp;
+      const dx=m.position.x-mx3, dy=m.position.y-my3;
+      const dist=Math.hypot(dx,dy);
+      if(dist<2.0&&dist>0){
+        const f=0.5*(1-dist/2.0);
+        m.position.x+=dx/dist*f;
+        m.position.y+=dy/dist*f;
+        // 가까울수록 빛남
+        m.material.emissive.setHex(0x88ccff);
+        m.material.emissiveIntensity = (1-dist/2.0)*0.4;
+      } else {
+        m.material.emissiveIntensity *= 0.92; // 서서히 꺼짐
+      }
+    } else {
+      m.material.emissiveIntensity *= 0.92;
+    }
+  }
+
+  // 눈 내리기
+  const sp = snow.geometry.attributes.position;
+  for (let i = 0; i < snowCount; i++) {
+    let y = sp.getY(i) - 0.008 - Math.random()*0.005;
+    let x = sp.getX(i) + Math.sin(t*0.5 + i)*0.002;
+    if (y < -4) { y = 8; x = (Math.random()-0.5)*16; }
+    sp.setY(i, y);
+    sp.setX(i, x);
+  }
+  sp.needsUpdate = true;
+
+  // 온도계: 마우스 오래 대면 녹음
+  if (hoverTarget && !isFalling) {
+    hoverTime += 0.016;
+    const meltStart = 1.5; // 1.5초 후부터 녹기 시작
+    if (hoverTime > meltStart) {
+      const meltRate = 0.003;
+      const s = hoverTarget.scale.x;
+      // 서서히 줄어듦
+      hoverTarget.scale.multiplyScalar(1 - meltRate);
+      // 색상이 점점 투명해짐
+      hoverTarget.material.opacity = Math.max(0.2, s);
+      // 물방울 파티클 생성
+      if (Math.random() < 0.3) {
+        spawnDroplet(hoverTarget.position);
+      }
+      // 완전히 녹으면 제거
+      if (hoverTarget.scale.x < 0.1) {
+        scene.remove(hoverTarget);
+        const idx = crystals.indexOf(hoverTarget);
+        if (idx > -1) crystals.splice(idx, 1);
+        hoverTarget.geometry.dispose();
+        hoverTarget.material.dispose();
+        hoverTarget = null;
+        hoverTime = 0;
+      }
+    }
+  }
+
+  // 물방울 업데이트
+  for (let i = droplets.length - 1; i >= 0; i--) {
+    const d = droplets[i];
+    d.vy -= 0.003; // 중력
+    d.mesh.position.y += d.vy;
+    d.mesh.position.x += d.vx;
+    d.life -= 0.016;
+    d.mesh.material.opacity = Math.max(0, d.life * 2);
+    if (d.life <= 0) {
+      scene.remove(d.mesh);
+      d.mesh.geometry.dispose();
+      d.mesh.material.dispose();
+      droplets.splice(i, 1);
+    }
+  }
+
+  if(mouse.x>-5){pLight.position.x=mouse.x*4;pLight.position.y=mouse.y*3;}
+  camera.position.x=Math.sin(t*0.08)*0.1;
+  camera.position.y=Math.cos(t*0.06)*0.06;
+  camera.lookAt(0,0,0);
+  composer.render();
+}
+
+addEventListener('resize',()=>{
+  camera.aspect=innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth,innerHeight);
+  composer.setSize(innerWidth,innerHeight);
+});
+
+animate();
+</script>
+</body>
+</html>
