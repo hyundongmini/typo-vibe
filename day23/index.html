@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 23 — 꾸러기 서당</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;700;900&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;overflow:auto}
+body{
+  background:linear-gradient(180deg,#f5e6c8 0%,#e8d4a8 40%,#c9a87a 70%,#8b7355 100%);
+  font-family:'Noto Serif KR',serif;
+  display:flex;align-items:center;justify-content:center;
+  min-height:100vh;
+}
+
+/* 시작 화면 */
+.start-screen{
+  position:fixed;inset:0;z-index:200;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  background:linear-gradient(180deg,#3a2a10,#1a1005);
+}
+.start-screen.hidden{display:none}
+.start-title{font-size:clamp(36px,8vw,56px);font-weight:900;color:#f5d98a;margin-bottom:8px;text-shadow:2px 2px 4px rgba(0,0,0,0.5)}
+.start-sub{font-size:16px;color:#c9a85a;margin-bottom:40px}
+.team-select{display:flex;gap:24px;margin-bottom:32px}
+.team-btn{
+  width:120px;height:200px;border-radius:8px;cursor:pointer;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  font-size:20px;font-weight:900;letter-spacing:4px;writing-mode:vertical-rl;
+  transition:all 0.3s;border:3px solid transparent;
+}
+.team-btn.black{background:#1a1a1a;color:#fff;border-color:#444}
+.team-btn.white{background:#f5f0e0;color:#1a1a1a;border-color:#c9a85a}
+.team-btn:hover{transform:scale(1.05);box-shadow:0 8px 24px rgba(0,0,0,0.4)}
+.team-btn.selected{border-color:#ffcc02;box-shadow:0 0 20px rgba(255,204,2,0.4)}
+.level-select{display:flex;gap:12px;margin-bottom:32px}
+.level-btn{
+  padding:10px 24px;border-radius:100px;border:2px solid #c9a85a;
+  background:transparent;color:#c9a85a;font:700 14px 'Noto Serif KR',serif;
+  cursor:pointer;transition:all 0.2s;
+}
+.level-btn:hover,.level-btn.selected{background:#c9a85a;color:#1a1005}
+.start-btn{
+  padding:14px 48px;border:none;border-radius:8px;
+  background:#f5d98a;color:#2a1f0f;font:900 18px 'Noto Serif KR',serif;
+  cursor:pointer;transition:all 0.2s;
+}
+.start-btn:hover{background:#ffcc02;transform:scale(1.05)}
+
+/* 게임 화면 */
+.game-wrap{
+  display:flex;gap:16px;align-items:flex-start;
+  position:relative;
+  background-color:#f8f2e4;
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='5' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.08'/%3E%3C/svg%3E");
+  padding:24px 40px;
+  max-width:98vw;
+  border-top:none;border-bottom:none;
+  border-left:none;border-right:none;
+  box-shadow:0 8px 32px rgba(0,0,0,0.3);
+}
+/* 두루마리 좌우 봉 */
+.game-wrap::before,.game-wrap::after{
+  content:'';position:absolute;top:-12px;bottom:-12px;width:28px;
+  background:linear-gradient(180deg,#c9a050,#8b6520,#c9a050,#6b4510,#c9a050);
+  border-radius:14px;
+  box-shadow:2px 0 8px rgba(0,0,0,0.3);
+}
+.game-wrap::before{left:-14px}
+.game-wrap::after{right:-14px}
+/* 두루마리 상하 테두리 */
+.scroll-top,.scroll-bottom{
+  position:absolute;left:10px;right:10px;height:14px;
+  background:linear-gradient(90deg,#c9a050,#e8d090,#c9a050);
+  border-radius:2px;
+  box-shadow:0 2px 4px rgba(0,0,0,0.2);
+}
+.scroll-top{top:-7px}
+.scroll-bottom{bottom:-7px}
+
+/* 왼쪽: 보기 목록 */
+.word-list{
+  width:160px;flex-shrink:0;
+  background:rgba(255,250,235,0.95);
+  border:2px solid #8b5a2b;border-radius:4px;padding:10px;
+  box-shadow:inset 0 0 10px rgba(139,90,43,0.1);
+}
+.word-list h3{
+  text-align:center;font-size:13px;color:#5a3a1a;
+  border-bottom:2px solid #c9a85a;padding-bottom:6px;margin-bottom:6px;
+}
+.word-item{
+  font-size:12px;padding:4px 6px;margin:2px 0;border-radius:3px;
+  color:#3a2a1a;transition:all 0.3s;
+}
+.word-item.found{background:#4caf50;color:#fff;text-decoration:line-through}
+.word-item.cpu-found{background:#e53935;color:#fff;text-decoration:line-through}
+
+/* 오른쪽: 격자판 */
+.grid-area{display:flex;flex-direction:column;align-items:center}
+.grid-header{
+  display:flex;align-items:center;justify-content:space-between;width:100%;
+  margin-bottom:8px;padding:0 4px;
+}
+.grid-title{font-size:16px;font-weight:900;color:#3a2010;letter-spacing:2px}
+.scores{display:flex;gap:16px;font-size:12px;font-weight:700}
+.score-player{color:#2e7d32}
+.score-cpu{color:#c62828}
+
+.grid{
+  display:grid;
+  grid-template-columns:repeat(14,1fr);
+  gap:1px;
+  background:#5a3a1a;
+  border:3px solid #3a2010;
+  padding:1px;
+}
+.cell{
+  width:clamp(28px,3.5vw,36px);height:clamp(28px,3.5vw,36px);
+  display:flex;align-items:center;justify-content:center;
+  font-size:clamp(12px,1.6vw,15px);font-weight:700;
+  background:#fdf5e6;color:#2a1a0a;
+  cursor:pointer;transition:all 0.15s;user-select:none;
+}
+.cell:hover{background:#fff3cd}
+.cell.selected{background:#ffcc02;color:#000;transform:scale(1.08);z-index:2;box-shadow:0 0 6px rgba(255,200,0,0.6)}
+.cell.found{background:#81c784;color:#fff;cursor:default}
+.cell.cpu-found{background:#ef5350;color:#fff;cursor:default}
+.cell.wrong{animation:shake 0.3s;background:#ef5350;color:#fff}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-2px)}75%{transform:translateX(2px)}}
+
+/* 하단 정보 */
+.bottom-bar{
+  margin-top:10px;width:100%;
+  background:rgba(30,20,5,0.85);border-radius:4px;padding:10px 14px;
+  color:#f5d98a;font-size:12px;min-height:44px;
+  display:flex;align-items:center;justify-content:center;text-align:center;
+  line-height:1.5;
+}
+
+/* 카운트다운 */
+.countdown{
+  position:fixed;inset:0;z-index:150;
+  display:flex;align-items:center;justify-content:center;
+  background:rgba(0,0,0,0.6);
+  opacity:0;pointer-events:none;transition:opacity 0.3s;
+}
+.countdown.show{opacity:1;pointer-events:auto}
+.countdown-num{
+  font-size:clamp(80px,20vw,160px);font-weight:900;color:#f5d98a;
+  text-shadow:0 4px 20px rgba(0,0,0,0.5);
+  animation:countPop 0.8s ease;
+}
+@keyframes countPop{0%{transform:scale(2);opacity:0}50%{transform:scale(1);opacity:1}100%{transform:scale(0.9);opacity:0.8}}
+.complete{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,0.8);z-index:100;opacity:0;pointer-events:none;transition:opacity 0.5s}
+.complete.show{opacity:1;pointer-events:auto}
+.complete h1{font-size:42px;color:#ffcc02;margin-bottom:12px}
+.complete p{font-size:16px;color:#fff;margin-bottom:8px}
+.complete button{margin-top:20px;padding:12px 32px;border:none;border-radius:8px;background:#ffcc02;color:#3a2010;font:700 16px 'Noto Serif KR',serif;cursor:pointer}
+</style>
+</head>
+<body>
+
+<!-- 시작 화면 -->
+<div class="start-screen" id="startScreen">
+  <div class="start-title">꾸러기 서당</div>
+  <div class="start-sub">사자성어를 찾아라!</div>
+  <div class="team-select">
+    <div class="team-btn black selected" data-team="black" onclick="selectTeam('black')">수<br>불<br>석<br>권</div>
+    <div class="team-btn white" data-team="white" onclick="selectTeam('white')">교<br>학<br>상<br>장</div>
+  </div>
+  <div class="level-select">
+    <button class="level-btn" data-level="1" onclick="selectLevel(1)">쉬움</button>
+    <button class="level-btn selected" data-level="2" onclick="selectLevel(2)">보통</button>
+    <button class="level-btn" data-level="3" onclick="selectLevel(3)">어려움</button>
+  </div>
+  <button class="start-btn" onclick="startGame()">게임 시작</button>
+</div>
+
+<!-- 게임 화면 -->
+<div class="game-wrap" id="gameWrap" style="display:none">
+  <div class="scroll-top"></div>
+  <div class="scroll-bottom"></div>
+  <div class="word-list">
+    <h3>📜 찾을 사자성어</h3>
+    <div id="wordList"></div>
+  </div>
+  <div class="grid-area">
+    <div class="grid-header">
+      <div class="grid-title">꾸러기 서당</div>
+      <div class="scores">
+        <span class="score-player" id="playerScore">나: 0</span>
+        <span class="score-cpu" id="cpuScore">컴퓨터: 0</span>
+      </div>
+    </div>
+    <div class="grid" id="grid"></div>
+    <div class="bottom-bar" id="bottomBar">사자성어를 찾아보세요! 글자를 순서대로 클릭 (상하좌우 연결)</div>
+  </div>
+</div>
+
+<!-- 카운트다운 -->
+<div class="countdown" id="countdown">
+  <div class="countdown-num" id="countNum">3</div>
+</div>
+
+<!-- 완료 -->
+<div class="complete" id="complete">
+  <h1 id="resultTitle">🎉</h1>
+  <p id="resultText"></p>
+  <button onclick="location.reload()">다시 하기</button>
+</div>
+
+<script>
+// ===== 사자성어 풀 (30개+) =====
+const ALL_WORDS=[
+  {word:'다사다난',meaning:'여러 가지 일이 많고 어려움도 많음'},
+  {word:'교학상장',meaning:'가르치고 배우면서 함께 성장함'},
+  {word:'금란지교',meaning:'쇠도 자를 만큼 단단한 우정'},
+  {word:'심사숙고',meaning:'깊이 생각하고 신중히 판단함'},
+  {word:'절차탁마',meaning:'학문을 갈고 닦음'},
+  {word:'형설지공',meaning:'반딧불과 눈빛으로 공부한 노력'},
+  {word:'온고지신',meaning:'옛것을 익혀 새것을 앎'},
+  {word:'일석이조',meaning:'돌 하나로 새 두 마리를 잡음'},
+  {word:'유비무환',meaning:'미리 준비하면 걱정 없음'},
+  {word:'자업자득',meaning:'자기가 한 일의 결과를 자기가 받음'},
+  {word:'동고동락',meaning:'괴로움과 즐거움을 함께함'},
+  {word:'대기만성',meaning:'큰 그릇은 늦게 이루어짐'},
+  {word:'각골난망',meaning:'뼈에 새길 만큼 잊지 못함'},
+  {word:'권선징악',meaning:'착한 일을 권하고 악한 일을 징계함'},
+  {word:'고군분투',meaning:'외로이 힘써 싸움'},
+  {word:'근묵자흑',meaning:'먹을 가까이하면 검어짐'},
+  {word:'낙성여우',meaning:'글을 완성하면 비가 옴'},
+  {word:'관포지교',meaning:'관중과 포숙의 깊은 우정'},
+  {word:'계란유골',meaning:'달걀에도 뼈가 있다 (운이 없음)'},
+  {word:'한우충동',meaning:'소가 짐을 가득 실음 (책이 많음)'},
+  {word:'굴화위지',meaning:'귤이 강을 건너면 탱자가 됨'},
+  {word:'철종철금',meaning:'쇠로 만든 종과 금'},
+  {word:'승구영신',meaning:'묵은해를 보내고 새해를 맞음'},
+  {word:'극구팡음',meaning:'입을 극도로 벌려 크게 웃음'},
+  {word:'수불석권',meaning:'손에서 책을 놓지 않음'},
+  {word:'백절불굴',meaning:'백 번 꺾여도 굽히지 않음'},
+  {word:'사필귀정',meaning:'모든 일은 바른 길로 돌아감'},
+  {word:'전화위복',meaning:'화가 바뀌어 복이 됨'},
+  {word:'일취월장',meaning:'날로 달로 발전함'},
+  {word:'무위도식',meaning:'하는 일 없이 먹기만 함'},
+];
+
+const GRID_SIZE=14;
+let grid,wordPositions,selectedCells,foundWords,cpuFoundWords;
+let playerTeam='black',cpuLevel=2;
+let gameWords=[];
+let cpuTimer=null;
+
+// ===== 시작 화면 =====
+function selectTeam(team){
+  playerTeam=team;
+  document.querySelectorAll('.team-btn').forEach(b=>b.classList.remove('selected'));
+  document.querySelector(`.team-btn.${team}`).classList.add('selected');
+}
+function selectLevel(lv){
+  cpuLevel=lv;
+  document.querySelectorAll('.level-btn').forEach(b=>b.classList.remove('selected'));
+  document.querySelector(`[data-level="${lv}"]`).classList.add('selected');
+}
+
+function startGame(){
+  document.getElementById('startScreen').classList.add('hidden');
+  document.getElementById('gameWrap').style.display='flex';
+  initGame();
+
+  // 카운트다운 3, 2, 1 → 시작
+  const countEl = document.getElementById('countdown');
+  const numEl = document.getElementById('countNum');
+  countEl.classList.add('show');
+
+  // 게임판은 보이지만 클릭 비활성화
+  document.getElementById('grid').style.pointerEvents = 'none';
+
+  let count = 3;
+  numEl.textContent = count;
+
+  const timer = setInterval(() => {
+    count--;
+    if (count > 0) {
+      numEl.textContent = count;
+      numEl.style.animation = 'none';
+      void numEl.offsetWidth; // reflow
+      numEl.style.animation = 'countPop 0.8s ease';
+    } else if (count === 0) {
+      numEl.textContent = '시작!';
+      numEl.style.animation = 'none';
+      void numEl.offsetWidth;
+      numEl.style.animation = 'countPop 0.8s ease';
+    } else {
+      clearInterval(timer);
+      countEl.classList.remove('show');
+      document.getElementById('grid').style.pointerEvents = 'auto';
+    }
+  }, 1000);
+}
+
+// ===== 게임 초기화 =====
+function initGame(){
+  // 랜덤 14개 선택
+  const shuffled=[...ALL_WORDS].sort(()=>Math.random()-0.5);
+  gameWords=shuffled.slice(0,14);
+
+  grid=Array.from({length:GRID_SIZE},()=>Array(GRID_SIZE).fill(''));
+  wordPositions={};
+  selectedCells=[];
+  foundWords=new Set();
+  cpuFoundWords=new Set();
+
+  const DIRS=[[0,1],[1,0],[0,-1],[-1,0]];
+  function canPlace(w,r,c,d){
+    for(let i=0;i<w.length;i++){
+      const nr=r+d[0]*i,nc=c+d[1]*i;
+      if(nr<0||nr>=GRID_SIZE||nc<0||nc>=GRID_SIZE)return false;
+      if(grid[nr][nc]!==''&&grid[nr][nc]!==w[i])return false;
+    }return true;
+  }
+  function place(w,r,c,d){
+    const cells=[];
+    for(let i=0;i<w.length;i++){const nr=r+d[0]*i,nc=c+d[1]*i;grid[nr][nc]=w[i];cells.push({r:nr,c:nc});}
+    return cells;
+  }
+
+  // 배치
+  for(const{word}of gameWords){
+    let placed=false;
+    for(let a=0;a<500&&!placed;a++){
+      const r=Math.floor(Math.random()*GRID_SIZE),c=Math.floor(Math.random()*GRID_SIZE);
+      const d=DIRS[Math.floor(Math.random()*DIRS.length)];
+      if(canPlace(word,r,c,d)){wordPositions[word]=place(word,r,c,d);placed=true;}
+    }
+    if(!placed){
+      for(let r=0;r<GRID_SIZE&&!placed;r++)
+        for(let c=0;c<GRID_SIZE&&!placed;c++)
+          for(const d of DIRS)
+            if(canPlace(word,r,c,d)){wordPositions[word]=place(word,r,c,d);placed=true;break;}
+    }
+  }
+
+  // 빈 칸 채우기
+  const FILLER='가나다라마바사아자차카타파하고노도로모보소오조초코토포호구누두루무부수우주추쿠투푸후경공광교금기남녕단달담대덕동두란력련령로류문민박방백병복본부비상서석선설성세소송수숙순승시신실심안양어언업여연영오옥완용우원위유은을음의이인일임자장재전절정제조종주준중지진질차창천철청초충취탁통판평포풍필학한항해행향헌현형혜호홍화환활황회효후훈휘흥희';
+  for(let r=0;r<GRID_SIZE;r++)
+    for(let c=0;c<GRID_SIZE;c++)
+      if(grid[r][c]==='')grid[r][c]=FILLER[Math.floor(Math.random()*FILLER.length)];
+
+  renderGrid();
+  renderWordList();
+  startCPU();
+}
+
+function renderGrid(){
+  const el=document.getElementById('grid');
+  el.innerHTML='';
+  for(let r=0;r<GRID_SIZE;r++)
+    for(let c=0;c<GRID_SIZE;c++){
+      const cell=document.createElement('div');
+      cell.className='cell';cell.textContent=grid[r][c];
+      cell.dataset.row=r;cell.dataset.col=c;
+      cell.addEventListener('click',()=>onCellClick(r,c,cell));
+      el.appendChild(cell);
+    }
+}
+
+function renderWordList(){
+  const el=document.getElementById('wordList');
+  el.innerHTML='';
+  gameWords.forEach(({word},i)=>{
+    const d=document.createElement('div');
+    d.className='word-item';d.textContent=`${i+1}. ${word}`;
+    d.id='word-'+word;el.appendChild(d);
+  });
+}
+
+// ===== 플레이어 인터랙션 =====
+function onCellClick(r,c,cellEl){
+  if(cellEl.classList.contains('found')||cellEl.classList.contains('cpu-found'))return;
+  const idx=selectedCells.findIndex(s=>s.r===r&&s.c===c);
+  if(idx>-1){if(idx===selectedCells.length-1){selectedCells.pop();cellEl.classList.remove('selected');}return;}
+  if(selectedCells.length>0){
+    const last=selectedCells[selectedCells.length-1];
+    if(!(Math.abs(r-last.r)+Math.abs(c-last.c)===1)){clearSelection();return;}
+  }
+  selectedCells.push({r,c,el:cellEl});cellEl.classList.add('selected');
+  if(selectedCells.length===4){
+    const attempt=selectedCells.map(s=>grid[s.r][s.c]).join('');
+    checkWord(attempt,'player');
+  }
+}
+
+function checkWord(attempt,who){
+  const reverse=attempt.split('').reverse().join('');
+  let found=null;
+  for(const{word}of gameWords)
+    if(!foundWords.has(word)&&!cpuFoundWords.has(word)&&(word===attempt||word===reverse)){found=word;break;}
+
+  if(found&&who==='player'){
+    foundWords.add(found);
+    selectedCells.forEach(s=>{s.el.classList.remove('selected');s.el.classList.add('found');});
+    document.getElementById('word-'+found).classList.add('found');
+    updateScores();
+    showMeaning(found);
+    selectedCells=[];
+    checkGameEnd();
+  }else if(who==='player'){
+    selectedCells.forEach(s=>{s.el.classList.add('wrong');setTimeout(()=>s.el.classList.remove('wrong','selected'),300);});
+    setTimeout(()=>{selectedCells=[];},300);
+  }
+  return !!found;
+}
+
+function clearSelection(){selectedCells.forEach(s=>s.el.classList.remove('selected'));selectedCells=[];}
+
+function showMeaning(word){
+  const w=gameWords.find(g=>g.word===word);
+  if(w)document.getElementById('bottomBar').textContent=`✅ ${w.word}: ${w.meaning}`;
+}
+
+function updateScores(){
+  document.getElementById('playerScore').textContent=`나: ${foundWords.size}`;
+  document.getElementById('cpuScore').textContent=`컴퓨터: ${cpuFoundWords.size}`;
+}
+
+// ===== CPU =====
+function startCPU(){
+  const intervals=[15000,10000,5000]; // 쉬움/보통/어려움
+  const interval=intervals[cpuLevel-1];
+  cpuTimer=setInterval(cpuTurn,interval);
+}
+
+function cpuTurn(){
+  // 아직 안 찾은 단어 중 하나를 랜덤으로 찾음
+  const remaining=gameWords.filter(w=>!foundWords.has(w.word)&&!cpuFoundWords.has(w.word));
+  if(remaining.length===0){clearInterval(cpuTimer);return;}
+  const target=remaining[Math.floor(Math.random()*remaining.length)];
+  const cells=wordPositions[target.word];
+  if(!cells)return;
+
+  cpuFoundWords.add(target.word);
+  cells.forEach(({r,c})=>{
+    const cellEl=document.querySelector(`.cell[data-row="${r}"][data-col="${c}"]`);
+    if(cellEl&&!cellEl.classList.contains('found'))cellEl.classList.add('cpu-found');
+  });
+  document.getElementById('word-'+target.word).classList.add('cpu-found');
+  updateScores();
+  document.getElementById('bottomBar').textContent=`🤖 컴퓨터가 "${target.word}" 을(를) 찾았습니다! (${target.meaning})`;
+  checkGameEnd();
+}
+
+function checkGameEnd(){
+  const total=foundWords.size+cpuFoundWords.size;
+  if(total>=gameWords.length){
+    clearInterval(cpuTimer);
+    setTimeout(()=>{
+      const el=document.getElementById('complete');
+      el.classList.add('show');
+      if(foundWords.size>cpuFoundWords.size){
+        document.getElementById('resultTitle').textContent='🎉 승리!';
+        document.getElementById('resultText').textContent=`${foundWords.size} : ${cpuFoundWords.size} 로 이겼습니다!`;
+      }else if(foundWords.size<cpuFoundWords.size){
+        document.getElementById('resultTitle').textContent='😢 패배...';
+        document.getElementById('resultText').textContent=`${foundWords.size} : ${cpuFoundWords.size} 로 졌습니다.`;
+      }else{
+        document.getElementById('resultTitle').textContent='🤝 무승부!';
+        document.getElementById('resultText').textContent=`${foundWords.size} : ${cpuFoundWords.size}`;
+      }
+    },800);
+  }
+}
+</script>
+</body>
+</html>
