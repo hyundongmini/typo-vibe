@@ -1,0 +1,1119 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 25 — 후, 모바일 담배 피고싶다</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;overflow:hidden}
+body{
+  background:#1a1a1a;
+  font-family:'Pretendard',-apple-system,sans-serif;
+}
+canvas{display:block;width:100%;height:100%}
+
+/* UI */
+.ui{
+  position:fixed;top:20px;left:20px;
+  color:#fff;font-size:14px;
+  pointer-events:none;z-index:10;
+  text-shadow:0 2px 4px rgba(0,0,0,0.5);
+}
+.mic-status{
+  display:flex;align-items:center;gap:8px;
+  margin-bottom:12px;
+}
+.mic-dot{
+  width:12px;height:12px;border-radius:50%;
+  background:#ff4444;
+  transition:background 0.2s;
+}
+.mic-dot.active{background:#44ff44;box-shadow:0 0 10px #44ff44}
+.mic-level{
+  width:100px;height:6px;
+  background:rgba(255,255,255,0.2);
+  border-radius:3px;overflow:hidden;
+}
+.mic-level-bar{
+  height:100%;width:0%;
+  background:linear-gradient(90deg,#44ff44,#ffff44,#ff4444);
+  transition:width 0.05s;
+}
+.cough-meter{
+  display:flex;align-items:center;gap:6px;
+  margin-top:8px;opacity:0;
+  transition:opacity 0.3s;
+}
+.cough-meter.show{opacity:1}
+.cough-bar{
+  width:80px;height:6px;
+  background:rgba(255,255,255,0.2);
+  border-radius:3px;overflow:hidden;
+}
+.cough-fill{
+  height:100%;width:0%;
+  background:linear-gradient(90deg,#ffaa00,#ff4444);
+  transition:width 0.1s;
+}
+.instructions{
+  background:rgba(0,0,0,0.6);
+  padding:12px 16px;border-radius:8px;
+  line-height:1.6;
+  pointer-events:auto;
+}
+.instructions h3{margin-bottom:8px;color:#ffd93d}
+.instructions.compact{
+  padding:8px 12px;
+  font-size:12px;
+  line-height:1.4;
+}
+.instructions.compact h3{display:none}
+.start-btn{
+  margin-top:12px;
+  padding:10px 20px;
+  background:#ff6b6b;color:#fff;
+  border:none;border-radius:20px;
+  font-size:14px;font-weight:600;
+  cursor:pointer;
+  transition:transform 0.2s;
+}
+.start-btn:hover{transform:scale(1.05)}
+
+.shortcut-hint{
+  position:fixed;bottom:80px;left:50%;transform:translateX(-50%);
+  display:flex;gap:12px;
+  pointer-events:none;z-index:10;
+  opacity:0;transition:opacity 0.5s;
+}
+.shortcut-hint.show{opacity:1}
+.shortcut-key{
+  background:rgba(0,0,0,0.7);
+  padding:8px 14px;border-radius:8px;
+  color:#fff;font-size:13px;
+  display:flex;align-items:center;gap:6px;
+  border:1px solid rgba(255,255,255,0.2);
+}
+.shortcut-key kbd{
+  background:rgba(255,255,255,0.2);
+  padding:2px 8px;border-radius:4px;
+  font-family:monospace;font-weight:bold;
+}
+
+.cough-overlay{
+  position:fixed;inset:0;
+  background:rgba(100,50,50,0);
+  pointer-events:none;z-index:5;
+  transition:background 0.1s;
+}
+.cough-overlay.active{
+  background:rgba(100,50,50,0.3);
+}
+
+.breath-indicator{
+  position:fixed;bottom:30px;left:50%;transform:translateX(-50%);
+  font-size:24px;color:#fff;
+  text-shadow:0 0 20px currentColor;
+  opacity:0;transition:opacity 0.3s;
+  pointer-events:none;z-index:10;
+}
+.breath-indicator.inhale{opacity:1;color:#ff6b6b}
+.breath-indicator.exhale{opacity:1;color:#87ceeb}
+
+.day-tag{position:fixed;bottom:14px;right:18px;font:11px/1 monospace;color:rgba(255,255,255,0.3);z-index:10}
+</style>
+</head>
+<body>
+
+<div class="ui">
+  <div class="mic-status">
+    <div class="mic-dot" id="micDot"></div>
+    <span id="micText">마이크 대기중</span>
+  </div>
+  <div class="mic-level">
+    <div class="mic-level-bar" id="micLevel"></div>
+  </div>
+  <div class="cough-meter" id="coughMeterUI">
+    <span>🫁</span>
+    <div class="cough-bar"><div class="cough-fill" id="coughFill"></div></div>
+  </div>
+  <div class="instructions" id="instructions">
+    <h3>🚬 담배 시뮬레이터</h3>
+    <p>• 클릭: 담배 집기/놓기<br>
+    • 들이마시기: 불꽃이 밝아지고 빨리 탐<br>
+    • 내쉬기: 연기가 뿜어져 나옴<br>
+    • <b>W키 / 마이크</b>: 들이마시기<br>
+    • <b>S키</b>: 내쉬기 (연기 뿜기)<br>
+    • 스페이스: 연기 피우기<br>
+    • T키: 재 털기<br>
+    • R키: 새 담배</p>
+    <button class="start-btn" id="startBtn">마이크 시작</button>
+  </div>
+</div>
+
+<div class="breath-indicator" id="breathIndicator">흡</div>
+
+<div class="shortcut-hint" id="shortcutHint">
+  <div class="shortcut-key"><kbd>W</kbd> 들이마시기</div>
+  <div class="shortcut-key"><kbd>S</kbd> 내쉬기</div>
+  <div class="shortcut-key"><kbd>SPACE</kbd> 연기</div>
+  <div class="shortcut-key"><kbd>T</kbd> 재털기</div>
+  <div class="shortcut-key"><kbd>R</kbd> 새담배</div>
+</div>
+
+<div class="cough-overlay" id="coughOverlay"></div>
+
+<canvas id="c"></canvas>
+<div class="day-tag">day 25 / typo-vibe</div>
+
+<script type="importmap">
+{"imports":{
+  "three":"https://cdn.jsdelivr.net/npm/three@0.164.1/build/three.module.js",
+  "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.164.1/examples/jsm/"
+}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+
+// ===== 기본 설정 =====
+const canvas = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.2;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0d0d0d);
+
+const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.1, 100);
+camera.position.set(0, 2, 4);
+camera.lookAt(0, 0.5, 0);
+
+// ===== 후처리 (Bloom) =====
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+const bloomPass = new UnrealBloomPass(
+  new THREE.Vector2(innerWidth, innerHeight),
+  0.8, 0.4, 0.85
+);
+composer.addPass(bloomPass);
+
+// ===== 조명 =====
+const ambientLight = new THREE.AmbientLight(0x404040, 0.5);
+scene.add(ambientLight);
+
+const mainLight = new THREE.DirectionalLight(0xfff5e0, 1);
+mainLight.position.set(2, 5, 3);
+mainLight.castShadow = true;
+scene.add(mainLight);
+
+const fillLight = new THREE.PointLight(0xff8844, 0.5, 10);
+fillLight.position.set(-2, 2, 1);
+scene.add(fillLight);
+
+// ===== 바닥 =====
+const floorGeo = new THREE.PlaneGeometry(10, 10);
+const floorMat = new THREE.MeshStandardMaterial({ 
+  color: 0x2a2a2a, 
+  roughness: 0.9,
+  metalness: 0.1
+});
+const floor = new THREE.Mesh(floorGeo, floorMat);
+floor.rotation.x = -Math.PI / 2;
+floor.receiveShadow = true;
+scene.add(floor);
+
+// ===== 재떨이 =====
+function createAshtray() {
+  const group = new THREE.Group();
+  
+  // 외부 원통
+  const outerGeo = new THREE.CylinderGeometry(0.8, 0.9, 0.4, 32);
+  const ashtrayMat = new THREE.MeshStandardMaterial({
+    color: 0x4a4a4a,
+    roughness: 0.8,
+    metalness: 0.2
+  });
+  const outer = new THREE.Mesh(outerGeo, ashtrayMat);
+  group.add(outer);
+  
+  // 내부 (파인 부분)
+  const innerGeo = new THREE.CylinderGeometry(0.65, 0.7, 0.35, 32);
+  const innerMat = new THREE.MeshStandardMaterial({
+    color: 0x2a2a2a,
+    roughness: 0.9,
+    metalness: 0.1
+  });
+  const inner = new THREE.Mesh(innerGeo, innerMat);
+  inner.position.y = 0.05;
+  group.add(inner);
+  
+  // 재 (바닥)
+  const ashGeo = new THREE.CylinderGeometry(0.6, 0.65, 0.05, 32);
+  const ashMat = new THREE.MeshStandardMaterial({
+    color: 0x3a3a3a,
+    roughness: 1,
+    metalness: 0
+  });
+  const ash = new THREE.Mesh(ashGeo, ashMat);
+  ash.position.y = -0.1;
+  group.add(ash);
+  
+  // V홈 (담배 거치대) - 4개
+  for (let i = 0; i < 4; i++) {
+    const angle = (i / 4) * Math.PI * 2;
+    const notchGeo = new THREE.BoxGeometry(0.15, 0.1, 0.4);
+    const notch = new THREE.Mesh(notchGeo, ashtrayMat);
+    notch.position.set(
+      Math.cos(angle) * 0.75,
+      0.2,
+      Math.sin(angle) * 0.75
+    );
+    notch.rotation.y = angle;
+    group.add(notch);
+  }
+  
+  group.position.y = 0.2;
+  return group;
+}
+
+const ashtray = createAshtray();
+scene.add(ashtray);
+
+// ===== 담배 =====
+let cigarette;
+let cigaretteState = 'RESTING'; // RESTING, HELD, SMOKING
+let burnProgress = 0; // 0~1 (다 타면 1)
+let emberIntensity = 0; // 불꽃 밝기
+
+function createCigarette() {
+  const group = new THREE.Group();
+  
+  // 담배 몸체 (흰색 부분)
+  const bodyGeo = new THREE.CylinderGeometry(0.04, 0.04, 0.6, 16);
+  const bodyMat = new THREE.MeshStandardMaterial({
+    color: 0xf5f5f0,
+    roughness: 0.9,
+    metalness: 0
+  });
+  const body = new THREE.Mesh(bodyGeo, bodyMat);
+  body.rotation.z = Math.PI / 2;
+  group.add(body);
+  
+  // 필터 (주황색)
+  const filterGeo = new THREE.CylinderGeometry(0.042, 0.042, 0.15, 16);
+  const filterMat = new THREE.MeshStandardMaterial({
+    color: 0xd4a574,
+    roughness: 0.8,
+    metalness: 0
+  });
+  const filter = new THREE.Mesh(filterGeo, filterMat);
+  filter.rotation.z = Math.PI / 2;
+  filter.position.x = -0.375;
+  group.add(filter);
+  
+  // 불씨 (Ember) - 발광 재질
+  const emberGeo = new THREE.SphereGeometry(0.045, 16, 16);
+  const emberMat = new THREE.MeshStandardMaterial({
+    color: 0xff4400,
+    emissive: 0xff2200,
+    emissiveIntensity: 0.5,
+    roughness: 0.5,
+    metalness: 0
+  });
+  const ember = new THREE.Mesh(emberGeo, emberMat);
+  ember.position.x = 0.3;
+  ember.scale.set(1, 0.8, 0.8);
+  group.add(ember);
+  group.userData.ember = ember;
+  group.userData.emberMat = emberMat;
+  
+  // 재 부분 (타들어간 부분)
+  const ashTipGeo = new THREE.CylinderGeometry(0.035, 0.04, 0.05, 16);
+  const ashTipMat = new THREE.MeshStandardMaterial({
+    color: 0x555555,
+    roughness: 1,
+    metalness: 0
+  });
+  const ashTip = new THREE.Mesh(ashTipGeo, ashTipMat);
+  ashTip.rotation.z = Math.PI / 2;
+  ashTip.position.x = 0.32;
+  group.add(ashTip);
+  
+  return group;
+}
+
+cigarette = createCigarette();
+cigarette.position.set(0.6, 0.45, 0); // 재떨이 V홈에 거치
+cigarette.rotation.z = 0.1;
+scene.add(cigarette);
+
+// ===== 연기 파티클 시스템 =====
+const PARTICLE_COUNT = 800;
+const smokeParticles = [];
+let smokeGeometry, smokeMaterial, smokePoints;
+
+function initSmokeSystem() {
+  const positions = new Float32Array(PARTICLE_COUNT * 3);
+  const sizes = new Float32Array(PARTICLE_COUNT);
+  const opacities = new Float32Array(PARTICLE_COUNT);
+  const lifetimes = new Float32Array(PARTICLE_COUNT);
+  
+  for (let i = 0; i < PARTICLE_COUNT; i++) {
+    positions[i * 3] = 0;
+    positions[i * 3 + 1] = -10; // 화면 밖에 숨김
+    positions[i * 3 + 2] = 0;
+    sizes[i] = 0;
+    opacities[i] = 0;
+    lifetimes[i] = 0;
+    
+    smokeParticles.push({
+      active: false,
+      life: 0,
+      maxLife: 0,
+      velocity: new THREE.Vector3(),
+      position: new THREE.Vector3()
+    });
+  }
+  
+  smokeGeometry = new THREE.BufferGeometry();
+  smokeGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  smokeGeometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+  smokeGeometry.setAttribute('opacity', new THREE.BufferAttribute(opacities, 1));
+  
+  smokeMaterial = new THREE.ShaderMaterial({
+    uniforms: {
+      uTime: { value: 0 }
+    },
+    vertexShader: `
+      attribute float size;
+      attribute float opacity;
+      varying float vOpacity;
+      
+      void main() {
+        vOpacity = opacity;
+        vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+        gl_PointSize = size * (300.0 / -mvPosition.z);
+        gl_Position = projectionMatrix * mvPosition;
+      }
+    `,
+    fragmentShader: `
+      varying float vOpacity;
+      
+      void main() {
+        vec2 center = gl_PointCoord - 0.5;
+        float dist = length(center);
+        if (dist > 0.5) discard;
+        
+        float alpha = smoothstep(0.5, 0.0, dist) * vOpacity;
+        vec3 color = vec3(0.85, 0.85, 0.9);
+        gl_FragColor = vec4(color, alpha * 0.6);
+      }
+    `,
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending
+  });
+  
+  smokePoints = new THREE.Points(smokeGeometry, smokeMaterial);
+  scene.add(smokePoints);
+}
+
+// Curl Noise 간단 구현
+function noise3D(x, y, z) {
+  return Math.sin(x * 1.5) * Math.cos(y * 1.5) * Math.sin(z * 1.5 + x);
+}
+
+function curlNoise(x, y, z, time) {
+  const eps = 0.01;
+  const n1 = noise3D(x + eps, y, z + time);
+  const n2 = noise3D(x - eps, y, z + time);
+  const n3 = noise3D(x, y + eps, z + time);
+  const n4 = noise3D(x, y - eps, z + time);
+  const n5 = noise3D(x, y, z + eps + time);
+  const n6 = noise3D(x, y, z - eps + time);
+  
+  return new THREE.Vector3(
+    (n3 - n4) / (2 * eps) - (n5 - n6) / (2 * eps),
+    (n5 - n6) / (2 * eps) - (n1 - n2) / (2 * eps),
+    (n1 - n2) / (2 * eps) - (n3 - n4) / (2 * eps)
+  ).multiplyScalar(0.02);
+}
+
+// ===== 재 파티클 시스템 =====
+const ashParticles = [];
+let ashGeometry, ashMaterial, ashPoints;
+
+function initAshSystem() {
+  const ASH_COUNT = 100;
+  const positions = new Float32Array(ASH_COUNT * 3);
+  const sizes = new Float32Array(ASH_COUNT);
+  
+  for (let i = 0; i < ASH_COUNT; i++) {
+    positions[i * 3] = 0;
+    positions[i * 3 + 1] = -10;
+    positions[i * 3 + 2] = 0;
+    sizes[i] = 0;
+    
+    ashParticles.push({
+      active: false,
+      life: 0,
+      velocity: new THREE.Vector3(),
+      position: new THREE.Vector3()
+    });
+  }
+  
+  ashGeometry = new THREE.BufferGeometry();
+  ashGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  ashGeometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+  
+  ashMaterial = new THREE.PointsMaterial({
+    color: 0x666666,
+    size: 0.02,
+    transparent: true,
+    opacity: 0.8,
+    sizeAttenuation: true
+  });
+  
+  ashPoints = new THREE.Points(ashGeometry, ashMaterial);
+  scene.add(ashPoints);
+}
+
+let nextAshIndex = 0;
+let ashAccumulator = 0;
+
+function emitAsh(origin, amount = 5) {
+  for (let i = 0; i < amount; i++) {
+    const p = ashParticles[nextAshIndex];
+    nextAshIndex = (nextAshIndex + 1) % ashParticles.length;
+    
+    p.active = true;
+    p.life = 1;
+    p.position.copy(origin);
+    p.position.x += (Math.random() - 0.5) * 0.1;
+    p.position.z += (Math.random() - 0.5) * 0.1;
+    p.velocity.set(
+      (Math.random() - 0.5) * 0.02,
+      -0.02 - Math.random() * 0.02,
+      (Math.random() - 0.5) * 0.02
+    );
+  }
+}
+
+function updateAsh(delta) {
+  const positions = ashGeometry.attributes.position.array;
+  const sizes = ashGeometry.attributes.size.array;
+  
+  for (let i = 0; i < ashParticles.length; i++) {
+    const p = ashParticles[i];
+    
+    if (p.active) {
+      p.life -= delta * 0.5;
+      
+      if (p.life <= 0 || p.position.y < 0) {
+        p.active = false;
+        positions[i * 3 + 1] = -10;
+        sizes[i] = 0;
+        continue;
+      }
+      
+      p.velocity.y -= 0.001; // 중력
+      p.position.add(p.velocity);
+      
+      positions[i * 3] = p.position.x;
+      positions[i * 3 + 1] = p.position.y;
+      positions[i * 3 + 2] = p.position.z;
+      sizes[i] = 0.015 + Math.random() * 0.01;
+    }
+  }
+  
+  ashGeometry.attributes.position.needsUpdate = true;
+  ashGeometry.attributes.size.needsUpdate = true;
+}
+
+initAshSystem();
+
+// ===== 도넛 연기 (담배 끝에서 피어오르는 연기) =====
+function emitDonutSmoke() {
+  // 담배 끝 위치 가져오기
+  const ember = cigarette.userData.ember;
+  const origin = new THREE.Vector3();
+  ember.getWorldPosition(origin);
+  
+  // 연기 파티클 여러 개 생성
+  for (let i = 0; i < 15; i++) {
+    const p = smokeParticles[nextParticleIndex];
+    nextParticleIndex = (nextParticleIndex + 1) % PARTICLE_COUNT;
+    
+    p.active = true;
+    p.life = 0;
+    p.maxLife = 3 + Math.random() * 2;
+    p.isRing = false;
+    
+    // 담배 끝에서 시작
+    p.position.set(
+      origin.x + (Math.random() - 0.5) * 0.05,
+      origin.y + (Math.random() - 0.5) * 0.05,
+      origin.z + (Math.random() - 0.5) * 0.05
+    );
+    
+    // 위로 피어오르는 속도
+    p.velocity.set(
+      (Math.random() - 0.5) * 0.03,
+      0.1 + Math.random() * 0.08,
+      (Math.random() - 0.5) * 0.03
+    );
+  }
+}
+
+// ===== 사운드 =====
+let coughAudio;
+
+function initSounds() {
+  // 실제 기침 소리 (무료 효과음 URL)
+  coughAudio = new Audio('https://cdn.freesound.org/previews/369/369515_6687700-lq.mp3');
+  coughAudio.volume = 0.6;
+  
+  // 백업용 두 번째 기침 소리
+  coughAudio.cough2 = new Audio('https://cdn.freesound.org/previews/434/434479_5121236-lq.mp3');
+  coughAudio.cough2.volume = 0.5;
+}
+
+const coughSound = {
+  play: function() {
+    if (coughAudio) {
+      coughAudio.currentTime = 0;
+      coughAudio.play().catch(() => {});
+      
+      // 두 번째 기침
+      setTimeout(() => {
+        if (coughAudio.cough2) {
+          coughAudio.cough2.currentTime = 0;
+          coughAudio.cough2.play().catch(() => {});
+        }
+      }, 300);
+    }
+  }
+};
+
+initSounds();
+
+// ===== 담배 카운터 & 기침 =====
+let cigaretteCount = 0;
+let coughMeter = 0;
+let isCoughing = false;
+
+function emitSmoke(origin, direction, intensity = 1, isExhale = false) {
+  const count = isExhale ? Math.floor(30 * intensity) : Math.floor(5 * intensity);
+  
+  for (let i = 0; i < count; i++) {
+    const p = smokeParticles[nextParticleIndex];
+    nextParticleIndex = (nextParticleIndex + 1) % PARTICLE_COUNT;
+    
+    p.active = true;
+    p.life = 0;
+    p.maxLife = isExhale ? 2.5 + Math.random() : 3 + Math.random() * 2;
+    p.position.copy(origin);
+    
+    if (isExhale) {
+      // 내쉬는 연기 - 앞으로 뿜어져 나감
+      p.velocity.set(
+        direction.x * 0.8 + (Math.random() - 0.5) * 0.3,
+        direction.y * 0.3 + Math.random() * 0.2 + 0.1,
+        direction.z * 0.8 + (Math.random() - 0.5) * 0.3
+      );
+    } else {
+      // 담배에서 피어오르는 연기
+      p.velocity.set(
+        (Math.random() - 0.5) * 0.05,
+        0.15 + Math.random() * 0.1,
+        (Math.random() - 0.5) * 0.05
+      );
+    }
+  }
+}
+
+function updateSmoke(delta, time) {
+  const positions = smokeGeometry.attributes.position.array;
+  const sizes = smokeGeometry.attributes.size.array;
+  const opacities = smokeGeometry.attributes.opacity.array;
+  
+  for (let i = 0; i < PARTICLE_COUNT; i++) {
+    const p = smokeParticles[i];
+    
+    if (p.active) {
+      p.life += delta;
+      const lifeRatio = p.life / p.maxLife;
+      
+      if (lifeRatio >= 1) {
+        p.active = false;
+        positions[i * 3 + 1] = -10;
+        sizes[i] = 0;
+        opacities[i] = 0;
+        continue;
+      }
+      
+      // Curl noise로 자연스러운 흐름
+      const curl = curlNoise(p.position.x, p.position.y, p.position.z, time * 0.5);
+      p.velocity.add(curl);
+      
+      // 위로 상승
+      p.velocity.y += 0.002;
+      
+      // 감속
+      p.velocity.multiplyScalar(0.98);
+      
+      // 위치 업데이트
+      p.position.add(p.velocity.clone().multiplyScalar(delta * 60));
+      
+      positions[i * 3] = p.position.x;
+      positions[i * 3 + 1] = p.position.y;
+      positions[i * 3 + 2] = p.position.z;
+      
+      // 크기: 시간에 따라 커짐
+      sizes[i] = 0.1 + lifeRatio * 0.4;
+      
+      // 투명도: 서서히 사라짐
+      opacities[i] = Math.sin(lifeRatio * Math.PI) * 0.8;
+    }
+  }
+  
+  smokeGeometry.attributes.position.needsUpdate = true;
+  smokeGeometry.attributes.size.needsUpdate = true;
+  smokeGeometry.attributes.opacity.needsUpdate = true;
+}
+
+initSmokeSystem();
+
+// ===== 마이크 입력 =====
+let audioContext, analyser, microphone, dataArray;
+let micActive = false;
+let currentVolume = 0;
+let isInhaling = false;
+let isExhaling = false;
+let inhaleTimer = 0;
+let exhaleTimer = 0;
+let exhaleAccumulator = 0;
+let lastVolume = 0;
+let nextParticleIndex = 0;
+let keyInhaling = false; // 키보드 들이마시기
+
+async function startMicrophone() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    audioContext = new AudioContext();
+    analyser = audioContext.createAnalyser();
+    analyser.fftSize = 256;
+    microphone = audioContext.createMediaStreamSource(stream);
+    microphone.connect(analyser);
+    dataArray = new Uint8Array(analyser.frequencyBinCount);
+    
+    micActive = true;
+    document.getElementById('micDot').classList.add('active');
+    document.getElementById('micText').textContent = '마이크 활성화';
+    
+    // 설명을 간소화하고 단축키 힌트 표시
+    const instructions = document.getElementById('instructions');
+    instructions.classList.add('compact');
+    instructions.innerHTML = '<p>🎤 소리로 담배를 피워보세요</p>';
+    
+    document.getElementById('shortcutHint').classList.add('show');
+    
+  } catch (err) {
+    console.error('마이크 접근 실패:', err);
+    document.getElementById('micText').textContent = '마이크 접근 실패';
+  }
+}
+
+function updateMicInput() {
+  if (!micActive || !analyser) return;
+  
+  analyser.getByteFrequencyData(dataArray);
+  
+  // 평균 볼륨 계산
+  let sum = 0;
+  for (let i = 0; i < dataArray.length; i++) {
+    sum += dataArray[i];
+  }
+  currentVolume = sum / dataArray.length / 255;
+  
+  // UI 업데이트
+  document.getElementById('micLevel').style.width = (currentVolume * 100) + '%';
+  
+  const breathIndicator = document.getElementById('breathIndicator');
+  
+  // 호흡 감지 로직
+  const volumeThreshold = 0.15;
+  const volumeDelta = currentVolume - lastVolume;
+  
+  if (currentVolume > volumeThreshold) {
+    if (volumeDelta > 0.02 && !isInhaling) {
+      // 볼륨 증가 = 들이마시기 시작
+      isInhaling = true;
+      isExhaling = false;
+      inhaleTimer = 0;
+      breathIndicator.className = 'breath-indicator inhale';
+      breathIndicator.textContent = '흡...';
+    }
+    inhaleTimer += 0.016;
+  } else if (isInhaling && currentVolume < volumeThreshold * 0.5) {
+    // 볼륨 감소 = 내쉬기
+    isInhaling = false;
+    isExhaling = true;
+    exhaleTimer = 0;
+    exhaleAccumulator = Math.min(inhaleTimer, 2); // 들이마신 양 저장
+    breathIndicator.className = 'breath-indicator exhale';
+    breathIndicator.textContent = '후...';
+  }
+  
+  if (isExhaling) {
+    exhaleTimer += 0.016;
+    if (exhaleTimer > 1.5) {
+      isExhaling = false;
+      breathIndicator.className = 'breath-indicator';
+    }
+  }
+  
+  lastVolume = currentVolume;
+}
+
+// ===== 담배 상태 업데이트 =====
+function updateCigarette(delta) {
+  const emberMat = cigarette.userData.emberMat;
+  const ember = cigarette.userData.ember;
+  
+  // 항상 천천히 탐 (기본)
+  const baseBurnRate = 0.008;
+  burnProgress = Math.min(burnProgress + delta * baseBurnRate, 1);
+  
+  // 기본 연기 (항상 약간씩)
+  if (Math.random() < 0.15) {
+    const smokeOrigin = new THREE.Vector3();
+    ember.getWorldPosition(smokeOrigin);
+    emitSmoke(smokeOrigin, new THREE.Vector3(0, 1, 0), 0.2);
+  }
+  
+  // 재 축적
+  ashAccumulator += delta * baseBurnRate * 0.5;
+  
+  // 들이마시기 - 불꽃 밝아지고 훨씬 빨리 탐 (마이크 또는 키보드)
+  if ((isInhaling || keyInhaling) && cigaretteState === 'HELD') {
+    emberIntensity = Math.min(emberIntensity + delta * 4, 2.5);
+    burnProgress = Math.min(burnProgress + delta * 0.12, 1); // 추가로 더 빨리 탐
+    ashAccumulator += delta * 0.1;
+    coughMeter += delta * 0.3;
+    inhaleTimer += delta; // 키보드용 타이머도 증가
+    
+    // 불꽃 색상 변화
+    emberMat.emissiveIntensity = 1.5 + emberIntensity;
+    emberMat.emissive.setHex(0xff4400);
+    ember.scale.setScalar(1 + emberIntensity * 0.3);
+  } else {
+    // 서서히 어두워짐
+    emberIntensity = Math.max(emberIntensity - delta * 2, 0.4);
+    emberMat.emissiveIntensity = emberIntensity;
+    ember.scale.setScalar(1);
+  }
+  
+  // 재가 일정량 쌓이면 자동으로 떨어짐 (회색 가루)
+  if (ashAccumulator > 0.25) {
+    // 랜덤하게 재가 떨어짐
+    if (Math.random() < 0.08) {
+      const ashOrigin = new THREE.Vector3();
+      ember.getWorldPosition(ashOrigin);
+      emitAsh(ashOrigin, Math.floor(3 + Math.random() * 5));
+      ashAccumulator -= 0.08;
+    }
+  }
+  
+  // 담배가 많이 타면 (30% 이상) 재가 더 자주 떨어짐
+  if (burnProgress > 0.3 && ashAccumulator > 0.15) {
+    if (Math.random() < 0.03) {
+      const ashOrigin = new THREE.Vector3();
+      ember.getWorldPosition(ashOrigin);
+      emitAsh(ashOrigin, 2);
+      ashAccumulator -= 0.03;
+    }
+  }
+  
+  // 내쉬기 - 연기 뿜기
+  if (isExhaling && exhaleAccumulator > 0) {
+    const mouthPos = new THREE.Vector3(0, 1.5, 2);
+    const exhaleDir = new THREE.Vector3(0, 0.2, -1).normalize();
+    emitSmoke(mouthPos, exhaleDir, exhaleAccumulator, true);
+    exhaleAccumulator *= 0.85;
+  }
+  
+  // 기침 체크 (너무 많이 피우면)
+  if (coughMeter > 2.5 && !isCoughing) {
+    triggerCough();
+  }
+  coughMeter = Math.max(coughMeter - delta * 0.15, 0);
+  
+  // 기침 게이지 UI 업데이트
+  const coughMeterUI = document.getElementById('coughMeterUI');
+  const coughFill = document.getElementById('coughFill');
+  if (coughMeter > 0.3) {
+    coughMeterUI.classList.add('show');
+    coughFill.style.width = Math.min(coughMeter / 2.5 * 100, 100) + '%';
+  } else {
+    coughMeterUI.classList.remove('show');
+  }
+  
+  // 담배 길이 줄이기 (시각적)
+  const burnScale = 1 - burnProgress * 0.5;
+  cigarette.children[0].scale.x = burnScale;
+  cigarette.children[0].position.x = -burnProgress * 0.15;
+  ember.position.x = 0.3 - burnProgress * 0.3;
+  
+  // 담배 다 탔으면
+  if (burnProgress >= 1) {
+    emberMat.emissiveIntensity = 0;
+  }
+}
+
+// ===== 기침 효과 =====
+function triggerCough() {
+  isCoughing = true;
+  const breathIndicator = document.getElementById('breathIndicator');
+  const coughOverlay = document.getElementById('coughOverlay');
+  
+  breathIndicator.className = 'breath-indicator inhale';
+  breathIndicator.textContent = '콜록콜록!!';
+  breathIndicator.style.opacity = '1';
+  breathIndicator.style.fontSize = '32px';
+  
+  // 화면 붉게
+  coughOverlay.classList.add('active');
+  
+  // 기침 소리
+  if (coughSound) coughSound.play();
+  
+  // 연기 막 뿜어져 나옴
+  for (let i = 0; i < 8; i++) {
+    setTimeout(() => {
+      const mouthPos = new THREE.Vector3(
+        (Math.random() - 0.5) * 0.8,
+        1.5 + (Math.random() - 0.5) * 0.5,
+        2
+      );
+      const dir = new THREE.Vector3(
+        (Math.random() - 0.5) * 2,
+        Math.random(),
+        -1
+      );
+      emitSmoke(mouthPos, dir, 2, true);
+    }, i * 80);
+  }
+  
+  // 담배 떨어뜨림
+  if (cigaretteState === 'HELD') {
+    cigaretteState = 'RESTING';
+    cigarette.position.set(0.6, 0.45, 0);
+    cigarette.rotation.set(0, 0, 0.1);
+  }
+  
+  // 카메라 흔들림
+  const originalPos = camera.position.clone();
+  let shakeTime = 0;
+  const shake = () => {
+    shakeTime += 0.05;
+    const intensity = (1 - shakeTime) * 0.08;
+    camera.position.x = originalPos.x + (Math.random() - 0.5) * intensity;
+    camera.position.y = originalPos.y + (Math.random() - 0.5) * intensity;
+    
+    if (shakeTime < 1.5) {
+      requestAnimationFrame(shake);
+    } else {
+      camera.position.copy(originalPos);
+      isCoughing = false;
+      coughOverlay.classList.remove('active');
+      breathIndicator.style.opacity = '0';
+      breathIndicator.style.fontSize = '24px';
+      coughMeter = 0;
+    }
+  };
+  shake();
+}
+
+// ===== 재 털기 =====
+function shakeAsh() {
+  const ember = cigarette.userData.ember;
+  const ashOrigin = new THREE.Vector3();
+  ember.getWorldPosition(ashOrigin);
+  
+  // 재가 조금이라도 있으면 털기
+  const ashAmount = Math.max(Math.floor(ashAccumulator * 30), 3);
+  emitAsh(ashOrigin, ashAmount);
+  ashAccumulator = 0;
+  
+  // 담배 흔드는 애니메이션
+  const originalRot = cigarette.rotation.z;
+  let t = 0;
+  const shakeAnim = () => {
+    t += 0.15;
+    cigarette.rotation.z = originalRot + Math.sin(t * 15) * 0.3 * Math.max(0, 1 - t);
+    if (t < 1) requestAnimationFrame(shakeAnim);
+    else cigarette.rotation.z = originalRot;
+  };
+  shakeAnim();
+}
+
+// ===== 새 담배 =====
+function newCigarette() {
+  burnProgress = 0;
+  ashAccumulator = 0;
+  cigaretteCount++;
+  
+  // 담배 리셋
+  cigarette.children[0].scale.x = 1;
+  cigarette.children[0].position.x = 0;
+  cigarette.userData.ember.position.x = 0.3;
+  cigarette.userData.emberMat.emissiveIntensity = 0.5;
+  
+  // 기침 소리 재생
+  if (coughSound && cigaretteCount > 0) {
+    coughSound.play();
+  }
+  
+  const breathIndicator = document.getElementById('breathIndicator');
+  breathIndicator.className = 'breath-indicator inhale';
+  breathIndicator.textContent = `콜록... 🚬 ${cigaretteCount + 1}번째`;
+  breathIndicator.style.opacity = '1';
+  setTimeout(() => { breathIndicator.style.opacity = '0'; }, 2000);
+}
+
+// ===== 마우스 인터랙션 =====
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+
+function onMouseClick(event) {
+  mouse.x = (event.clientX / innerWidth) * 2 - 1;
+  mouse.y = -(event.clientY / innerHeight) * 2 + 1;
+  
+  raycaster.setFromCamera(mouse, camera);
+  const intersects = raycaster.intersectObject(cigarette, true);
+  
+  if (intersects.length > 0 || cigaretteState === 'HELD') {
+    if (cigaretteState === 'RESTING') {
+      // 집기
+      cigaretteState = 'HELD';
+      cigarette.position.set(0.5, 1.2, 1.5);
+      cigarette.rotation.set(0, 0, 0.3);
+    } else if (cigaretteState === 'HELD') {
+      // 놓기
+      cigaretteState = 'RESTING';
+      cigarette.position.set(0.6, 0.45, 0);
+      cigarette.rotation.set(0, 0, 0.1);
+    }
+  }
+}
+
+window.addEventListener('click', onMouseClick);
+
+// ===== 이벤트 =====
+document.getElementById('startBtn').addEventListener('click', startMicrophone);
+
+// 키보드 이벤트
+window.addEventListener('keydown', (e) => {
+  switch(e.code) {
+    case 'KeyW':
+      // 들이마시기
+      if (!keyInhaling && cigaretteState === 'HELD') {
+        keyInhaling = true;
+        isInhaling = true;
+        isExhaling = false;
+        inhaleTimer = 0;
+        const breathIndicator = document.getElementById('breathIndicator');
+        breathIndicator.className = 'breath-indicator inhale';
+        breathIndicator.textContent = '흡...';
+        breathIndicator.style.opacity = '1';
+      }
+      break;
+    case 'KeyS':
+      // 내쉬기
+      if (cigaretteState === 'HELD') {
+        isInhaling = false;
+        keyInhaling = false;
+        isExhaling = true;
+        exhaleTimer = 0;
+        exhaleAccumulator = Math.max(inhaleTimer, 0.5);
+        const breathIndicator = document.getElementById('breathIndicator');
+        breathIndicator.className = 'breath-indicator exhale';
+        breathIndicator.textContent = '후...';
+        breathIndicator.style.opacity = '1';
+      }
+      break;
+    case 'Space':
+      e.preventDefault();
+      // 도넛 연기 (담배 끝에서)
+      if (cigaretteState === 'HELD') {
+        emitDonutSmoke();
+        const breathIndicator = document.getElementById('breathIndicator');
+        breathIndicator.className = 'breath-indicator exhale';
+        breathIndicator.textContent = '○○○';
+        breathIndicator.style.opacity = '1';
+        setTimeout(() => { breathIndicator.style.opacity = '0'; }, 1000);
+      }
+      break;
+    case 'KeyT':
+      // 재 털기
+      shakeAsh();
+      break;
+    case 'KeyR':
+      // 새 담배
+      newCigarette();
+      break;
+  }
+});
+
+window.addEventListener('keyup', (e) => {
+  if (e.code === 'KeyW') {
+    // 들이마시기 끝 → 자동으로 내쉬기
+    if (keyInhaling) {
+      keyInhaling = false;
+      isInhaling = false;
+      isExhaling = true;
+      exhaleTimer = 0;
+      exhaleAccumulator = Math.max(inhaleTimer, 0.3);
+      const breathIndicator = document.getElementById('breathIndicator');
+      breathIndicator.className = 'breath-indicator exhale';
+      breathIndicator.textContent = '후...';
+    }
+  }
+});
+
+// ===== 애니메이션 루프 =====
+const clock = new THREE.Clock();
+
+function animate() {
+  requestAnimationFrame(animate);
+  const delta = clock.getDelta();
+  const time = clock.getElapsedTime();
+  
+  updateMicInput();
+  updateCigarette(delta);
+  updateSmoke(delta, time);
+  updateAsh(delta);
+  
+  smokeMaterial.uniforms.uTime.value = time;
+  
+  composer.render();
+}
+
+animate();
+
+// ===== 리사이즈 =====
+window.addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+  composer.setSize(innerWidth, innerHeight);
+});
+</script>
+</body>
+</html>
