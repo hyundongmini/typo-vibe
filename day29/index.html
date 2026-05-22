@@ -14,12 +14,22 @@ html, body {
   position: fixed;
   font-family: -apple-system, sans-serif;
 }
+* {
+  box-sizing: border-box;
+}
+*:focus {
+  outline: none;
+}
 canvas {
   display: block;
   cursor: crosshair;
   position: fixed;
   top: 0;
   left: 0;
+  outline: none;
+}
+canvas:focus {
+  outline: none;
 }
 .hint {
   position: fixed;
@@ -40,6 +50,7 @@ canvas {
   letter-spacing: 0.1em;
   pointer-events: none;
   z-index: 10;
+  background: transparent;
 }
 </style>
 </head>
@@ -71,9 +82,10 @@ resize();
 const words = ['MOLD', '2026'];
 let wordIdx = 0;
 let blobs = [];
-const mouse = { x: -9999, y: -9999 };
+const mouse = { x: -9999, y: -9999, isOver: false };
 let customText = '';
 let isTyping = false;
+let spreadingBlobs = []; // 번지는 효과용 임시 blob들
 
 // ===== Step 1: 글자에서 anchor 좌표 추출 =====
 function extractAnchors(text) {
@@ -143,12 +155,21 @@ function setupBlobs(text) {
       phase: Math.random() * Math.PI * 2,
       radiusPhase: Math.random() * Math.PI * 2,
       flickerPhase: Math.random() * Math.PI * 2,
-      thresholdOffset: (Math.random() - 0.5) * 0.2 // 임계값 왜곡용
+      thresholdOffset: (Math.random() - 0.5) * 0.2,
+      // 부패 효과용
+      lifespan: 0.5 + Math.random() * 0.5, // 0.5~1.0 (생명력)
+      decaySpeed: 0.001 + Math.random() * 0.002, // 죽는 속도
+      isDying: Math.random() < 0.1 // 10%는 처음부터 죽어가는 중
     };
   });
   
   label.textContent = text;
   console.log('blob count:', blobs.length);
+  
+  // 임시 캔버스 정리 (메모리 누수 방지)
+  if (window.tempCanvas) {
+    window.tempCanvas = null;
+  }
 }
 
 setupBlobs(words[0]);
@@ -157,11 +178,32 @@ setupBlobs(words[0]);
 window.addEventListener('mousemove', (e) => {
   mouse.x = e.clientX;
   mouse.y = e.clientY;
+  mouse.isOver = true;
+  
+  // 마우스 주변에서 번지는 효과 (확률적으로 새 blob 생성)
+  if (Math.random() < 0.15) { // 15% 확률
+    const angle = Math.random() * Math.PI * 2;
+    const distance = 30 + Math.random() * 50;
+    
+    spreadingBlobs.push({
+      x: mouse.x + Math.cos(angle) * distance,
+      y: mouse.y + Math.sin(angle) * distance,
+      vx: Math.cos(angle) * 2,
+      vy: Math.sin(angle) * 2,
+      radius: 4 + Math.random() * 6,
+      life: 1.0, // 생명력 (1.0 → 0)
+      phase: Math.random() * Math.PI * 2,
+      radiusPhase: Math.random() * Math.PI * 2,
+      flickerPhase: Math.random() * Math.PI * 2,
+      thresholdOffset: (Math.random() - 0.5) * 0.2
+    });
+  }
 });
 
 window.addEventListener('mouseleave', () => {
   mouse.x = -9999; 
   mouse.y = -9999;
+  mouse.isOver = false;
 });
 
 window.addEventListener('click', () => {
@@ -296,7 +338,47 @@ let t = 0;
 function update() {
   t += 0.025; // 0.012 → 0.025 (2배 빠르게)
   
+  // 번지는 blob 업데이트
+  for (let i = spreadingBlobs.length - 1; i >= 0; i--) {
+    const sb = spreadingBlobs[i];
+    
+    // 생명력 감소
+    sb.life -= 0.02;
+    
+    if (sb.life <= 0) {
+      spreadingBlobs.splice(i, 1);
+      continue;
+    }
+    
+    // 감속
+    sb.vx *= 0.95;
+    sb.vy *= 0.95;
+    
+    // 위치 업데이트
+    sb.x += sb.vx;
+    sb.y += sb.vy;
+    
+    // 부유 효과
+    sb.x += Math.cos(t + sb.phase) * 0.5;
+    sb.y += Math.sin(t * 1.3 + sb.phase) * 0.5;
+  }
+  
   for (const b of blobs) {
+    // 부패 효과: 생명력 감소
+    if (b.isDying) {
+      b.lifespan -= b.decaySpeed;
+      
+      // 죽으면 다시 살아남
+      if (b.lifespan <= 0) {
+        b.lifespan = 0.5 + Math.random() * 0.5;
+        b.isDying = false;
+      }
+    } else {
+      // 랜덤하게 죽기 시작 (0.05% 확률로 낮춤)
+      if (Math.random() < 0.0005) {
+        b.isDying = true;
+      }
+    }
     // (a) anchor 복원력
     const dx = b.anchorX - b.x;
     const dy = b.anchorY - b.y;
@@ -385,20 +467,31 @@ window.addEventListener('resize', setupField);
 function render() {
   field.fill(0);
   
+  // 메인 blob + 번지는 blob 모두 렌더링
+  const allBlobs = [...blobs, ...spreadingBlobs];
+  
   // 각 blob 주변 그리드 셀에만 영향력 누적
-  for (const b of blobs) {
+  for (const b of allBlobs) {
     // 시간에 따라 반경 변화 (±20%)
     const radiusVariation = 1 + Math.sin(t * 2 + b.radiusPhase) * 0.2;
-    const currentRadius = b.radius * radiusVariation;
+    let currentRadius = b.radius * radiusVariation;
+    
+    // 번지는 blob은 생명력에 따라 크기 조절
+    const lifeFactor = b.life !== undefined ? b.life : 1.0;
+    
+    // 부패 효과: 죽어가는 blob은 크기 감소 (최소 30%까지만)
+    const decayFactor = b.lifespan !== undefined ? Math.max(0.3, b.lifespan) : 1.0;
+    
+    const finalRadius = currentRadius * lifeFactor * decayFactor;
     
     // 랜덤 깜빡임 (5% 확률로 비활성화)
     const flicker = Math.sin(t * 5 + b.flickerPhase);
     if (flicker < -0.9) continue; // 일부 blob 건너뛰기
     
     // 임계값 왜곡 (각 blob마다 다른 영향력)
-    const thresholdMod = 1 + b.thresholdOffset;
-    const r2 = currentRadius * currentRadius * thresholdMod;
-    const reach = currentRadius * 2.5;
+    const thresholdMod = 1 + (b.thresholdOffset || 0);
+    const r2 = finalRadius * finalRadius * thresholdMod;
+    const reach = finalRadius * 2.5;
     
     const minCx = Math.max(0, Math.floor((b.x - reach) / GRID));
     const maxCx = Math.min(cols - 1, Math.ceil((b.x + reach) / GRID));
@@ -422,29 +515,25 @@ function render() {
   ctx.fillStyle = '#000';
   ctx.fillRect(0, 0, W, H);
   
-  // 1) 내부 + 두꺼운 윤곽선 (임계값 > 0.85)
+  // 1) 먼저 내부를 완전히 채움 (임계값 > 0.7)
   for (let cy = 0; cy < rows; cy++) {
     for (let cx = 0; cx < cols; cx++) {
       const v = field[cy * cols + cx];
       
-      // 강한 노이즈 (찢어진 효과) - 비대칭 + 방향성
-      const noiseX = Math.sin(cx * 0.3 + t * 1.8) * 0.12;
-      const noiseY = Math.cos(cy * 0.35 + t * 1.4) * 0.15; // x, y 다른 강도
-      const directionalNoise = Math.sin((cx + cy) * 0.2 + t * 0.5) * 0.1; // 대각선 방향
-      const noise = noiseX + noiseY + directionalNoise;
-      const noise2 = Math.sin(cx * 0.7 + cy * 0.5 + t) * 0.08;
+      // 내부용 약한 노이즈
+      const noiseX = Math.sin(cx * 0.3 + t * 1.8) * 0.08;
+      const noiseY = Math.cos(cy * 0.35 + t * 1.4) * 0.1;
+      const noise = noiseX + noiseY;
       
-      if (v + noise + noise2 > 0.85) {
-        // 내부는 완전 불투명, 윤곽선은 그라데이션
-        const alpha = v > 1.0 ? 1.0 : (v - 0.85) / 0.15;
-        
+      if (v + noise > 0.7) {
+        // 내부는 완전 흰색으로 채움
         for (let dy = 0; dy < GRID; dy++) {
           for (let dx = 0; dx < GRID; dx++) {
             const px = cx * GRID + dx;
             const py = cy * GRID + dy;
             
             if (px < W && py < H) {
-              ctx.fillStyle = `rgba(255,255,255,${alpha})`;
+              ctx.fillStyle = 'rgba(255,255,255,1.0)';
               ctx.fillRect(px, py, 1, 1);
             }
           }
@@ -453,37 +542,73 @@ function render() {
     }
   }
   
-  // 2) 바깥쪽 점묘 구름 (0.3~0.85 영역) - 밀도 감소로 속도 보완
-  for (const b of blobs) {
-    const particleCount = 25; // 35 → 25
+  // 2) 외곽선 레이어 (0.5 < 임계값 <= 0.7) - 회색으로 덮어씀
+  for (let cy = 0; cy < rows; cy++) {
+    for (let cx = 0; cx < cols; cx++) {
+      const v = field[cy * cols + cx];
+      
+      // 외곽선용 강한 노이즈
+      const outlineNoiseX = Math.sin(cx * 0.25 + t * 2.1) * 0.25;
+      const outlineNoiseY = Math.cos(cy * 0.28 + t * 1.7) * 0.3;
+      const chaoticNoise = Math.sin((cx * 0.4 + cy * 0.3) + t * 0.8) * 0.2;
+      const breakNoise = Math.sin(cx * 1.3 + cy * 1.7 + t * 3) * 0.4;
+      
+      const vWithNoise = v + outlineNoiseX + outlineNoiseY + chaoticNoise + breakNoise;
+      
+      if (vWithNoise > 0.5 && vWithNoise <= 0.7) {
+        // 외곽선은 회색
+        const alpha = (vWithNoise - 0.5) / 0.2;
+        
+        for (let dy = 0; dy < GRID; dy++) {
+          for (let dx = 0; dx < GRID; dx++) {
+            const px = cx * GRID + dx;
+            const py = cy * GRID + dy;
+            
+            if (px < W && py < H) {
+              ctx.fillStyle = `rgba(160,160,160,${alpha * 0.9})`;
+              ctx.fillRect(px, py, 1, 1);
+            }
+          }
+        }
+      }
+    }
+  }
+  
+  // 3) 바깥쪽 점묘 구름 (0.25~0.5 영역) - 외곽선 바깥
+  for (const b of allBlobs) {
+    const particleCount = 25;
     
-    for (let i = 0; i < particleCount; i++) {
+    // 번지는 blob은 입자 수 감소
+    const finalCount = b.life !== undefined ? Math.floor(particleCount * b.life) : particleCount;
+    
+    for (let i = 0; i < finalCount; i++) {
       const angle = Math.random() * Math.PI * 2;
-      const distance = b.radius * (1.0 + Math.random() * 2.0); // 1.0~3.0배
+      const distance = b.radius * (1.0 + Math.random() * 2.0);
       
       const px = b.x + Math.cos(angle) * distance;
       const py = b.y + Math.sin(angle) * distance;
       
       if (px >= 0 && px < W && py >= 0 && py < H) {
         let influence = 0;
-        for (const bb of blobs) {
+        for (const bb of allBlobs) {
           const ddx = px - bb.x;
           const ddy = py - bb.y;
           const d2 = ddx*ddx + ddy*ddy + 1;
           influence += (bb.radius * bb.radius) / d2;
         }
         
-        if (influence > 0.3 && influence < 0.85) {
-          const alpha = (influence - 0.3) / 0.55;
-          const size = Math.random() < 0.85 ? 1 : 2; // 가끔 2px
-          ctx.fillStyle = `rgba(255,255,255,${alpha * 0.6})`;
+        if (influence > 0.25 && influence < 0.5) {
+          const alpha = (influence - 0.25) / 0.25;
+          const lifeFactor = b.life !== undefined ? b.life : 1.0;
+          const size = Math.random() < 0.85 ? 1 : 2;
+          ctx.fillStyle = `rgba(255,255,255,${alpha * 0.5 * lifeFactor})`;
           ctx.fillRect(Math.floor(px), Math.floor(py), size, size);
         }
       }
     }
   }
   
-  // 3) 주변 떠다니는 입자
+  // 4) 주변 떠다니는 입자
   for (let i = 0; i < 30; i++) {
     const px = (Math.sin(t * 0.4 + i * 1.7) * 0.5 + 0.5) * W;
     const py = (Math.cos(t * 0.25 + i * 2.3) * 0.5 + 0.5) * H;
