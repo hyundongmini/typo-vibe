@@ -180,8 +180,8 @@ window.addEventListener('mousemove', (e) => {
   mouse.y = e.clientY;
   mouse.isOver = true;
   
-  // 마우스 주변에서 번지는 효과 (확률적으로 새 blob 생성)
-  if (Math.random() < 0.15) { // 15% 확률
+  // 마우스 주변에서 번지는 효과 (확률 낮춤)
+  if (Math.random() < 0.08) { // 15% → 8%
     const angle = Math.random() * Math.PI * 2;
     const distance = 30 + Math.random() * 50;
     
@@ -452,7 +452,7 @@ function update() {
 }
 
 // ===== Step 4: 렌더링 =====
-const GRID = 1; // 2 → 1 (매우 부드러운 윤곽선)
+const GRID = 2; // 1 → 2 (속도 개선)
 let cols, rows, field;
 
 function setupField() {
@@ -576,7 +576,7 @@ function render() {
   
   // 3) 바깥쪽 점묘 구름 (0.25~0.5 영역) - 외곽선 바깥
   for (const b of allBlobs) {
-    const particleCount = 25;
+    const particleCount = 15; // 25 → 15 (속도 개선)
     
     // 번지는 blob은 입자 수 감소
     const finalCount = b.life !== undefined ? Math.floor(particleCount * b.life) : particleCount;
@@ -606,14 +606,6 @@ function render() {
         }
       }
     }
-  }
-  
-  // 4) 주변 떠다니는 입자
-  for (let i = 0; i < 30; i++) {
-    const px = (Math.sin(t * 0.4 + i * 1.7) * 0.5 + 0.5) * W;
-    const py = (Math.cos(t * 0.25 + i * 2.3) * 0.5 + 0.5) * H;
-    ctx.fillStyle = 'rgba(255,255,255,0.3)';
-    ctx.fillRect(Math.floor(px), Math.floor(py), 1, 1);
   }
 }
 
