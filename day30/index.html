@@ -1,0 +1,908 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>살인자 추적 포스터 - 구겨지는 인터랙션</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<!-- Noto Serif KR: 묵직한 명조, 헤드라인용 / Nanum Pen Script: 손글씨 느낌 본문용 -->
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@700;900&family=Nanum+Pen+Script&family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet">
+<style>
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: #d8d2c4;
+  font-family: 'Gowun Batang', serif;
+  overflow: hidden;
+}
+
+.poster-wrap {
+  position: relative;
+  cursor: pointer;
+  filter: drop-shadow(0 10px 30px rgba(0,0,0,0.25));
+  transition: transform 0.3s ease-out;
+}
+
+.poster-wrap:hover {
+  transform: scale(1.02);
+}
+
+.poster-wrap.shake {
+  animation: shake 0.5s ease-in-out;
+}
+
+@keyframes shake {
+  0%, 100% { transform: rotate(0deg); }
+  10% { transform: rotate(-2deg); }
+  20% { transform: rotate(2deg); }
+  30% { transform: rotate(-2deg); }
+  40% { transform: rotate(2deg); }
+  50% { transform: rotate(-1deg); }
+  60% { transform: rotate(1deg); }
+  70% { transform: rotate(-1deg); }
+  80% { transform: rotate(1deg); }
+  90% { transform: rotate(-0.5deg); }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+}
+
+.floating {
+  animation: float 3s ease-in-out infinite;
+}
+
+.hint {
+  position: fixed;
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: #555;
+  font-size: 13px;
+  letter-spacing: 2px;
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.reset {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  padding: 8px 16px;
+  background: #222;
+  color: white;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  letter-spacing: 1px;
+  border-radius: 2px;
+}
+
+.mode-toggle {
+  position: fixed;
+  top: 20px;
+  left: 20px;
+  padding: 8px 16px;
+  background: #444;
+  color: white;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  letter-spacing: 1px;
+  border-radius: 2px;
+}
+
+.mode-toggle.active {
+  background: #666;
+}
+
+/* 구김 파티클 효과 */
+.crumple-particle {
+  position: fixed;
+  width: 4px;
+  height: 4px;
+  background: #333;
+  border-radius: 50%;
+  pointer-events: none;
+  animation: particle-fly 1s ease-out forwards;
+}
+
+@keyframes particle-fly {
+  0% {
+    opacity: 1;
+    transform: translate(0, 0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--tx), var(--ty)) scale(0);
+  }
+}
+
+/* 구김 웨이브 효과 */
+.crumple-wave {
+  position: fixed;
+  border: 2px solid rgba(0,0,0,0.3);
+  border-radius: 50%;
+  pointer-events: none;
+  animation: wave-expand 0.8s ease-out forwards;
+}
+
+@keyframes wave-expand {
+  0% {
+    width: 0;
+    height: 0;
+    opacity: 1;
+  }
+  100% {
+    width: 200px;
+    height: 200px;
+    opacity: 0;
+  }
+}
+
+/* 피 효과 */
+.blood-splatter {
+  position: fixed;
+  pointer-events: none;
+  filter: blur(1px);
+}
+
+.blood-drop {
+  position: fixed;
+  background: radial-gradient(ellipse at center, #8b0000 0%, #5a0000 100%);
+  border-radius: 50% 50% 50% 0;
+  pointer-events: none;
+  transform: rotate(45deg);
+  animation: blood-drip 2s ease-in forwards;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
+}
+
+@keyframes blood-drip {
+  0% {
+    opacity: 1;
+    transform: translateY(0) translateX(0) rotate(45deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(200px) translateX(var(--horizontal-offset, 0px)) rotate(45deg);
+  }
+}
+
+/* 피 얼룩 (강화) */
+.blood-stain {
+  position: fixed;
+  pointer-events: none;
+  animation: stain-appear 0.5s ease-out forwards;
+}
+
+.blood-stain.large {
+  background: radial-gradient(circle, rgba(139,0,0,0.8) 0%, rgba(90,0,0,0.5) 40%, rgba(60,0,0,0.2) 70%, transparent 100%);
+  border-radius: 50%;
+  filter: blur(2px) drop-shadow(0 2px 8px rgba(0,0,0,0.4));
+}
+
+.blood-stain.small {
+  background: radial-gradient(circle, rgba(139,0,0,0.7) 0%, rgba(90,0,0,0.4) 60%, transparent 100%);
+  border-radius: 50%;
+  filter: blur(1px);
+}
+
+.blood-stain-inner {
+  position: absolute;
+  background: radial-gradient(circle, rgba(139,0,0,0.9) 0%, rgba(90,0,0,0.6) 50%, transparent 100%);
+  border-radius: 50%;
+  filter: blur(1px);
+}
+
+@keyframes stain-appear {
+  0% {
+    opacity: 0;
+    transform: scale(0);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* 찢어짐 효과 강화 */
+.tear-mark {
+  position: fixed;
+  pointer-events: none;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
+}
+</style>
+</head>
+<body>
+
+<svg id="poster-svg" class="poster-wrap"
+     width="500" height="800" viewBox="0 0 500 800"
+     xmlns="http://www.w3.org/2000/svg">
+  
+  <defs id="filter-defs">
+    <!-- 기본 종이 구김 필터 (포스터 전체에 살짝) -->
+    <filter id="base-crumple" x="-10%" y="-10%" width="120%" height="120%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.015 0.025" numOctaves="2" seed="3" result="noise"/>
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="2" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+    
+    <!-- 띠 가장자리 거칠게: 잉크 번진 효과 -->
+    <filter id="rough-edge" x="-10%" y="-30%" width="120%" height="160%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="3" seed="5" result="t"/>
+      <feDisplacementMap in="SourceGraphic" in2="t" scale="14" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+    
+    <!-- 다른 띠용 거친 가장자리 (시드 다름) -->
+    <filter id="rough-edge-2" x="-10%" y="-30%" width="120%" height="160%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.06" numOctaves="3" seed="11" result="t"/>
+      <feDisplacementMap in="SourceGraphic" in2="t" scale="18" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+    
+    <!-- 종이 질감 (배경에 깔리는 그레인) -->
+    <filter id="paper-grain">
+      <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="7"/>
+      <feColorMatrix values="0 0 0 0 0
+                              0 0 0 0 0
+                              0 0 0 0 0
+                              0 0 0 0.15 0"/>
+      <feComposite in2="SourceGraphic" operator="in"/>
+    </filter>
+    
+    <!-- 글자 살짝 떨림(잉크 번짐 느낌) -->
+    <filter id="text-wobble">
+      <feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="2" seed="9" result="t"/>
+      <feDisplacementMap in="SourceGraphic" in2="t" scale="2"/>
+    </filter>
+    
+    <!-- 찢어진 선 패턴 (재사용 가능) -->
+    <pattern id="tear-pattern" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse">
+      <path d="M 0 10 Q 5 8, 10 10 T 20 10" stroke="#d8d2c4" stroke-width="2" fill="none"/>
+    </pattern>
+  </defs>
+  
+  <!-- 전체에 base-crumple 적용 -->
+  <g id="layer-stack" filter="url(#base-crumple)">
+    
+    <!-- 1) 종이 배경 -->
+    <rect x="0" y="0" width="500" height="800" fill="#efe9da"/>
+    
+    <!-- 종이 질감 그레인 오버레이 -->
+    <rect x="0" y="0" width="500" height="800" fill="#efe9da" filter="url(#paper-grain)"/>
+    
+    <!-- 2) 헤드라인: 묵직한 굴림 명조 -->
+    <text x="250" y="75" 
+          font-family="'Noto Serif KR', serif" 
+          font-weight="900" 
+          font-size="38" 
+          fill="#1a1a1a" 
+          text-anchor="middle"
+          letter-spacing="2"
+          filter="url(#text-wobble)">살인자ㅇ난감을 읽다</text>
+    
+    <!-- 3) 본문 텍스트 영역 (검은 띠가 일부를 가림) -->
+    <!-- SVG에서 긴 본문 줄바꿈은 <tspan>으로 -->
+    <g font-family="'Gowun Batang', serif" font-size="13" fill="#2a2a2a" filter="url(#text-wobble)">
+      <text x="60" y="155">
+        <tspan x="60" dy="0">어떤 우연한 사건을 계기로 살인자가 된 남자</tspan>
+        <tspan x="60" dy="22">이탕과 그를 쫓는 형사 장난감의 이야기를</tspan>
+        <tspan x="60" dy="22">다룬 내용이다. 무거운 내용과는 달리</tspan>
+        <tspan x="60" dy="22">4컷에다가 그림체도 귀엽고 매우 단순한</tspan>
+        <tspan x="60" dy="22">편이지만 그걸 무시하고 보게 될 정도로</tspan>
+        <tspan x="60" dy="22">높은 흡입력 있는 진행을 보여주고 있다.</tspan>
+        <tspan x="60" dy="22">더불어 심리 묘사가 기가 막힌데, 오죽하면</tspan>
+        <tspan x="60" dy="22">주인공의 첫 살인 후 심정을 묘사한 4화에서는</tspan>
+        <tspan x="60" dy="22">"작가가 실제로 살인해 본 거 아니냐"는</tspan>
+        <tspan x="60" dy="22">말까지 나왔을 정도. 전개 방식의 큰 특징은</tspan>
+        <tspan x="60" dy="22">곳곳에 깔려 있는 복선과 암시. 덕분에</tspan>
+        <tspan x="60" dy="22">등장인물들 이름도 처음에는 제대로 나오지</tspan>
+        <tspan x="60" dy="22">않지만 만화를 보면서 독자들로 하여금 추리를</tspan>
+        <tspan x="60" dy="22">할 여지를 남기고 이야기에 몰입하게 하는</tspan>
+        <tspan x="60" dy="22">긍정적인 효과를 준다. 가령 송촌이나 노빈은</tspan>
+        <tspan x="60" dy="22">스토리상 비중이 큰 편인데도 등장하고</tspan>
+        <tspan x="60" dy="22">한참 뒤에야 이름이 나왔으며, 장난감 형사의</tspan>
+        <tspan x="60" dy="22">후배나 이탕의 친구는 조연이라고는 하지만</tspan>
+        <tspan x="60" dy="22">끝까지 이름 한번 안 나왔다. 주연도 4명</tspan>
+        <tspan x="60" dy="22">정도밖에 되지 않으므로 인물들을 헷갈릴</tspan>
+        <tspan x="60" dy="22">일은 아마 없을 것이다.</tspan>
+      </text>
+    </g>
+    
+    <!-- 4) 검은 띠들: 본문 위에 얹어서 일부를 가림 -->
+    <!-- 각 띠는 rect지만 rough-edge 필터로 가장자리가 잉크 번진 듯 들쭉날쭉 -->
+    <g id="black-bars">
+      <!-- 띠 1: 상단 ("우연한 사건을 계기로 살인자가" 부분 일부) -->
+      <rect x="180" y="138" width="260" height="28" fill="#0a0a0a" filter="url(#rough-edge)"/>
+      
+      <!-- 띠 2: "형사 장난감의" 부분 -->
+      <rect x="100" y="178" width="200" height="24" fill="#0a0a0a" filter="url(#rough-edge-2)"/>
+      
+      <!-- 띠 3: 가운데 큰 띠 -->
+      <rect x="50" y="240" width="380" height="34" fill="#0a0a0a" filter="url(#rough-edge)"/>
+      
+      <!-- 띠 4: 짧은 띠 -->
+      <rect x="200" y="295" width="180" height="22" fill="#0a0a0a" filter="url(#rough-edge-2)"/>
+      
+      <!-- 띠 5: "작가가 실제로 살인해" 부분 가리기 -->
+      <rect x="80" y="330" width="320" height="30" fill="#0a0a0a" filter="url(#rough-edge)"/>
+      
+      <!-- 띠 6: 중간 -->
+      <rect x="150" y="395" width="280" height="26" fill="#0a0a0a" filter="url(#rough-edge-2)"/>
+      
+      <!-- 띠 7: 긴 띠 -->
+      <rect x="40" y="440" width="380" height="32" fill="#0a0a0a" filter="url(#rough-edge)"/>
+      
+      <!-- 띠 8: 짧은 띠 두 개 -->
+      <rect x="70" y="500" width="140" height="22" fill="#0a0a0a" filter="url(#rough-edge-2)"/>
+      <rect x="280" y="500" width="160" height="22" fill="#0a0a0a" filter="url(#rough-edge)"/>
+      
+      <!-- 띠 9: "송촌이나 노빈" 부분 -->
+      <rect x="100" y="545" width="320" height="28" fill="#0a0a0a" filter="url(#rough-edge-2)"/>
+      
+      <!-- 띠 10: 하단 -->
+      <rect x="50" y="610" width="340" height="30" fill="#0a0a0a" filter="url(#rough-edge)"/>
+      
+      <!-- 띠 11: 마지막 큰 띠 -->
+      <rect x="120" y="660" width="300" height="26" fill="#0a0a0a" filter="url(#rough-edge-2)"/>
+    </g>
+    
+    <!-- 5) 좌측 세로 작은 텍스트 (저자명 자리 같은 디테일) -->
+    <text x="22" y="450" 
+          font-family="'Nanum Pen Script', cursive" 
+          font-size="14" 
+          fill="#444"
+          transform="rotate(-90, 22, 450)"
+          filter="url(#text-wobble)">독자ㅇ후기 모음</text>
+    
+    <!-- 6) 하단 부제 -->
+    <text x="40" y="755" 
+          font-family="'Gowun Batang', serif"
+          font-weight="700"
+          font-size="14" 
+          fill="#1a1a1a"
+          filter="url(#text-wobble)">복선과 암시는 디테일에서 시작된다</text>
+    
+    <!-- 7) 우측 하단 작은 로고 (원본의 사각형 도형 모방 - 단순 아이콘) -->
+    <g transform="translate(420, 730)">
+      <rect x="0" y="0" width="14" height="14" fill="none" stroke="#1a1a1a" stroke-width="2"/>
+      <rect x="18" y="0" width="14" height="14" fill="#1a1a1a"/>
+      <rect x="0" y="18" width="14" height="14" fill="#1a1a1a"/>
+      <rect x="18" y="18" width="14" height="14" fill="none" stroke="#1a1a1a" stroke-width="2"/>
+    </g>
+    
+  </g>
+</svg>
+
+<div class="hint" id="hint-text">클릭해서 종이를 구겨보세요</div>
+<button class="mode-toggle" id="mode-btn">드래그 모드</button>
+<button class="reset" id="reset-btn">리셋</button>
+
+<script>
+// ============================================
+// 변수
+// ============================================
+const svg = document.getElementById('poster-svg');
+const defs = document.getElementById('filter-defs');
+const layerStack = document.getElementById('layer-stack');
+const resetBtn = document.getElementById('reset-btn');
+const modeBtn = document.getElementById('mode-btn');
+const hintText = document.getElementById('hint-text');
+
+// 클릭 카운터 (필터 ID 충돌 방지)
+let clickCount = 0;
+
+// 드래그 모드
+let isDragMode = false;
+let isDragging = false;
+let dragPath = [];
+
+// 구김 자동 복구 타이머
+const crumpleTimers = new Map();
+
+// 원본 SVG 내용을 통째로 저장 (구김 패치가 이걸 복제해서 씀)
+// 단, base-crumple 적용 전의 raw 콘텐츠가 필요해서 layerStack의 innerHTML을 백업
+const originalContent = layerStack.innerHTML;
+
+// ============================================
+// 모드 토글
+// ============================================
+modeBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  isDragMode = !isDragMode;
+  modeBtn.classList.toggle('active', isDragMode);
+  hintText.textContent = isDragMode 
+    ? '드래그해서 종이를 구겨보세요' 
+    : '클릭해서 종이를 구겨보세요';
+});
+
+// ============================================
+// 클릭 → 그 자리에 구김 만들기
+// ============================================
+svg.addEventListener('click', (e) => {
+  if (e.target === resetBtn || e.target === modeBtn) return;
+  if (isDragMode) return; // 드래그 모드에서는 클릭 무시
+  
+  clickCount++;
+  
+  // 화면 좌표 → SVG 내부 좌표 변환
+  const pt = svg.createSVGPoint();
+  pt.x = e.clientX;
+  pt.y = e.clientY;
+  const svgPt = pt.matrixTransform(svg.getScreenCTM().inverse());
+  
+  // 포스터 흔들기 애니메이션
+  svg.classList.add('shake');
+  setTimeout(() => svg.classList.remove('shake'), 500);
+  
+  // 피 효과
+  createParticles(e.clientX, e.clientY);
+  
+  // 피 얼룩 (클릭 지점에 남김)
+  createBloodStain(e.clientX, e.clientY);
+  
+  // 웨이브 효과 (어두운 색으로)
+  createDarkWave(e.clientX, e.clientY);
+  
+  // 이 클릭만의 필터 만들기
+  const filterId = `crumple-${clickCount}`;
+  const filter = createCrumpleFilter(filterId, clickCount);
+  defs.appendChild(filter);
+  
+  // 클릭 위치 주변에 구김 패치 만들기
+  const patch = createCrumplePatch(svgPt.x, svgPt.y, filterId, false);
+  svg.appendChild(patch);
+});
+
+// ============================================
+// 드래그 → 경로를 따라 구김 만들기
+// ============================================
+svg.addEventListener('mousedown', (e) => {
+  if (!isDragMode) return;
+  if (e.target === resetBtn || e.target === modeBtn) return;
+  
+  isDragging = true;
+  dragPath = [];
+  
+  const pt = svg.createSVGPoint();
+  pt.x = e.clientX;
+  pt.y = e.clientY;
+  const svgPt = pt.matrixTransform(svg.getScreenCTM().inverse());
+  dragPath.push({ x: svgPt.x, y: svgPt.y });
+});
+
+svg.addEventListener('mousemove', (e) => {
+  if (!isDragging) return;
+  
+  const pt = svg.createSVGPoint();
+  pt.x = e.clientX;
+  pt.y = e.clientY;
+  const svgPt = pt.matrixTransform(svg.getScreenCTM().inverse());
+  
+  const lastPt = dragPath[dragPath.length - 1];
+  const dist = Math.sqrt((svgPt.x - lastPt.x) ** 2 + (svgPt.y - lastPt.y) ** 2);
+  
+  // 일정 거리마다 포인트 추가
+  if (dist > 20) {
+    dragPath.push({ x: svgPt.x, y: svgPt.y });
+  }
+});
+
+svg.addEventListener('mouseup', (e) => {
+  if (!isDragging) return;
+  isDragging = false;
+  
+  // 드래그 경로를 따라 구김 생성
+  if (dragPath.length > 1) {
+    dragPath.forEach((pt, i) => {
+      setTimeout(() => {
+        clickCount++;
+        const filterId = `crumple-${clickCount}`;
+        const filter = createCrumpleFilter(filterId, clickCount);
+        defs.appendChild(filter);
+        
+        const patch = createCrumplePatch(pt.x, pt.y, filterId, false);
+        svg.appendChild(patch);
+      }, i * 30); // 순차적으로 생성 (애니메이션 효과)
+    });
+  }
+  
+  dragPath = [];
+});
+
+svg.addEventListener('mouseleave', () => {
+  isDragging = false;
+  dragPath = [];
+});
+
+// ============================================
+// 클릭마다 새 필터 (다른 노이즈 + 그림자/하이라이트)
+// ============================================
+function createCrumpleFilter(id, seed) {
+  const NS = 'http://www.w3.org/2000/svg';
+  
+  const filter = document.createElementNS(NS, 'filter');
+  filter.setAttribute('id', id);
+  filter.setAttribute('x', '-50%');
+  filter.setAttribute('y', '-50%');
+  filter.setAttribute('width', '200%');
+  filter.setAttribute('height', '200%');
+  
+  // 1. 노이즈 생성 (구김 패턴)
+  const turb = document.createElementNS(NS, 'feTurbulence');
+  turb.setAttribute('type', 'turbulence');
+  const freq = (0.03 + Math.random() * 0.04).toFixed(3);
+  turb.setAttribute('baseFrequency', freq);
+  turb.setAttribute('numOctaves', '3');
+  turb.setAttribute('seed', seed);
+  turb.setAttribute('result', 'turb');
+  
+  // 2. 왜곡 적용
+  const disp = document.createElementNS(NS, 'feDisplacementMap');
+  disp.setAttribute('in', 'SourceGraphic');
+  disp.setAttribute('in2', 'turb');
+  disp.setAttribute('scale', (20 + Math.random() * 20).toFixed(0));
+  disp.setAttribute('xChannelSelector', 'R');
+  disp.setAttribute('yChannelSelector', 'G');
+  disp.setAttribute('result', 'displaced');
+  
+  // 3. 그림자 생성 (구김 음영)
+  const blur = document.createElementNS(NS, 'feGaussianBlur');
+  blur.setAttribute('in', 'turb');
+  blur.setAttribute('stdDeviation', '3');
+  blur.setAttribute('result', 'blurred');
+  
+  const colorMatrix = document.createElementNS(NS, 'feColorMatrix');
+  colorMatrix.setAttribute('in', 'blurred');
+  colorMatrix.setAttribute('type', 'matrix');
+  colorMatrix.setAttribute('values', '0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.3 0');
+  colorMatrix.setAttribute('result', 'shadow');
+  
+  const offset = document.createElementNS(NS, 'feOffset');
+  offset.setAttribute('in', 'shadow');
+  offset.setAttribute('dx', '2');
+  offset.setAttribute('dy', '2');
+  offset.setAttribute('result', 'offsetShadow');
+  
+  // 4. 하이라이트 생성 (구김 봉우리)
+  const colorMatrix2 = document.createElementNS(NS, 'feColorMatrix');
+  colorMatrix2.setAttribute('in', 'blurred');
+  colorMatrix2.setAttribute('type', 'matrix');
+  colorMatrix2.setAttribute('values', '0 0 0 0 1  0 0 0 0 1  0 0 0 0 0.9  0 0 0 0.2 0');
+  colorMatrix2.setAttribute('result', 'highlight');
+  
+  const offset2 = document.createElementNS(NS, 'feOffset');
+  offset2.setAttribute('in', 'highlight');
+  offset2.setAttribute('dx', '-1');
+  offset2.setAttribute('dy', '-1');
+  offset2.setAttribute('result', 'offsetHighlight');
+  
+  // 5. 합성
+  const merge = document.createElementNS(NS, 'feMerge');
+  merge.innerHTML = `
+    <feMergeNode in="offsetShadow"/>
+    <feMergeNode in="displaced"/>
+    <feMergeNode in="offsetHighlight"/>
+  `;
+  
+  filter.appendChild(turb);
+  filter.appendChild(disp);
+  filter.appendChild(blur);
+  filter.appendChild(colorMatrix);
+  filter.appendChild(offset);
+  filter.appendChild(colorMatrix2);
+  filter.appendChild(offset2);
+  filter.appendChild(merge);
+  
+  return filter;
+}
+
+// ============================================
+// 구김 패치: 클릭 위치 주변 원형 영역만 구겨진 포스터 복제본
+// ============================================
+function createCrumplePatch(cx, cy, filterId, shouldTear = false) {
+  const NS = 'http://www.w3.org/2000/svg';
+  
+  const radius = 80 + Math.random() * 60;
+  
+  // 마스크 정의 (원형 + 가장자리 부드럽게)
+  const maskId = `mask-${filterId}`;
+  const gradId = `grad-${filterId}`;
+  
+  const grad = document.createElementNS(NS, 'radialGradient');
+  grad.setAttribute('id', gradId);
+  grad.innerHTML = `
+    <stop offset="0%" stop-color="white" stop-opacity="1"/>
+    <stop offset="70%" stop-color="white" stop-opacity="1"/>
+    <stop offset="100%" stop-color="white" stop-opacity="0"/>
+  `;
+  
+  const mask = document.createElementNS(NS, 'mask');
+  mask.setAttribute('id', maskId);
+  mask.innerHTML = `<circle cx="${cx}" cy="${cy}" r="${radius}" fill="url(#${gradId})"/>`;
+  
+  defs.appendChild(grad);
+  defs.appendChild(mask);
+  
+  // 포스터 전체를 다시 그리는 g 그룹, 단 필터+마스크 적용
+  const patch = document.createElementNS(NS, 'g');
+  patch.setAttribute('filter', `url(#${filterId})`);
+  patch.setAttribute('mask', `url(#${maskId})`);
+  patch.setAttribute('data-patch-id', filterId);
+  patch.innerHTML = originalContent; // 백업해둔 원본 내용 복제
+  
+  // 등장 효과 (펄스 애니메이션)
+  patch.style.opacity = '0';
+  patch.style.transform = 'scale(0.8)';
+  patch.style.transformOrigin = `${cx}px ${cy}px`;
+  patch.style.transition = 'opacity 0.2s ease-out, transform 0.2s ease-out';
+  requestAnimationFrame(() => {
+    patch.style.opacity = '1';
+    patch.style.transform = 'scale(1)';
+  });
+  
+  // 찢어짐 효과 (랜덤 확률 높임)
+  if (shouldTear || Math.random() < 0.3) { // 30% 확률
+    addTearEffect(cx, cy, radius);
+  }
+  
+  // 자동 복구 타이머 (5초 후 천천히 펴짐 + 스케일 애니메이션)
+  const timerId = setTimeout(() => {
+    patch.style.transition = 'opacity 2s ease-out, transform 2s ease-out';
+    patch.style.opacity = '0';
+    patch.style.transform = 'scale(0.8)';
+    
+    setTimeout(() => {
+      patch.remove();
+      // 필터/마스크/그라데이션도 제거
+      document.getElementById(filterId)?.remove();
+      document.getElementById(maskId)?.remove();
+      document.getElementById(gradId)?.remove();
+      crumpleTimers.delete(filterId);
+    }, 2000);
+  }, 5000);
+  
+  crumpleTimers.set(filterId, timerId);
+  
+  return patch;
+}
+
+// ============================================
+// 파티클 효과 → 피 효과로 변경
+// ============================================
+function createParticles(x, y) {
+  // 피 튀김 효과
+  createBloodSplatter(x, y);
+  
+  // 피 방울 떨어지기 (개수 증가)
+  const dropCount = 5 + Math.floor(Math.random() * 5); // 5~9개
+  for (let i = 0; i < dropCount; i++) {
+    setTimeout(() => {
+      createBloodDrop(x + (Math.random() - 0.5) * 60, y);
+    }, i * 80); // 더 빠른 간격
+  }
+}
+
+// 피 튀김
+function createBloodSplatter(x, y) {
+  const splatterCount = 12;
+  
+  for (let i = 0; i < splatterCount; i++) {
+    const splatter = document.createElement('div');
+    splatter.className = 'blood-splatter';
+    
+    const angle = (Math.PI * 2 * i) / splatterCount + (Math.random() - 0.5) * 0.5;
+    const distance = 30 + Math.random() * 40;
+    const size = 3 + Math.random() * 5;
+    
+    splatter.style.left = x + 'px';
+    splatter.style.top = y + 'px';
+    splatter.style.width = size + 'px';
+    splatter.style.height = size + 'px';
+    splatter.style.background = `radial-gradient(circle, #8b0000, #5a0000)`;
+    splatter.style.borderRadius = '50%';
+    splatter.style.opacity = '0';
+    splatter.style.transition = 'all 0.3s ease-out';
+    
+    document.body.appendChild(splatter);
+    
+    requestAnimationFrame(() => {
+      splatter.style.opacity = '0.8';
+      splatter.style.transform = `translate(${Math.cos(angle) * distance}px, ${Math.sin(angle) * distance}px)`;
+    });
+    
+    setTimeout(() => {
+      splatter.style.opacity = '0';
+      setTimeout(() => splatter.remove(), 300);
+    }, 1500);
+  }
+}
+
+// 피 방울 떨어지기 (강화)
+function createBloodDrop(x, y) {
+  const drop = document.createElement('div');
+  drop.className = 'blood-drop';
+  
+  // 랜덤 크기
+  const size = 6 + Math.random() * 8;
+  drop.style.width = size + 'px';
+  drop.style.height = (size * 1.5) + 'px';
+  
+  // 랜덤 수평 이동
+  const horizontalOffset = (Math.random() - 0.5) * 60;
+  drop.style.left = x + 'px';
+  drop.style.top = y + 'px';
+  drop.style.setProperty('--horizontal-offset', horizontalOffset + 'px');
+  
+  // 랜덤 속도
+  const duration = 1.5 + Math.random() * 1;
+  drop.style.animationDuration = duration + 's';
+  
+  document.body.appendChild(drop);
+  
+  // 떨어진 곳에 작은 얼룩 생성
+  setTimeout(() => {
+    const finalY = y + 200;
+    const finalX = x + horizontalOffset;
+    createSmallStain(finalX, finalY);
+    drop.remove();
+  }, duration * 1000);
+}
+
+// 작은 피 얼룩 (방울이 떨어진 자리)
+function createSmallStain(x, y) {
+  const stain = document.createElement('div');
+  stain.className = 'blood-stain small';
+  
+  const size = 10 + Math.random() * 15;
+  stain.style.left = (x - size / 2) + 'px';
+  stain.style.top = (y - size / 2) + 'px';
+  stain.style.width = size + 'px';
+  stain.style.height = size + 'px';
+  
+  document.body.appendChild(stain);
+  
+  // 15초 후 사라짐
+  setTimeout(() => {
+    stain.style.transition = 'opacity 2s ease-out';
+    stain.style.opacity = '0';
+    setTimeout(() => stain.remove(), 2000);
+  }, 15000);
+}
+
+// 피 얼룩 (클릭 지점에 남김 - 강화)
+function createBloodStain(x, y) {
+  const stain = document.createElement('div');
+  stain.className = 'blood-stain large';
+  
+  const size = 60 + Math.random() * 80;
+  stain.style.left = (x - size / 2) + 'px';
+  stain.style.top = (y - size / 2) + 'px';
+  stain.style.width = size + 'px';
+  stain.style.height = size + 'px';
+  
+  // 불규칙한 모양 (여러 원을 겹쳐서)
+  const innerStains = 3 + Math.floor(Math.random() * 3);
+  for (let i = 0; i < innerStains; i++) {
+    const inner = document.createElement('div');
+    inner.className = 'blood-stain-inner';
+    
+    const innerSize = size * (0.3 + Math.random() * 0.4);
+    const offsetX = (Math.random() - 0.5) * size * 0.4;
+    const offsetY = (Math.random() - 0.5) * size * 0.4;
+    
+    inner.style.width = innerSize + 'px';
+    inner.style.height = innerSize + 'px';
+    inner.style.left = (size / 2 + offsetX - innerSize / 2) + 'px';
+    inner.style.top = (size / 2 + offsetY - innerSize / 2) + 'px';
+    
+    stain.appendChild(inner);
+  }
+  
+  document.body.appendChild(stain);
+  
+  // 15초 후 서서히 사라짐
+  setTimeout(() => {
+    stain.style.transition = 'opacity 3s ease-out';
+    stain.style.opacity = '0';
+    setTimeout(() => stain.remove(), 3000);
+  }, 15000);
+}
+
+// ============================================
+// 웨이브 효과 (어두운 버전)
+// ============================================
+function createDarkWave(x, y) {
+  const wave = document.createElement('div');
+  wave.className = 'crumple-wave';
+  wave.style.left = (x - 100) + 'px';
+  wave.style.top = (y - 100) + 'px';
+  wave.style.borderColor = 'rgba(139, 0, 0, 0.5)'; // 피 색상
+  
+  document.body.appendChild(wave);
+  
+  setTimeout(() => wave.remove(), 800);
+}
+
+// ============================================
+// 찢어짐 효과
+// ============================================
+function addTearEffect(cx, cy, radius) {
+  const NS = 'http://www.w3.org/2000/svg';
+  
+  // 불규칙한 찢어진 선 생성
+  const tearLine = document.createElementNS(NS, 'path');
+  
+  const angle = Math.random() * Math.PI * 2;
+  const length = radius * 0.8;
+  const startX = cx - Math.cos(angle) * length / 2;
+  const startY = cy - Math.sin(angle) * length / 2;
+  const endX = cx + Math.cos(angle) * length / 2;
+  const endY = cy + Math.sin(angle) * length / 2;
+  
+  // 불규칙한 경로 생성
+  let pathData = `M ${startX} ${startY}`;
+  const segments = 8;
+  for (let i = 1; i <= segments; i++) {
+    const t = i / segments;
+    const x = startX + (endX - startX) * t + (Math.random() - 0.5) * 10;
+    const y = startY + (endY - startY) * t + (Math.random() - 0.5) * 10;
+    pathData += ` L ${x} ${y}`;
+  }
+  
+  tearLine.setAttribute('d', pathData);
+  tearLine.setAttribute('stroke', '#5a0000'); // 어두운 피 색상
+  tearLine.setAttribute('stroke-width', '4');
+  tearLine.setAttribute('fill', 'none');
+  tearLine.setAttribute('filter', 'url(#rough-edge)');
+  tearLine.setAttribute('stroke-dasharray', length);
+  tearLine.setAttribute('stroke-dashoffset', length);
+  tearLine.style.opacity = '0';
+  tearLine.style.transition = 'opacity 0.3s ease-out, stroke-dashoffset 0.5s ease-out';
+  tearLine.classList.add('tear-mark');
+  
+  svg.appendChild(tearLine);
+  
+  // 찢어지는 애니메이션 (선이 그려지는 효과)
+  requestAnimationFrame(() => {
+    tearLine.style.opacity = '1';
+    tearLine.style.strokeDashoffset = '0';
+  });
+  
+  // 5초 후 제거
+  setTimeout(() => {
+    tearLine.style.opacity = '0';
+    setTimeout(() => tearLine.remove(), 300);
+  }, 5000);
+}
+
+// ============================================
+// 리셋
+// ============================================
+resetBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  
+  // svg 직속 g 중 layer-stack 외의 것들(=구김 패치) 제거
+  svg.querySelectorAll('g').forEach(g => {
+    if (g.id !== 'layer-stack' && g.parentNode === svg) {
+      g.remove();
+    }
+  });
+  
+  // 동적 생성된 필터/마스크/그라데이션 제거
+  defs.querySelectorAll('filter').forEach(f => {
+    if (!['base-crumple', 'rough-edge', 'rough-edge-2', 'paper-grain', 'text-wobble'].includes(f.id)) {
+      f.remove();
+    }
+  });
+  defs.querySelectorAll('mask').forEach(m => m.remove());
+  defs.querySelectorAll('radialGradient').forEach(g => g.remove());
+  
+  clickCount = 0;
+});
+</script>
+
+</body>
+</html>
