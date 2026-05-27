@@ -6,17 +6,18 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Do+Hyeon&family=Jua&family=Noto+Sans+KR:wght@900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Noto+Sans+KR:wght@900&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #1A1A1A;
-    --postit: #FFC600;
+    --bg: #1A7CFF;
+    --postit: #FFFFFF;
+    --border: #1A7CFF;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body {
     background: var(--bg);
     min-height: 100vh;
-    overflow-x: hidden;
+    overflow: hidden;
   }
   body {
     font-family: "Black Han Sans", "Noto Sans KR", sans-serif;
@@ -25,13 +26,13 @@
     align-items: center;
     justify-content: center;
     min-height: 100vh;
-    padding: 48px 40px 80px;
   }
 
   .stage {
     position: relative;
     width: 100%;
     max-width: 900px;
+    padding: 48px 40px;
   }
 
   .canvas-wrap {
@@ -43,11 +44,33 @@
   .postit {
     position: absolute;
     background: var(--postit);
-    will-change: transform;
+    border: 1px solid var(--border);
     border-radius: 1px;
     pointer-events: none;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.3);
-    transition: transform 0.3s ease-out, opacity 0.3s ease-out;
+    opacity: 0;
+    animation: flutter-down 0.8s ease-out forwards;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  }
+
+  @keyframes flutter-down {
+    0% {
+      opacity: 0;
+      transform: translateY(-60px) rotate(var(--start-rot)) scale(0.5);
+    }
+    30% {
+      opacity: 1;
+      transform: translateY(-20px) rotate(calc(var(--start-rot) * -0.5)) scale(1.05);
+    }
+    60% {
+      transform: translateY(5px) rotate(calc(var(--end-rot) * 1.2)) scale(0.98);
+    }
+    80% {
+      transform: translateY(-2px) rotate(calc(var(--end-rot) * 0.8)) scale(1.01);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0) rotate(var(--end-rot)) scale(var(--end-sc));
+    }
   }
 
   .footnote {
@@ -58,10 +81,23 @@
     font-weight: 700;
     letter-spacing: 0.06em;
     text-transform: uppercase;
-    color: rgba(255,255,255,0.4);
+    color: rgba(255,255,255,0.5);
     line-height: 1.5;
     pointer-events: none;
   }
+
+  .input-hint {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: rgba(255,255,255,0.3);
+    font-size: 24px;
+    letter-spacing: 0.05em;
+    pointer-events: none;
+    transition: opacity 0.5s;
+  }
+  .input-hint.hidden { opacity: 0; }
 
   /* 비네팅 */
   .stage::after {
@@ -69,21 +105,24 @@
     position: fixed;
     inset: 0;
     pointer-events: none;
-    background: radial-gradient(120% 80% at 50% 50%, transparent 55%, rgba(0,0,0,0.4) 100%);
+    background: radial-gradient(120% 80% at 50% 50%, transparent 60%, rgba(0,0,0,0.15) 100%);
   }
 
-  /* 숨겨진 캔버스 */
   #sampler { position: absolute; left: -99999px; top: 0; }
 
-  /* 힌트 */
-  .hint {
+  /* 커서 깜빡임 */
+  .cursor-blink {
     position: fixed;
     bottom: 30px;
     right: 40px;
-    color: rgba(255,255,255,0.3);
-    font-size: 11px;
-    letter-spacing: 0.05em;
-    pointer-events: none;
+    color: rgba(255,255,255,0.6);
+    font-size: 13px;
+    letter-spacing: 0.03em;
+    animation: blink 1s step-end infinite;
+  }
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
   }
 </style>
 </head>
@@ -95,70 +134,61 @@
   <div class="canvas-wrap" id="wrap"></div>
 </div>
 
-<div class="footnote">
-  DAY31 — POST-IT TYPE<br/>
-  판단의언어란
-</div>
+<div class="input-hint" id="hint">타이핑하세요...</div>
+<div class="cursor-blink" id="cursor-display">|</div>
 
-<div class="hint">hover to scatter</div>
+<div class="footnote">
+  WELTFORM.AT<br/>
+  POSTITPOSTER.COM
+</div>
 
 <script>
 // ============================================
 // 설정
 // ============================================
 const CONFIG = {
-  headline: '판단의\n언어란',
   fontFamily: 'Black Han Sans',
   fontWeight: 900,
   letterSpacing: -3,
   lineHeight: 1.06,
   postitSize: 22,
-  postitSpacing: 14,
-  rotJitter: 30,
-  posJitter: 5,
-  scaleJitter: 0.15,
+  postitSpacing: 13,
+  rotJitter: 34,
+  posJitter: 6,
+  scaleJitter: 0.16,
   threshold: 140,
-  postitColor: '#FFC600',
-  borderColor: '#1A1A1A',
-  borderWidth: 0.5,
 };
 
-// ============================================
-// 픽셀 샘플링: 텍스트 → 포스트잇 위치
-// ============================================
-function samplePostits(text, opts) {
-  const {
-    fontFamily, fontWeight, letterSpacing, lineHeight,
-    postitSize, postitSpacing, threshold, maxWidth,
-  } = opts;
+let currentText = '';
+let previousPostits = 0;
 
+// ============================================
+// 픽셀 샘플링
+// ============================================
+function samplePostits(text, maxWidth) {
   const canvas = document.getElementById('sampler');
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
 
   const lines = text.split('\n').filter(l => l.length > 0);
   if (lines.length === 0) return { items: [], width: 0, height: 0 };
 
-  // 측정용 폰트 크기
   const measureSize = 200;
-  ctx.font = `${fontWeight} ${measureSize}px ${fontFamily}, sans-serif`;
+  ctx.font = `${CONFIG.fontWeight} ${measureSize}px ${CONFIG.fontFamily}, sans-serif`;
   ctx.textBaseline = 'alphabetic';
 
-  // 가장 긴 줄 측정
   let longest = 0;
   for (const l of lines) longest = Math.max(longest, ctx.measureText(l).width);
 
-  const lsAtMeasure = letterSpacing * (measureSize / 100);
+  const lsAtMeasure = CONFIG.letterSpacing * (measureSize / 100);
   const widestLineCharCount = Math.max(...lines.map(l => l.length));
   longest += lsAtMeasure * (widestLineCharCount - 1);
 
-  // maxWidth의 94%에 맞추기
   const target = maxWidth * 0.94;
   const scale = target / Math.max(longest, 1);
   const fontSize = measureSize * scale;
   const ls = lsAtMeasure * scale;
-  const lh = fontSize * lineHeight;
+  const lh = fontSize * CONFIG.lineHeight;
 
-  // 캔버스 크기
   const W = Math.ceil(maxWidth);
   const H = Math.ceil(lh * lines.length + fontSize * 0.3);
   canvas.width = W;
@@ -166,10 +196,9 @@ function samplePostits(text, opts) {
 
   ctx.clearRect(0, 0, W, H);
   ctx.fillStyle = '#000';
-  ctx.font = `${fontWeight} ${fontSize}px ${fontFamily}, sans-serif`;
+  ctx.font = `${CONFIG.fontWeight} ${fontSize}px ${CONFIG.fontFamily}, sans-serif`;
   ctx.textBaseline = 'alphabetic';
 
-  // 각 줄 그리기 (letter-spacing 수동 적용)
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     const y = (i + 1) * lh - fontSize * 0.18;
@@ -190,15 +219,14 @@ function samplePostits(text, opts) {
     }
   }
 
-  // 샘플링
   const data = ctx.getImageData(0, 0, W, H).data;
-  const step = postitSpacing;
+  const step = CONFIG.postitSpacing;
   const items = [];
 
   for (let y = 0; y < H; y += step) {
     for (let x = 0; x < W; x += step) {
-      const idx = (y * W + x) * 4 + 3; // alpha 채널
-      if (data[idx] > threshold) {
+      const idx = (y * W + x) * 4 + 3;
+      if (data[idx] > CONFIG.threshold) {
         items.push({ x, y });
       }
     }
@@ -208,17 +236,29 @@ function samplePostits(text, opts) {
 }
 
 // ============================================
-// 포스트잇 렌더링
+// 렌더링 (새 포스트잇만 애니메이션)
 // ============================================
-function renderPostits(wrap, sample, opts) {
-  const { postitSize, rotJitter, posJitter, scaleJitter, postitColor, borderColor, borderWidth } = opts;
+function render() {
+  const wrap = document.getElementById('wrap');
+  const stageW = Math.min(900, window.innerWidth - 80);
 
-  // 시드 기반 랜덤 (안정적인 레이아웃)
-  let seed = 1 + (CONFIG.headline.length * 13) + Math.floor(postitSize * 7);
+  if (currentText.length === 0) {
+    wrap.innerHTML = '';
+    wrap.style.width = '0';
+    wrap.style.height = '0';
+    previousPostits = 0;
+    return;
+  }
+
+  const sample = samplePostits(currentText, stageW);
+  const { postitSize, rotJitter, posJitter, scaleJitter } = CONFIG;
+
+  // 시드 기반 랜덤
+  let seed = 1 + (currentText.length * 13) + Math.floor(postitSize * 7);
   const rng = () => { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; };
 
   let html = '';
-  for (const it of sample.items) {
+  sample.items.forEach((it, idx) => {
     const rot = (rng() * 2 - 1) * rotJitter;
     const ox = (rng() * 2 - 1) * posJitter;
     const oy = (rng() * 2 - 1) * posJitter;
@@ -226,99 +266,74 @@ function renderPostits(wrap, sample, opts) {
     const px = it.x + ox - postitSize / 2;
     const py = it.y + oy - postitSize / 2;
 
-    html += `<div class="postit" 
-      data-ox="${ox.toFixed(1)}" data-oy="${oy.toFixed(1)}"
-      data-rot="${rot.toFixed(1)}" data-sc="${sc.toFixed(3)}"
-      style="
-        left:${px.toFixed(1)}px;
-        top:${py.toFixed(1)}px;
-        width:${postitSize}px;
-        height:${postitSize}px;
-        transform:rotate(${rot.toFixed(1)}deg) scale(${sc.toFixed(3)});
-        background:${postitColor};
-        border:${borderWidth}px solid ${borderColor};
-      "></div>`;
-  }
+    // 새로 추가된 포스트잇만 애니메이션
+    const isNew = idx >= previousPostits;
+    const delay = isNew ? (idx - previousPostits) * 3 : 0; // 3ms 간격
+    const startRot = (rng() * 2 - 1) * 60;
+
+    html += `<div class="postit" style="
+      left:${px.toFixed(1)}px;
+      top:${py.toFixed(1)}px;
+      width:${postitSize}px;
+      height:${postitSize}px;
+      --start-rot:${startRot.toFixed(1)}deg;
+      --end-rot:${rot.toFixed(1)}deg;
+      --end-sc:${sc.toFixed(3)};
+      ${isNew ? `animation-delay:${delay}ms;` : `opacity:1;transform:rotate(${rot.toFixed(1)}deg) scale(${sc.toFixed(3)});`}
+    "></div>`;
+  });
 
   wrap.style.width = sample.width + 'px';
   wrap.style.height = sample.height + 'px';
   wrap.innerHTML = html;
+
+  previousPostits = sample.items.length;
 }
 
 // ============================================
-// 인터랙션: 마우스 hover → 포스트잇 흩어짐
+// 키보드 입력
 // ============================================
-function setupInteraction(wrap) {
-  const postits = wrap.querySelectorAll('.postit');
-  const RADIUS = 120;
-  const FORCE = 40;
+const hint = document.getElementById('hint');
+const cursorDisplay = document.getElementById('cursor-display');
 
-  wrap.addEventListener('mousemove', (e) => {
-    const rect = wrap.getBoundingClientRect();
-    const mx = e.clientX - rect.left;
-    const my = e.clientY - rect.top;
+document.addEventListener('keydown', (e) => {
+  // 무시할 키
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.key === 'Tab' || e.key === 'Escape') return;
 
-    postits.forEach(p => {
-      const px = parseFloat(p.style.left) + CONFIG.postitSize / 2;
-      const py = parseFloat(p.style.top) + CONFIG.postitSize / 2;
+  hint.classList.add('hidden');
 
-      const dx = px - mx;
-      const dy = py - my;
-      const dist = Math.sqrt(dx * dx + dy * dy);
+  if (e.key === 'Backspace') {
+    currentText = currentText.slice(0, -1);
+    previousPostits = 0; // 전체 다시 그리기
+  } else if (e.key === 'Enter') {
+    currentText += '\n';
+  } else if (e.key.length === 1) {
+    currentText += e.key;
+  } else {
+    return;
+  }
 
-      if (dist < RADIUS) {
-        const factor = (1 - dist / RADIUS) * FORCE;
-        const angle = Math.atan2(dy, dx);
-        const pushX = Math.cos(angle) * factor;
-        const pushY = Math.sin(angle) * factor;
-        const rot = parseFloat(p.dataset.rot) + pushX * 0.5;
-        const sc = parseFloat(p.dataset.sc);
+  // 커서 표시 업데이트
+  cursorDisplay.textContent = currentText.replace(/\n/g, '↵') + '|';
 
-        p.style.transform = `translate(${pushX.toFixed(1)}px, ${pushY.toFixed(1)}px) rotate(${rot.toFixed(1)}deg) scale(${sc})`;
-      } else {
-        // 원래 위치로 복귀
-        const rot = p.dataset.rot;
-        const sc = p.dataset.sc;
-        p.style.transform = `rotate(${rot}deg) scale(${sc})`;
-      }
-    });
-  });
+  render();
+});
 
-  // 마우스 나가면 전부 원위치
-  wrap.addEventListener('mouseleave', () => {
-    postits.forEach(p => {
-      const rot = p.dataset.rot;
-      const sc = p.dataset.sc;
-      p.style.transform = `rotate(${rot}deg) scale(${sc})`;
-    });
-  });
-}
+// 초기 텍스트로 시작
+currentText = '판단의\n언어란';
+hint.classList.add('hidden');
+cursorDisplay.textContent = currentText.replace(/\n/g, '↵') + '|';
 
-// ============================================
-// 초기화
-// ============================================
-function init() {
-  const wrap = document.getElementById('wrap');
-  const stageW = Math.min(900, window.innerWidth - 80);
+// 폰트 로드 후 렌더링
+document.fonts.ready.then(() => {
+  render();
+});
 
-  const opts = {
-    ...CONFIG,
-    maxWidth: stageW,
-  };
-
-  // 폰트 로드 후 렌더링
-  document.fonts.ready.then(() => {
-    const sample = samplePostits(CONFIG.headline, opts);
-    renderPostits(wrap, sample, opts);
-    setupInteraction(wrap);
-  });
-}
-
-init();
-
-// 리사이즈 대응
+// 리사이즈
 window.addEventListener('resize', () => {
-  init();
+  previousPostits = 0;
+  render();
 });
 </script>
 
