@@ -449,84 +449,112 @@ function spawnFallingPapers(count) {
 }
 
 // ============================================
-// SVG 유기적 종이 모양 생성
+// SVG 유기적 종이 모양 생성 (곡선 기반)
 // ============================================
 function createPaperSVG(size) {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   svg.setAttribute('width', size);
   svg.setAttribute('height', size);
-  svg.setAttribute('viewBox', '0 0 100 100');
+  svg.setAttribute('viewBox', '0 0 100 120');
   svg.style.overflow = 'visible';
   
-  // 랜덤 종이 형태 (모서리 접힘, 휘어짐)
-  const type = Math.floor(Math.random() * 4);
+  // 랜덤 곡선 종이 형태
+  const type = Math.floor(Math.random() * 5);
+  const r = () => (Math.random() * 10 - 5).toFixed(1); // 미세 랜덤
   
-  let pathData, foldPath, shadowPath;
+  let mainPath, foldPath;
   
   switch(type) {
     case 0:
-      // 모서리 하나 접힌 종이
-      pathData = 'M 15,5 L 85,8 L 82,70 L 70,72 L 68,85 L 12,80 Z';
-      foldPath = 'M 70,72 L 82,70 L 80,82 Z';
-      shadowPath = 'M 70,72 L 68,85 L 80,82 Z';
+      // 전체가 S자로 휘어진 종이
+      mainPath = `M 10,10 
+        C ${20+r()},${5+r()} ${80+r()},${5+r()} 90,12 
+        C ${95+r()},${40+r()} ${92+r()},${70+r()} 88,95 
+        C ${75+r()},${100+r()} ${25+r()},${105+r()} 12,98 
+        C ${5+r()},${70+r()} ${8+r()},${40+r()} 10,10 Z`;
+      foldPath = `M 65,8 C 75,5 85,8 90,12 C 88,20 82,25 75,22 C 70,18 68,12 65,8 Z`;
       break;
     case 1:
-      // 위쪽이 말린 종이
-      pathData = 'M 10,20 Q 30,5 50,8 Q 70,5 90,18 L 88,85 L 12,82 Z';
-      foldPath = 'M 10,20 Q 30,12 50,14 Q 70,12 90,18 L 88,22 Q 70,16 50,18 Q 30,16 12,22 Z';
-      shadowPath = null;
+      // 위쪽이 크게 말린 종이
+      mainPath = `M 8,30 
+        C ${15+r()},${10+r()} ${85+r()},${8+r()} 92,28 
+        L 90,95 
+        C ${75+r()},${100+r()} ${25+r()},${102+r()} 10,97 Z`;
+      foldPath = `M 8,30 
+        C 15,10 85,8 92,28 
+        C 85,22 70,18 50,20 
+        C 30,22 15,25 8,30 Z`;
       break;
     case 2:
-      // 살짝 기울어진 평평한 종이 (원근감)
-      pathData = 'M 8,12 L 92,8 L 95,88 L 5,92 Z';
+      // 물결치는 종이 (양쪽이 말림)
+      mainPath = `M 15,15 
+        C ${40+r()},${5+r()} ${60+r()},${5+r()} 85,15 
+        C ${95+r()},${45+r()} ${90+r()},${75+r()} 85,100 
+        C ${60+r()},${110+r()} ${40+r()},${110+r()} 15,100 
+        C ${5+r()},${75+r()} ${8+r()},${45+r()} 15,15 Z`;
       foldPath = null;
-      shadowPath = null;
       break;
     case 3:
-      // 모서리 두 개 접힌 종이
-      pathData = 'M 20,5 L 80,8 L 85,65 L 75,68 L 72,85 L 25,88 L 22,75 L 12,72 Z';
-      foldPath = 'M 85,65 L 75,68 L 78,78 Z';
-      shadowPath = 'M 12,72 L 22,75 L 18,82 Z';
+      // 한쪽이 접혀 올라간 종이
+      mainPath = `M 10,10 
+        C ${30+r()},${8+r()} ${70+r()},${6+r()} 90,10 
+        C ${93+r()},${50+r()} ${90+r()},${80+r()} 85,105 
+        C ${60+r()},${108+r()} ${30+r()},${110+r()} 12,105 
+        C ${8+r()},${70+r()} ${7+r()},${40+r()} 10,10 Z`;
+      foldPath = `M 70,6 C 80,5 88,8 90,10 C 85,18 78,22 72,18 C 68,14 69,9 70,6 Z`;
+      break;
+    case 4:
+      // 크게 구부러진 종이 (C자 형태)
+      mainPath = `M 20,8 
+        C ${50+r()},${2+r()} ${80+r()},${10+r()} 88,25 
+        C ${92+r()},${50+r()} ${85+r()},${80+r()} 75,100 
+        C ${55+r()},${112+r()} ${30+r()},${108+r()} 15,95 
+        C ${8+r()},${65+r()} ${12+r()},${35+r()} 20,8 Z`;
+      foldPath = `M 75,100 C 82,95 88,85 85,80 C 78,88 70,95 65,98 C 68,100 72,101 75,100 Z`;
       break;
   }
+  
+  // 그림자 (뒤에 깔림)
+  const shadow = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  shadow.setAttribute('d', mainPath);
+  shadow.setAttribute('fill', 'rgba(0,0,0,0.08)');
+  shadow.setAttribute('transform', 'translate(3, 4)');
+  svg.appendChild(shadow);
   
   // 메인 종이
   const paper = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-  paper.setAttribute('d', pathData);
+  paper.setAttribute('d', mainPath);
   paper.setAttribute('fill', '#FFFFFF');
   paper.setAttribute('stroke', '#1A7CFF');
-  paper.setAttribute('stroke-width', '1.5');
+  paper.setAttribute('stroke-width', '1.2');
+  paper.setAttribute('stroke-linejoin', 'round');
   svg.appendChild(paper);
   
-  // 접힌 부분 (밝은 회색)
+  // 접힌 부분
   if (foldPath) {
     const fold = document.createElementNS('http://www.w3.org/2000/svg', 'path');
     fold.setAttribute('d', foldPath);
-    fold.setAttribute('fill', '#e8e8e8');
+    fold.setAttribute('fill', '#e0e4e8');
     fold.setAttribute('stroke', '#1A7CFF');
-    fold.setAttribute('stroke-width', '1');
+    fold.setAttribute('stroke-width', '0.8');
     svg.appendChild(fold);
   }
   
-  // 그림자 부분 (뒷면 비침)
-  if (shadowPath) {
-    const shadow = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    shadow.setAttribute('d', shadowPath);
-    shadow.setAttribute('fill', '#d0d0d0');
-    shadow.setAttribute('stroke', '#1A7CFF');
-    shadow.setAttribute('stroke-width', '0.8');
-    svg.appendChild(shadow);
-  }
+  // SVG 내부 흔들림 (종이 자체가 유기적으로 흔들림)
+  const animDur = (2 + Math.random() * 1.5).toFixed(2);
+  const skewAmount = 3 + Math.random() * 5;
   
-  // SVG 내부 흔들림 애니메이션 (종이 자체가 유기적으로 변형)
-  const animDuration = (2 + Math.random() * 2).toFixed(2);
   const animate = document.createElementNS('http://www.w3.org/2000/svg', 'animateTransform');
   animate.setAttribute('attributeName', 'transform');
   animate.setAttribute('type', 'rotate');
-  animate.setAttribute('values', `0 50 50; ${10 + Math.random() * 15} 50 50; ${-(10 + Math.random() * 15)} 50 50; 0 50 50`);
-  animate.setAttribute('dur', animDuration + 's');
+  animate.setAttribute('values', `0 50 60; ${skewAmount} 50 60; ${-skewAmount} 50 60; 0 50 60`);
+  animate.setAttribute('dur', animDur + 's');
   animate.setAttribute('repeatCount', 'indefinite');
-  paper.appendChild(animate);
+  animate.setAttribute('additive', 'sum');
+  paper.appendChild(animate.cloneNode());
+  if (foldPath) {
+    svg.lastChild.appendChild(animate.cloneNode());
+  }
   
   return svg;
 }
