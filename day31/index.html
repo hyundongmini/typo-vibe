@@ -54,44 +54,6 @@
       inset 0 0 0 0.5px rgba(0,0,0,0.05);
   }
 
-  /* 새로 추가되는 포스트잇: 위에서 떨어져서 제자리에 안착 */
-  .postit.new {
-    opacity: 0;
-    animation: postit-land var(--fall-duration) cubic-bezier(0.4, 0, 0.2, 1) forwards;
-    animation-delay: var(--fall-delay);
-  }
-
-  @keyframes postit-land {
-    0% {
-      opacity: 1;
-      transform: 
-        translateY(var(--fall-from))
-        translateX(var(--fall-drift))
-        rotateZ(var(--fall-rz-start));
-    }
-    40% {
-      opacity: 1;
-      transform: 
-        translateY(calc(var(--fall-from) * 0.3))
-        translateX(calc(var(--fall-drift) * -0.4))
-        rotateZ(calc(var(--fall-rz-start) * -0.3));
-    }
-    70% {
-      transform: 
-        translateY(-5px)
-        translateX(calc(var(--fall-drift) * 0.1))
-        rotateZ(calc(var(--final-rot) + 3deg));
-    }
-    100% {
-      opacity: 1;
-      transform: 
-        translateY(0)
-        translateX(0)
-        rotateZ(var(--final-rot))
-        scale(var(--final-sc));
-    }
-  }
-
   .paper-falling.animate {
     animation: paper-fall var(--duration) cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
     animation-delay: var(--delay);
@@ -373,39 +335,14 @@ function render() {
     const px = it.x + ox - postitSize / 2;
     const py = it.y + oy - postitSize / 2;
 
-    const isNew = idx >= previousCount;
-
-    if (isNew) {
-      // 새 포스트잇: 위에서 떨어져서 제자리에 안착
-      const fallFrom = -80 - Math.random() * 120;
-      const fallDrift = (rng() * 2 - 1) * 30;
-      const fallRzStart = (rng() * 2 - 1) * 30;
-      const fallDelay = Math.floor(rng() * 300); // 랜덤 딜레이 (0~300ms)
-      const fallDuration = 0.4 + rng() * 0.3;
-
-      html += `<div class="postit new" style="
-        left:${px.toFixed(1)}px;
-        top:${py.toFixed(1)}px;
-        width:${postitSize}px;
-        height:${postitSize}px;
-        --fall-from:${fallFrom.toFixed(0)}px;
-        --fall-drift:${fallDrift.toFixed(0)}px;
-        --fall-rz-start:${fallRzStart.toFixed(0)}deg;
-        --final-rot:${rot.toFixed(1)}deg;
-        --final-sc:${sc.toFixed(3)};
-        --fall-delay:${fallDelay}ms;
-        --fall-duration:${fallDuration.toFixed(2)}s;
-      "></div>`;
-    } else {
-      // 기존 포스트잇: 즉시 표시
-      html += `<div class="postit" style="
-        left:${px.toFixed(1)}px;
-        top:${py.toFixed(1)}px;
-        width:${postitSize}px;
-        height:${postitSize}px;
-        transform: rotateZ(${rot.toFixed(1)}deg) scale(${sc.toFixed(3)});
-      "></div>`;
-    }
+    // 모든 포스트잇 즉시 표시 (애니메이션 없이)
+    html += `<div class="postit" style="
+      left:${px.toFixed(1)}px;
+      top:${py.toFixed(1)}px;
+      width:${postitSize}px;
+      height:${postitSize}px;
+      transform: rotateZ(${rot.toFixed(1)}deg) scale(${sc.toFixed(3)});
+    "></div>`;
   });
 
   wrap.style.width = sample.width + 'px';
