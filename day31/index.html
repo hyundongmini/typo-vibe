@@ -54,19 +54,43 @@
       inset 0 0 0 0.5px rgba(0,0,0,0.05);
   }
 
-  /* 떨어지는 포스트잇 - 글자에서 떨어져 나옴 */
+  /* 떨어지는 포스트잇 - SVG 기반 유기적 종이 */
   .paper-falling {
     position: fixed;
-    background: #FFFFFF;
-    border: 1px solid #1A7CFF;
-    border-radius: 1px;
     pointer-events: none;
-    transform-style: preserve-3d;
-    opacity: 0;
     z-index: 100;
-    box-shadow: 
-      1px 2px 4px rgba(0,0,0,0.15),
-      inset 0 0 0 0.5px rgba(0,0,0,0.05);
+    opacity: 0;
+  }
+
+  .paper-falling.animate {
+    animation: paper-drift var(--duration) cubic-bezier(0.2, 0.6, 0.4, 1) forwards;
+    animation-delay: var(--delay);
+  }
+
+  @keyframes paper-drift {
+    0% {
+      opacity: 1;
+      transform: translateY(0) translateX(0) rotate(0deg);
+    }
+    15% {
+      opacity: 1;
+      transform: translateY(12vh) translateX(var(--drift)) rotate(var(--rz-start));
+    }
+    35% {
+      transform: translateY(30vh) translateX(calc(var(--drift) * -0.5)) rotate(calc(var(--rz-start) * -0.6));
+    }
+    55% {
+      opacity: 0.9;
+      transform: translateY(50vh) translateX(calc(var(--drift) * 0.4)) rotate(var(--rz-end));
+    }
+    75% {
+      opacity: 0.6;
+      transform: translateY(70vh) translateX(calc(var(--drift) * -0.2)) rotate(calc(var(--rz-end) * -0.4));
+    }
+    100% {
+      opacity: 0;
+      transform: translateY(100vh) translateX(0) rotate(var(--rz-end));
+    }
   }
 
   .paper-falling.animate {
@@ -373,7 +397,7 @@ function render() {
 }
 
 // ============================================
-// 글자에 붙어있던 포스트잇이 떨어져 나감
+// 글자에 붙어있던 포스트잇이 떨어져 나감 (SVG 유기적 종이)
 // ============================================
 function spawnFallingPapers(count) {
   const wrap = document.getElementById('wrap');
@@ -381,7 +405,6 @@ function spawnFallingPapers(count) {
   
   if (postits.length < count) return;
   
-  // 글자를 구성하는 포스트잇 중 랜덤으로 선택
   const indices = [];
   while (indices.length < count) {
     const idx = Math.floor(Math.random() * postits.length);
@@ -392,37 +415,120 @@ function spawnFallingPapers(count) {
     const source = postits[idx];
     const rect = source.getBoundingClientRect();
     
-    const paper = document.createElement('div');
-    paper.className = 'paper-falling';
+    const container = document.createElement('div');
+    container.className = 'paper-falling';
     
+    const size = rect.width * 1.5; // 약간 크게
     const drift = (Math.random() - 0.5) * 100;
-    const rx = (Math.random() - 0.5) * 160;
-    const ry = (Math.random() - 0.5) * 120;
-    const rzStart = (Math.random() - 0.5) * 80;
-    const rzEnd = (Math.random() - 0.5) * 60;
-    const duration = 2.5 + Math.random() * 2;
-    const delay = i * 150;
-
-    // 원본 포스트잇 위치에서 시작
-    paper.style.cssText = `
+    const rzStart = (Math.random() - 0.5) * 40;
+    const rzEnd = (Math.random() - 0.5) * 30;
+    const duration = 3 + Math.random() * 2;
+    const delay = i * 200;
+    
+    // SVG로 유기적 종이 모양 생성
+    const svg = createPaperSVG(size);
+    
+    container.style.cssText = `
       left: ${rect.left}px;
       top: ${rect.top}px;
-      width: ${rect.width}px;
-      height: ${rect.height}px;
+      width: ${size}px;
+      height: ${size}px;
       --drift: ${drift.toFixed(0)}px;
-      --rx: ${rx.toFixed(0)}deg;
-      --ry: ${ry.toFixed(0)}deg;
       --rz-start: ${rzStart.toFixed(0)}deg;
       --rz-end: ${rzEnd.toFixed(0)}deg;
       --duration: ${duration.toFixed(2)}s;
       --delay: ${delay}ms;
     `;
+    
+    container.appendChild(svg);
+    document.body.appendChild(container);
+    requestAnimationFrame(() => container.classList.add('animate'));
 
-    document.body.appendChild(paper);
-    requestAnimationFrame(() => paper.classList.add('animate'));
-
-    setTimeout(() => paper.remove(), (duration * 1000) + delay + 200);
+    setTimeout(() => container.remove(), (duration * 1000) + delay + 200);
   });
+}
+
+// ============================================
+// SVG 유기적 종이 모양 생성
+// ============================================
+function createPaperSVG(size) {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('width', size);
+  svg.setAttribute('height', size);
+  svg.setAttribute('viewBox', '0 0 100 100');
+  svg.style.overflow = 'visible';
+  
+  // 랜덤 종이 형태 (모서리 접힘, 휘어짐)
+  const type = Math.floor(Math.random() * 4);
+  
+  let pathData, foldPath, shadowPath;
+  
+  switch(type) {
+    case 0:
+      // 모서리 하나 접힌 종이
+      pathData = 'M 15,5 L 85,8 L 82,70 L 70,72 L 68,85 L 12,80 Z';
+      foldPath = 'M 70,72 L 82,70 L 80,82 Z';
+      shadowPath = 'M 70,72 L 68,85 L 80,82 Z';
+      break;
+    case 1:
+      // 위쪽이 말린 종이
+      pathData = 'M 10,20 Q 30,5 50,8 Q 70,5 90,18 L 88,85 L 12,82 Z';
+      foldPath = 'M 10,20 Q 30,12 50,14 Q 70,12 90,18 L 88,22 Q 70,16 50,18 Q 30,16 12,22 Z';
+      shadowPath = null;
+      break;
+    case 2:
+      // 살짝 기울어진 평평한 종이 (원근감)
+      pathData = 'M 8,12 L 92,8 L 95,88 L 5,92 Z';
+      foldPath = null;
+      shadowPath = null;
+      break;
+    case 3:
+      // 모서리 두 개 접힌 종이
+      pathData = 'M 20,5 L 80,8 L 85,65 L 75,68 L 72,85 L 25,88 L 22,75 L 12,72 Z';
+      foldPath = 'M 85,65 L 75,68 L 78,78 Z';
+      shadowPath = 'M 12,72 L 22,75 L 18,82 Z';
+      break;
+  }
+  
+  // 메인 종이
+  const paper = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  paper.setAttribute('d', pathData);
+  paper.setAttribute('fill', '#FFFFFF');
+  paper.setAttribute('stroke', '#1A7CFF');
+  paper.setAttribute('stroke-width', '1.5');
+  svg.appendChild(paper);
+  
+  // 접힌 부분 (밝은 회색)
+  if (foldPath) {
+    const fold = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    fold.setAttribute('d', foldPath);
+    fold.setAttribute('fill', '#e8e8e8');
+    fold.setAttribute('stroke', '#1A7CFF');
+    fold.setAttribute('stroke-width', '1');
+    svg.appendChild(fold);
+  }
+  
+  // 그림자 부분 (뒷면 비침)
+  if (shadowPath) {
+    const shadow = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    shadow.setAttribute('d', shadowPath);
+    shadow.setAttribute('fill', '#d0d0d0');
+    shadow.setAttribute('stroke', '#1A7CFF');
+    shadow.setAttribute('stroke-width', '0.8');
+    svg.appendChild(shadow);
+  }
+  
+  // SVG 내부 흔들림 애니메이션 (종이 자체가 유기적으로 변형)
+  const animDuration = (2 + Math.random() * 2).toFixed(2);
+  const animate = document.createElementNS('http://www.w3.org/2000/svg', 'animateTransform');
+  animate.setAttribute('attributeName', 'transform');
+  animate.setAttribute('type', 'rotate');
+  animate.setAttribute('values', `0 50 50; ${10 + Math.random() * 15} 50 50; ${-(10 + Math.random() * 15)} 50 50; 0 50 50`);
+  animate.setAttribute('dur', animDuration + 's');
+  animate.setAttribute('repeatCount', 'indefinite');
+  paper.appendChild(animate);
+  
+  return svg;
 }
 
 // ============================================
