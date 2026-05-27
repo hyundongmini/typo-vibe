@@ -217,6 +217,25 @@
   }
   .input-hint.hidden { opacity: 0; }
 
+  .mode-btn {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    padding: 8px 16px;
+    background: rgba(255,255,255,0.15);
+    color: #fff;
+    border: 1px solid rgba(255,255,255,0.3);
+    border-radius: 4px;
+    font-size: 12px;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    z-index: 10;
+    backdrop-filter: blur(4px);
+    transition: background 0.2s;
+  }
+  .mode-btn:hover { background: rgba(255,255,255,0.25); }
+  .mode-btn.active { background: rgba(255,255,255,0.35); border-color: #fff; }
+
   .stage::after {
     content: "";
     position: fixed;
@@ -254,6 +273,7 @@
 
 <div class="input-hint" id="hint">타이핑하세요</div>
 <div class="cursor-display" id="cursor-display"><span>|</span></div>
+<button class="mode-btn" id="mode-btn">🖱 마우스 모드</button>
 
 <!-- 숨겨진 input (한글 조합 처리용) -->
 <input type="text" id="hidden-input" autocomplete="off" autofocus
@@ -563,7 +583,7 @@ function resetIdleTimer() {
   
   idleTimer = setTimeout(() => {
     startIdleDrop();
-  }, 5000);
+  }, 2000);
 }
 
 function startIdleDrop() {
@@ -598,6 +618,79 @@ window.addEventListener('resize', () => {
   previousCount = 0;
   render();
 });
+
+// ============================================
+// 마우스 드로잉 모드
+// ============================================
+let isMouseMode = false;
+let isDrawing = false;
+const modeBtnEl = document.getElementById('mode-btn');
+
+modeBtnEl.addEventListener('click', (e) => {
+  e.stopPropagation();
+  isMouseMode = !isMouseMode;
+  modeBtnEl.classList.toggle('active', isMouseMode);
+  modeBtnEl.textContent = isMouseMode ? '⌨️ 타이핑 모드' : '🖱 마우스 모드';
+  
+  if (isMouseMode) {
+    hiddenInput.style.pointerEvents = 'none';
+    hint.textContent = '마우스로 그려보세요';
+    hint.classList.remove('hidden');
+  } else {
+    hiddenInput.style.pointerEvents = '';
+    hiddenInput.focus();
+    hint.classList.add('hidden');
+  }
+});
+
+document.addEventListener('mousedown', (e) => {
+  if (!isMouseMode) return;
+  if (e.target === modeBtnEl) return;
+  isDrawing = true;
+  addPostitAtMouse(e);
+});
+
+document.addEventListener('mousemove', (e) => {
+  if (!isMouseMode || !isDrawing) return;
+  addPostitAtMouse(e);
+});
+
+document.addEventListener('mouseup', () => {
+  isDrawing = false;
+});
+
+function addPostitAtMouse(e) {
+  const wrap = document.getElementById('wrap');
+  const rect = wrap.getBoundingClientRect();
+  
+  // wrap 크기 자동 확장
+  if (wrap.style.width === '0px' || !wrap.style.width) {
+    wrap.style.width = window.innerWidth - 80 + 'px';
+    wrap.style.height = window.innerHeight - 96 + 'px';
+  }
+  
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+  
+  const size = CONFIG.postitSize;
+  const rot = (Math.random() - 0.5) * CONFIG.rotJitter * 2;
+  const sc = 1 + (Math.random() - 0.5) * CONFIG.scaleJitter * 2;
+  
+  const postit = document.createElement('div');
+  postit.className = 'postit';
+  postit.style.cssText = `
+    left: ${x - size/2}px;
+    top: ${y - size/2}px;
+    width: ${size}px;
+    height: ${size}px;
+    transform: rotateZ(${rot.toFixed(1)}deg) scale(${sc.toFixed(3)});
+  `;
+  postit.dataset.rot = rot.toFixed(1);
+  postit.dataset.sc = sc.toFixed(3);
+  
+  wrap.appendChild(postit);
+  resetIdleTimer();
+}
 </script>
 
 </body>
