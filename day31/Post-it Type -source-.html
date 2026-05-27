@@ -1,0 +1,1035 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<title>Post-it Type</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo+Black&family=Bebas+Neue&family=Bowlby+One&family=Bungee&family=Inter:wght@400;700;900&family=Black+Han+Sans&family=Do+Hyeon&family=Jua&family=Noto+Sans+KR:wght@400;700;900&family=Spoqa+Han+Sans+Neo:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#C8161D;        /* poster red */
+    --postit:#FFFFFF;
+    --ink:#FFFFFF;       /* secondary text color */
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--bg);min-height:100%;}
+  body{
+    font-family:"Spoqa Han Sans Neo","Noto Sans KR",system-ui,sans-serif;
+    color:var(--ink);
+    overflow-x:hidden;
+  }
+
+  /* ─────────── Stage ─────────── */
+  .stage{
+    position:relative;
+    width:100vw;
+    min-height:100vh;
+    padding:48px 56px 96px;
+    overflow:hidden;
+  }
+  .canvas-wrap{
+    position:relative;
+    width:100%;
+    margin:0 auto;
+    /* postits are absolutely positioned inside */
+  }
+  .postit{
+    position:absolute;
+    background:var(--postit);
+    will-change:transform;
+    border-radius:1px;
+    pointer-events:none;
+    box-sizing:border-box;
+  }
+
+  /* ─────────── Secondary copy (overlay lines) ─────────── */
+  .lines{
+    position:absolute;
+    inset:0;
+    pointer-events:none;
+  }
+  .lines .l{
+    position:absolute;
+    left:8%;
+    color:var(--ink);
+    letter-spacing:.02em;
+    font-weight:700;
+    font-size:clamp(18px,2.2vw,34px);
+    text-transform:uppercase;
+    font-family:"Anton","Archivo Black","Noto Sans KR",sans-serif;
+    text-shadow:0 0 0.5px rgba(0,0,0,.15);
+  }
+
+  /* ─────────── Edit overlay ─────────── */
+  .editor{
+    position:fixed;
+    top:14px;left:14px;
+    z-index:100;
+    background:rgba(0,0,0,.55);
+    color:#fff;
+    backdrop-filter:blur(10px);
+    -webkit-backdrop-filter:blur(10px);
+    border-radius:10px;
+    padding:10px 12px;
+    font:12px/1.4 ui-sans-serif,system-ui,sans-serif;
+    width:280px;
+    display:flex;flex-direction:column;gap:8px;
+  }
+  .editor textarea{
+    width:100%;
+    background:rgba(255,255,255,.08);
+    color:#fff;
+    border:1px solid rgba(255,255,255,.2);
+    border-radius:6px;
+    padding:6px 8px;
+    font-family:inherit;
+    font-size:12px;
+    resize:vertical;
+    min-height:56px;
+    outline:none;
+  }
+  .editor label{opacity:.7;font-size:10.5px;letter-spacing:.04em;text-transform:uppercase}
+  .editor .hint{font-size:10.5px;opacity:.55;line-height:1.45}
+  .editor .row{display:flex;gap:6px}
+  .editor input[type=text]{
+    flex:1;background:rgba(255,255,255,.08);color:#fff;border:1px solid rgba(255,255,255,.2);
+    border-radius:6px;padding:5px 8px;font:inherit;outline:none;
+  }
+  .footnote{
+    position:absolute;
+    left:48px;bottom:36px;
+    font-size:11px;font-weight:700;letter-spacing:.06em;
+    text-transform:uppercase;
+    color:var(--ink);
+    opacity:.95;
+    line-height:1.5;
+    pointer-events:none;
+  }
+
+  /* hide canvas used for sampling */
+  #sampler{position:absolute;left:-99999px;top:0}
+
+  /* a faint vignette to feel printed */
+  .stage::after{
+    content:"";
+    position:absolute;inset:0;pointer-events:none;
+    background:radial-gradient(120% 80% at 50% 50%,transparent 55%,rgba(0,0,0,.18) 100%);
+    mix-blend-mode:multiply;
+  }
+</style>
+</head>
+<body>
+
+<template id="__bundler_thumbnail" data-bg-color="#1A7CFF">
+  <svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+    <g fill="#fff" stroke="#181A1C" stroke-width="0.8">
+      <rect x="22" y="30" width="9" height="9" transform="rotate(-8 26.5 34.5)"/>
+      <rect x="34" y="28" width="9" height="9" transform="rotate(6 38.5 32.5)"/>
+      <rect x="46" y="32" width="9" height="9" transform="rotate(-4 50.5 36.5)"/>
+      <rect x="58" y="29" width="9" height="9" transform="rotate(10 62.5 33.5)"/>
+      <rect x="70" y="31" width="9" height="9" transform="rotate(-12 74.5 35.5)"/>
+      <rect x="82" y="33" width="9" height="9" transform="rotate(5 86.5 37.5)"/>
+      <rect x="22" y="55" width="9" height="9" transform="rotate(7 26.5 59.5)"/>
+      <rect x="46" y="56" width="9" height="9" transform="rotate(-10 50.5 60.5)"/>
+      <rect x="70" y="55" width="9" height="9" transform="rotate(3 74.5 59.5)"/>
+      <rect x="82" y="58" width="9" height="9" transform="rotate(-6 86.5 62.5)"/>
+      <rect x="22" y="78" width="9" height="9" transform="rotate(-5 26.5 82.5)"/>
+      <rect x="34" y="80" width="9" height="9" transform="rotate(9 38.5 84.5)"/>
+      <rect x="46" y="77" width="9" height="9" transform="rotate(-11 50.5 81.5)"/>
+      <rect x="58" y="81" width="9" height="9" transform="rotate(4 62.5 85.5)"/>
+      <rect x="70" y="78" width="9" height="9" transform="rotate(-7 74.5 82.5)"/>
+      <rect x="82" y="80" width="9" height="9" transform="rotate(8 86.5 84.5)"/>
+    </g>
+  </svg>
+</template>
+
+<canvas id="sampler"></canvas>
+
+<div class="stage" id="stage">
+  <div class="canvas-wrap" id="wrap"></div>
+
+  <div class="lines" id="lines">
+    <!-- positions are computed in JS so they sit inside the empty stripes -->
+  </div>
+
+  <div class="footnote">
+    WELTFORM.AT<br/>
+    POSTITPOSTER.COM
+  </div>
+</div>
+
+<!-- React + Babel for the Tweaks panel -->
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script type="text/babel" data-presets="react">
+/* ===== tweaks-panel.jsx (inlined) ===== */
+
+// tweaks-panel.jsx
+// Reusable Tweaks shell + form-control helpers.
+//
+// Owns the host protocol (listens for __activate_edit_mode / __deactivate_edit_mode,
+// posts __edit_mode_available / __edit_mode_set_keys / __edit_mode_dismissed) so
+// individual prototypes don't re-roll it. Ships a consistent set of controls so you
+// don't hand-draw <input type="range">, segmented radios, steppers, etc.
+//
+// Usage (in an HTML file that loads React + Babel):
+//
+//   const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+//     "primaryColor": "#D97757",
+//     "palette": ["#D97757", "#29261b", "#f6f4ef"],
+//     "fontSize": 16,
+//     "density": "regular",
+//     "dark": false
+//   }/*EDITMODE-END*/;
+//
+//   function App() {
+//     const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+//     return (
+//       <div style={{ fontSize: t.fontSize, color: t.primaryColor }}>
+//         Hello
+//         <TweaksPanel>
+//           <TweakSection label="Typography" />
+//           <TweakSlider label="Font size" value={t.fontSize} min={10} max={32} unit="px"
+//                        onChange={(v) => setTweak('fontSize', v)} />
+//           <TweakRadio  label="Density" value={t.density}
+//                        options={['compact', 'regular', 'comfy']}
+//                        onChange={(v) => setTweak('density', v)} />
+//           <TweakSection label="Theme" />
+//           <TweakColor  label="Primary" value={t.primaryColor}
+//                        options={['#D97757', '#2A6FDB', '#1F8A5B', '#7A5AE0']}
+//                        onChange={(v) => setTweak('primaryColor', v)} />
+//           <TweakColor  label="Palette" value={t.palette}
+//                        options={[['#D97757', '#29261b', '#f6f4ef'],
+//                                  ['#475569', '#0f172a', '#f1f5f9']]}
+//                        onChange={(v) => setTweak('palette', v)} />
+//           <TweakToggle label="Dark mode" value={t.dark}
+//                        onChange={(v) => setTweak('dark', v)} />
+//         </TweaksPanel>
+//       </div>
+//     );
+//   }
+//
+// ─────────────────────────────────────────────────────────────────────────────
+
+const __TWEAKS_STYLE = `
+  .twk-panel{position:fixed;right:16px;bottom:16px;z-index:2147483646;width:280px;
+    max-height:calc(100vh - 32px);display:flex;flex-direction:column;
+    transform:scale(var(--dc-inv-zoom,1));transform-origin:bottom right;
+    background:rgba(250,249,247,.78);color:#29261b;
+    -webkit-backdrop-filter:blur(24px) saturate(160%);backdrop-filter:blur(24px) saturate(160%);
+    border:.5px solid rgba(255,255,255,.6);border-radius:14px;
+    box-shadow:0 1px 0 rgba(255,255,255,.5) inset,0 12px 40px rgba(0,0,0,.18);
+    font:11.5px/1.4 ui-sans-serif,system-ui,-apple-system,sans-serif;overflow:hidden}
+  .twk-hd{display:flex;align-items:center;justify-content:space-between;
+    padding:10px 8px 10px 14px;cursor:move;user-select:none}
+  .twk-hd b{font-size:12px;font-weight:600;letter-spacing:.01em}
+  .twk-x{appearance:none;border:0;background:transparent;color:rgba(41,38,27,.55);
+    width:22px;height:22px;border-radius:6px;cursor:default;font-size:13px;line-height:1}
+  .twk-x:hover{background:rgba(0,0,0,.06);color:#29261b}
+  .twk-body{padding:2px 14px 14px;display:flex;flex-direction:column;gap:10px;
+    overflow-y:auto;overflow-x:hidden;min-height:0;
+    scrollbar-width:thin;scrollbar-color:rgba(0,0,0,.15) transparent}
+  .twk-body::-webkit-scrollbar{width:8px}
+  .twk-body::-webkit-scrollbar-track{background:transparent;margin:2px}
+  .twk-body::-webkit-scrollbar-thumb{background:rgba(0,0,0,.15);border-radius:4px;
+    border:2px solid transparent;background-clip:content-box}
+  .twk-body::-webkit-scrollbar-thumb:hover{background:rgba(0,0,0,.25);
+    border:2px solid transparent;background-clip:content-box}
+  .twk-row{display:flex;flex-direction:column;gap:5px}
+  .twk-row-h{flex-direction:row;align-items:center;justify-content:space-between;gap:10px}
+  .twk-lbl{display:flex;justify-content:space-between;align-items:baseline;
+    color:rgba(41,38,27,.72)}
+  .twk-lbl>span:first-child{font-weight:500}
+  .twk-val{color:rgba(41,38,27,.5);font-variant-numeric:tabular-nums}
+
+  .twk-sect{font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;
+    color:rgba(41,38,27,.45);padding:10px 0 0}
+  .twk-sect:first-child{padding-top:0}
+
+  .twk-field{appearance:none;box-sizing:border-box;width:100%;min-width:0;height:26px;padding:0 8px;
+    border:.5px solid rgba(0,0,0,.1);border-radius:7px;
+    background:rgba(255,255,255,.6);color:inherit;font:inherit;outline:none}
+  .twk-field:focus{border-color:rgba(0,0,0,.25);background:rgba(255,255,255,.85)}
+  select.twk-field{padding-right:22px;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path fill='rgba(0,0,0,.5)' d='M0 0h10L5 6z'/></svg>");
+    background-repeat:no-repeat;background-position:right 8px center}
+
+  .twk-slider{appearance:none;-webkit-appearance:none;width:100%;height:4px;margin:6px 0;
+    border-radius:999px;background:rgba(0,0,0,.12);outline:none}
+  .twk-slider::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;
+    width:14px;height:14px;border-radius:50%;background:#fff;
+    border:.5px solid rgba(0,0,0,.12);box-shadow:0 1px 3px rgba(0,0,0,.2);cursor:default}
+  .twk-slider::-moz-range-thumb{width:14px;height:14px;border-radius:50%;
+    background:#fff;border:.5px solid rgba(0,0,0,.12);box-shadow:0 1px 3px rgba(0,0,0,.2);cursor:default}
+
+  .twk-seg{position:relative;display:flex;padding:2px;border-radius:8px;
+    background:rgba(0,0,0,.06);user-select:none}
+  .twk-seg-thumb{position:absolute;top:2px;bottom:2px;border-radius:6px;
+    background:rgba(255,255,255,.9);box-shadow:0 1px 2px rgba(0,0,0,.12);
+    transition:left .15s cubic-bezier(.3,.7,.4,1),width .15s}
+  .twk-seg.dragging .twk-seg-thumb{transition:none}
+  .twk-seg button{appearance:none;position:relative;z-index:1;flex:1;border:0;
+    background:transparent;color:inherit;font:inherit;font-weight:500;min-height:22px;
+    border-radius:6px;cursor:default;padding:4px 6px;line-height:1.2;
+    overflow-wrap:anywhere}
+
+  .twk-toggle{position:relative;width:32px;height:18px;border:0;border-radius:999px;
+    background:rgba(0,0,0,.15);transition:background .15s;cursor:default;padding:0}
+  .twk-toggle[data-on="1"]{background:#34c759}
+  .twk-toggle i{position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;
+    background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.25);transition:transform .15s}
+  .twk-toggle[data-on="1"] i{transform:translateX(14px)}
+
+  .twk-num{display:flex;align-items:center;box-sizing:border-box;min-width:0;height:26px;padding:0 0 0 8px;
+    border:.5px solid rgba(0,0,0,.1);border-radius:7px;background:rgba(255,255,255,.6)}
+  .twk-num-lbl{font-weight:500;color:rgba(41,38,27,.6);cursor:ew-resize;
+    user-select:none;padding-right:8px}
+  .twk-num input{flex:1;min-width:0;height:100%;border:0;background:transparent;
+    font:inherit;font-variant-numeric:tabular-nums;text-align:right;padding:0 8px 0 0;
+    outline:none;color:inherit;-moz-appearance:textfield}
+  .twk-num input::-webkit-inner-spin-button,.twk-num input::-webkit-outer-spin-button{
+    -webkit-appearance:none;margin:0}
+  .twk-num-unit{padding-right:8px;color:rgba(41,38,27,.45)}
+
+  .twk-btn{appearance:none;height:26px;padding:0 12px;border:0;border-radius:7px;
+    background:rgba(0,0,0,.78);color:#fff;font:inherit;font-weight:500;cursor:default}
+  .twk-btn:hover{background:rgba(0,0,0,.88)}
+  .twk-btn.secondary{background:rgba(0,0,0,.06);color:inherit}
+  .twk-btn.secondary:hover{background:rgba(0,0,0,.1)}
+
+  .twk-swatch{appearance:none;-webkit-appearance:none;width:56px;height:22px;
+    border:.5px solid rgba(0,0,0,.1);border-radius:6px;padding:0;cursor:default;
+    background:transparent;flex-shrink:0}
+  .twk-swatch::-webkit-color-swatch-wrapper{padding:0}
+  .twk-swatch::-webkit-color-swatch{border:0;border-radius:5.5px}
+  .twk-swatch::-moz-color-swatch{border:0;border-radius:5.5px}
+
+  .twk-chips{display:flex;gap:6px}
+  .twk-chip{position:relative;appearance:none;flex:1;min-width:0;height:46px;
+    padding:0;border:0;border-radius:6px;overflow:hidden;cursor:default;
+    box-shadow:0 0 0 .5px rgba(0,0,0,.12),0 1px 2px rgba(0,0,0,.06);
+    transition:transform .12s cubic-bezier(.3,.7,.4,1),box-shadow .12s}
+  .twk-chip:hover{transform:translateY(-1px);
+    box-shadow:0 0 0 .5px rgba(0,0,0,.18),0 4px 10px rgba(0,0,0,.12)}
+  .twk-chip[data-on="1"]{box-shadow:0 0 0 1.5px rgba(0,0,0,.85),
+    0 2px 6px rgba(0,0,0,.15)}
+  .twk-chip>span{position:absolute;top:0;bottom:0;right:0;width:34%;
+    display:flex;flex-direction:column;box-shadow:-1px 0 0 rgba(0,0,0,.1)}
+  .twk-chip>span>i{flex:1;box-shadow:0 -1px 0 rgba(0,0,0,.1)}
+  .twk-chip>span>i:first-child{box-shadow:none}
+  .twk-chip svg{position:absolute;top:6px;left:6px;width:13px;height:13px;
+    filter:drop-shadow(0 1px 1px rgba(0,0,0,.3))}
+`;
+
+// ── useTweaks ───────────────────────────────────────────────────────────────
+// Single source of truth for tweak values. setTweak persists via the host
+// (__edit_mode_set_keys → host rewrites the EDITMODE block on disk).
+function useTweaks(defaults) {
+  const [values, setValues] = React.useState(defaults);
+  // Accepts either setTweak('key', value) or setTweak({ key: value, ... }) so a
+  // useState-style call doesn't write a "[object Object]" key into the persisted
+  // JSON block.
+  const setTweak = React.useCallback((keyOrEdits, val) => {
+    const edits = typeof keyOrEdits === 'object' && keyOrEdits !== null
+      ? keyOrEdits : { [keyOrEdits]: val };
+    setValues((prev) => ({ ...prev, ...edits }));
+    window.parent.postMessage({ type: '__edit_mode_set_keys', edits }, '*');
+    // Same-window signal so in-page listeners (deck-stage rail thumbnails)
+    // can react — the parent message only reaches the host, not peers.
+    window.dispatchEvent(new CustomEvent('tweakchange', { detail: edits }));
+  }, []);
+  return [values, setTweak];
+}
+
+// ── TweaksPanel ─────────────────────────────────────────────────────────────
+// Floating shell. Registers the protocol listener BEFORE announcing
+// availability — if the announce ran first, the host's activate could land
+// before our handler exists and the toolbar toggle would silently no-op.
+// The close button posts __edit_mode_dismissed so the host's toolbar toggle
+// flips off in lockstep; the host echoes __deactivate_edit_mode back which
+// is what actually hides the panel.
+function TweaksPanel({ title = 'Tweaks', children }) {
+  const [open, setOpen] = React.useState(false);
+  const dragRef = React.useRef(null);
+  const offsetRef = React.useRef({ x: 16, y: 16 });
+  const PAD = 16;
+
+  const clampToViewport = React.useCallback(() => {
+    const panel = dragRef.current;
+    if (!panel) return;
+    const w = panel.offsetWidth, h = panel.offsetHeight;
+    const maxRight = Math.max(PAD, window.innerWidth - w - PAD);
+    const maxBottom = Math.max(PAD, window.innerHeight - h - PAD);
+    offsetRef.current = {
+      x: Math.min(maxRight, Math.max(PAD, offsetRef.current.x)),
+      y: Math.min(maxBottom, Math.max(PAD, offsetRef.current.y)),
+    };
+    panel.style.right = offsetRef.current.x + 'px';
+    panel.style.bottom = offsetRef.current.y + 'px';
+  }, []);
+
+  React.useEffect(() => {
+    if (!open) return;
+    clampToViewport();
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', clampToViewport);
+      return () => window.removeEventListener('resize', clampToViewport);
+    }
+    const ro = new ResizeObserver(clampToViewport);
+    ro.observe(document.documentElement);
+    return () => ro.disconnect();
+  }, [open, clampToViewport]);
+
+  React.useEffect(() => {
+    const onMsg = (e) => {
+      const t = e?.data?.type;
+      if (t === '__activate_edit_mode') setOpen(true);
+      else if (t === '__deactivate_edit_mode') setOpen(false);
+    };
+    window.addEventListener('message', onMsg);
+    window.parent.postMessage({ type: '__edit_mode_available' }, '*');
+    return () => window.removeEventListener('message', onMsg);
+  }, []);
+
+  const dismiss = () => {
+    setOpen(false);
+    window.parent.postMessage({ type: '__edit_mode_dismissed' }, '*');
+  };
+
+  const onDragStart = (e) => {
+    const panel = dragRef.current;
+    if (!panel) return;
+    const r = panel.getBoundingClientRect();
+    const sx = e.clientX, sy = e.clientY;
+    const startRight = window.innerWidth - r.right;
+    const startBottom = window.innerHeight - r.bottom;
+    const move = (ev) => {
+      offsetRef.current = {
+        x: startRight - (ev.clientX - sx),
+        y: startBottom - (ev.clientY - sy),
+      };
+      clampToViewport();
+    };
+    const up = () => {
+      window.removeEventListener('mousemove', move);
+      window.removeEventListener('mouseup', up);
+    };
+    window.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', up);
+  };
+
+  if (!open) return null;
+  return (
+    <>
+      <style>{__TWEAKS_STYLE}</style>
+      <div ref={dragRef} className="twk-panel" data-omelette-chrome=""
+           style={{ right: offsetRef.current.x, bottom: offsetRef.current.y }}>
+        <div className="twk-hd" onMouseDown={onDragStart}>
+          <b>{title}</b>
+          <button className="twk-x" aria-label="Close tweaks"
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={dismiss}>✕</button>
+        </div>
+        <div className="twk-body">
+          {children}
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ── Layout helpers ──────────────────────────────────────────────────────────
+
+function TweakSection({ label, children }) {
+  return (
+    <>
+      <div className="twk-sect">{label}</div>
+      {children}
+    </>
+  );
+}
+
+function TweakRow({ label, value, children, inline = false }) {
+  return (
+    <div className={inline ? 'twk-row twk-row-h' : 'twk-row'}>
+      <div className="twk-lbl">
+        <span>{label}</span>
+        {value != null && <span className="twk-val">{value}</span>}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+// ── Controls ────────────────────────────────────────────────────────────────
+
+function TweakSlider({ label, value, min = 0, max = 100, step = 1, unit = '', onChange }) {
+  return (
+    <TweakRow label={label} value={`${value}${unit}`}>
+      <input type="range" className="twk-slider" min={min} max={max} step={step}
+             value={value} onChange={(e) => onChange(Number(e.target.value))} />
+    </TweakRow>
+  );
+}
+
+function TweakToggle({ label, value, onChange }) {
+  return (
+    <div className="twk-row twk-row-h">
+      <div className="twk-lbl"><span>{label}</span></div>
+      <button type="button" className="twk-toggle" data-on={value ? '1' : '0'}
+              role="switch" aria-checked={!!value}
+              onClick={() => onChange(!value)}><i /></button>
+    </div>
+  );
+}
+
+function TweakRadio({ label, value, options, onChange }) {
+  const trackRef = React.useRef(null);
+  const [dragging, setDragging] = React.useState(false);
+  // The active value is read by pointer-move handlers attached for the lifetime
+  // of a drag — ref it so a stale closure doesn't fire onChange for every move.
+  const valueRef = React.useRef(value);
+  valueRef.current = value;
+
+  // Segments wrap mid-word once per-segment width runs out. The track is
+  // ~248px (280 panel − 28 body pad − 4 seg pad), each button loses 12px
+  // to its own padding, and 11.5px system-ui averages ~6.3px/char — so 2
+  // options fit ~16 chars each, 3 fit ~10. Past that (or >3 options), fall
+  // back to a dropdown rather than wrap.
+  const labelLen = (o) => String(typeof o === 'object' ? o.label : o).length;
+  const maxLen = options.reduce((m, o) => Math.max(m, labelLen(o)), 0);
+  const fitsAsSegments = maxLen <= ({ 2: 16, 3: 10 }[options.length] ?? 0);
+  if (!fitsAsSegments) {
+    // <select> emits strings — map back to the original option value so the
+    // fallback stays type-preserving (numbers, booleans) like the segment path.
+    const resolve = (s) => {
+      const m = options.find((o) => String(typeof o === 'object' ? o.value : o) === s);
+      return m === undefined ? s : typeof m === 'object' ? m.value : m;
+    };
+    return <TweakSelect label={label} value={value} options={options}
+                        onChange={(s) => onChange(resolve(s))} />;
+  }
+  const opts = options.map((o) => (typeof o === 'object' ? o : { value: o, label: o }));
+  const idx = Math.max(0, opts.findIndex((o) => o.value === value));
+  const n = opts.length;
+
+  const segAt = (clientX) => {
+    const r = trackRef.current.getBoundingClientRect();
+    const inner = r.width - 4;
+    const i = Math.floor(((clientX - r.left - 2) / inner) * n);
+    return opts[Math.max(0, Math.min(n - 1, i))].value;
+  };
+
+  const onPointerDown = (e) => {
+    setDragging(true);
+    const v0 = segAt(e.clientX);
+    if (v0 !== valueRef.current) onChange(v0);
+    const move = (ev) => {
+      if (!trackRef.current) return;
+      const v = segAt(ev.clientX);
+      if (v !== valueRef.current) onChange(v);
+    };
+    const up = () => {
+      setDragging(false);
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  };
+
+  return (
+    <TweakRow label={label}>
+      <div ref={trackRef} role="radiogroup" onPointerDown={onPointerDown}
+           className={dragging ? 'twk-seg dragging' : 'twk-seg'}>
+        <div className="twk-seg-thumb"
+             style={{ left: `calc(2px + ${idx} * (100% - 4px) / ${n})`,
+                      width: `calc((100% - 4px) / ${n})` }} />
+        {opts.map((o) => (
+          <button key={o.value} type="button" role="radio" aria-checked={o.value === value}>
+            {o.label}
+          </button>
+        ))}
+      </div>
+    </TweakRow>
+  );
+}
+
+function TweakSelect({ label, value, options, onChange }) {
+  return (
+    <TweakRow label={label}>
+      <select className="twk-field" value={value} onChange={(e) => onChange(e.target.value)}>
+        {options.map((o) => {
+          const v = typeof o === 'object' ? o.value : o;
+          const l = typeof o === 'object' ? o.label : o;
+          return <option key={v} value={v}>{l}</option>;
+        })}
+      </select>
+    </TweakRow>
+  );
+}
+
+function TweakText({ label, value, placeholder, onChange }) {
+  return (
+    <TweakRow label={label}>
+      <input className="twk-field" type="text" value={value} placeholder={placeholder}
+             onChange={(e) => onChange(e.target.value)} />
+    </TweakRow>
+  );
+}
+
+function TweakNumber({ label, value, min, max, step = 1, unit = '', onChange }) {
+  const clamp = (n) => {
+    if (min != null && n < min) return min;
+    if (max != null && n > max) return max;
+    return n;
+  };
+  const startRef = React.useRef({ x: 0, val: 0 });
+  const onScrubStart = (e) => {
+    e.preventDefault();
+    startRef.current = { x: e.clientX, val: value };
+    const decimals = (String(step).split('.')[1] || '').length;
+    const move = (ev) => {
+      const dx = ev.clientX - startRef.current.x;
+      const raw = startRef.current.val + dx * step;
+      const snapped = Math.round(raw / step) * step;
+      onChange(clamp(Number(snapped.toFixed(decimals))));
+    };
+    const up = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  };
+  return (
+    <div className="twk-num">
+      <span className="twk-num-lbl" onPointerDown={onScrubStart}>{label}</span>
+      <input type="number" value={value} min={min} max={max} step={step}
+             onChange={(e) => onChange(clamp(Number(e.target.value)))} />
+      {unit && <span className="twk-num-unit">{unit}</span>}
+    </div>
+  );
+}
+
+// Relative-luminance contrast pick — checkmarks drawn over a swatch need to
+// read on both #111 and #fafafa without per-option configuration. Hex input
+// only (#rgb / #rrggbb); named or rgb()/hsl() colors fall through to "light".
+function __twkIsLight(hex) {
+  const h = String(hex).replace('#', '');
+  const x = h.length === 3 ? h.replace(/./g, (c) => c + c) : h.padEnd(6, '0');
+  const n = parseInt(x.slice(0, 6), 16);
+  if (Number.isNaN(n)) return true;
+  const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  return r * 299 + g * 587 + b * 114 > 148000;
+}
+
+const __TwkCheck = ({ light }) => (
+  <svg viewBox="0 0 14 14" aria-hidden="true">
+    <path d="M3 7.2 5.8 10 11 4.2" fill="none" strokeWidth="2.2"
+          strokeLinecap="round" strokeLinejoin="round"
+          stroke={light ? 'rgba(0,0,0,.78)' : '#fff'} />
+  </svg>
+);
+
+// TweakColor — curated color/palette picker. Each option is either a single
+// hex string or an array of 1-5 hex strings; the card adapts — a lone color
+// renders solid, a palette renders colors[0] as the hero (left ~2/3) with the
+// rest stacked in a sharp column on the right. onChange emits the
+// option in the shape it was passed (string stays string, array stays array).
+// Without options it falls back to the native color input for back-compat.
+function TweakColor({ label, value, options, onChange }) {
+  if (!options || !options.length) {
+    return (
+      <div className="twk-row twk-row-h">
+        <div className="twk-lbl"><span>{label}</span></div>
+        <input type="color" className="twk-swatch" value={value}
+               onChange={(e) => onChange(e.target.value)} />
+      </div>
+    );
+  }
+  // Native <input type=color> emits lowercase hex per the HTML spec, so
+  // compare case-insensitively. String() guards JSON.stringify(undefined),
+  // which returns the primitive undefined (no .toLowerCase).
+  const key = (o) => String(JSON.stringify(o)).toLowerCase();
+  const cur = key(value);
+  return (
+    <TweakRow label={label}>
+      <div className="twk-chips" role="radiogroup">
+        {options.map((o, i) => {
+          const colors = Array.isArray(o) ? o : [o];
+          const [hero, ...rest] = colors;
+          const sup = rest.slice(0, 4);
+          const on = key(o) === cur;
+          return (
+            <button key={i} type="button" className="twk-chip" role="radio"
+                    aria-checked={on} data-on={on ? '1' : '0'}
+                    aria-label={colors.join(', ')} title={colors.join(' · ')}
+                    style={{ background: hero }}
+                    onClick={() => onChange(o)}>
+              {sup.length > 0 && (
+                <span>
+                  {sup.map((c, j) => <i key={j} style={{ background: c }} />)}
+                </span>
+              )}
+              {on && <__TwkCheck light={__twkIsLight(hero)} />}
+            </button>
+          );
+        })}
+      </div>
+    </TweakRow>
+  );
+}
+
+function TweakButton({ label, onClick, secondary = false }) {
+  return (
+    <button type="button" className={secondary ? 'twk-btn secondary' : 'twk-btn'}
+            onClick={onClick}>{label}</button>
+  );
+}
+
+Object.assign(window, {
+  useTweaks, TweaksPanel, TweakSection, TweakRow,
+  TweakSlider, TweakToggle, TweakRadio, TweakSelect,
+  TweakText, TweakNumber, TweakColor, TweakButton,
+});
+
+</script>
+
+<!-- Defaults editable by host -->
+<script>
+window.TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "headline": "변도동",
+  "subLines": [
+    "PLAKAT AUSSTELLUNG",
+    "RÖSSLIGASSE 12, LUZERN",
+    "SEPTEMBER 24—OKTOBER 02",
+    "12—18UHR",
+    "EINTRITT FREI!"
+  ],
+  "fontFamily": "Anton",
+  "fontWeight": 900,
+  "letterSpacing": -3,
+  "lineHeight": 1.06,
+  "postitSize": 25,
+  "postitSpacing": 16,
+  "rotJitter": 34,
+  "posJitter": 6,
+  "scaleJitter": 0.16,
+  "threshold": 160,
+  "bg": "#1A7CFF",
+  "postit": "#FFFFFF",
+  "borderColor": "#1A7CFF",
+  "borderWidth": 1,
+  "showLines": false,
+  "showEditor": true
+}/*EDITMODE-END*/;
+</script>
+
+<script type="text/babel">
+const { useState, useEffect, useMemo, useRef, useLayoutEffect } = React;
+
+/* ────────── pixel sampler: text → postit positions ────────── */
+
+function samplePostits(text, opts){
+  const {
+    fontFamily, fontWeight, letterSpacing, lineHeight,
+    postitSize, sampleStep, threshold, maxWidth,
+  } = opts;
+
+  // Render text to a hidden canvas at high resolution, then sample
+  // every `sampleStep` px. Cells whose average alpha > threshold get a postit.
+  const canvas = document.getElementById('sampler');
+  const ctx = canvas.getContext('2d', { willReadFrequently:true });
+
+  // Estimate font size that fills maxWidth for the longest line
+  const lines = text.split('\n').filter(l=>l.length>0);
+  if (lines.length === 0) return { items:[], width:0, height:0, lineRects:[] };
+
+  // Use a measurement font size, then scale text so longest line ≈ maxWidth
+  const measureSize = 200;
+  ctx.font = `${fontWeight} ${measureSize}px ${fontFamily}, sans-serif`;
+  ctx.textBaseline = 'alphabetic';
+
+  let longest = 0;
+  for (const l of lines) longest = Math.max(longest, ctx.measureText(l).width);
+  // account for letter-spacing (approx: per-char)
+  const lsAtMeasure = letterSpacing * (measureSize/100); // letterSpacing is in 100-unit terms
+  const widestLineCharCount = Math.max(...lines.map(l=>l.length));
+  longest += lsAtMeasure * (widestLineCharCount - 1);
+
+  // target ~88% of maxWidth so there's a little margin
+  const target = maxWidth * 0.94;
+  const scale = target / Math.max(longest,1);
+  const fontSize = measureSize * scale;
+  const ls = lsAtMeasure * scale;
+  const lh = fontSize * lineHeight;
+
+  // canvas dims
+  const W = Math.ceil(maxWidth);
+  const H = Math.ceil(lh * lines.length + fontSize*0.3);
+  canvas.width = W;
+  canvas.height = H;
+
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle = '#000';
+  ctx.font = `${fontWeight} ${fontSize}px ${fontFamily}, sans-serif`;
+  ctx.textBaseline = 'alphabetic';
+
+  // Draw each line, applying letter-spacing manually so it works cross-browser.
+  const lineRects = [];
+  for (let i=0;i<lines.length;i++){
+    const line = lines[i];
+    const y = (i+1) * lh - fontSize*0.18;
+    // measure full width with letter-spacing
+    let totalW = 0;
+    const widths = [];
+    for (const ch of line){
+      const w = ctx.measureText(ch).width;
+      widths.push(w);
+      totalW += w;
+    }
+    totalW += ls * (line.length-1);
+    let x = (W - totalW)/2;
+    const startX = x;
+    for (let j=0;j<line.length;j++){
+      ctx.fillText(line[j], x, y);
+      x += widths[j] + ls;
+    }
+    lineRects.push({
+      top: (i)*lh + fontSize*0.05,
+      bottom: (i+1)*lh - fontSize*0.05,
+      left: startX,
+      right: startX + totalW,
+    });
+  }
+
+  // Sample
+  const data = ctx.getImageData(0,0,W,H).data;
+  const step = sampleStep;
+  const items = [];
+  for (let y=0; y<H; y+=step){
+    for (let x=0; x<W; x+=step){
+      // sample center pixel alpha
+      const idx = (y*W + x)*4 + 3;
+      if (data[idx] > threshold){
+        items.push({x,y});
+      }
+    }
+  }
+
+  return { items, width:W, height:H, lineRects, fontSize, lh };
+}
+
+/* ────────── postit rendering ────────── */
+
+function renderPostits(wrap, sample, opts){
+  const { postitSize, rotJitter, posJitter, scaleJitter, postit, borderColor, borderWidth } = opts;
+
+  // Build inner HTML once for performance
+  let html = '';
+  // seeded random for repeatability based on text+settings (so postits don't reshuffle on every render)
+  let seed = opts.seed || 1;
+  const rng = () => { seed = (seed*9301 + 49297) % 233280; return seed/233280; };
+
+  for (const it of sample.items){
+    const rot = (rng()*2-1) * rotJitter;
+    const ox  = (rng()*2-1) * posJitter;
+    const oy  = (rng()*2-1) * posJitter;
+    const sc  = 1 + (rng()*2-1) * scaleJitter;
+    const px  = it.x + ox - postitSize/2;
+    const py  = it.y + oy - postitSize/2;
+    html += `<div class="postit" style="left:${px.toFixed(1)}px;top:${py.toFixed(1)}px;width:${postitSize}px;height:${postitSize}px;transform:rotate(${rot.toFixed(1)}deg) scale(${sc.toFixed(3)});background:${postit};border:${borderWidth}px solid ${borderColor};"></div>`;
+  }
+  wrap.style.width = sample.width + 'px';
+  wrap.style.height = sample.height + 'px';
+  wrap.innerHTML = html;
+}
+
+/* ────────── secondary text lines positioning ────────── */
+
+function placeLines(linesEl, subLines, sample, stageWidth){
+  if (!sample.lineRects.length){ linesEl.innerHTML=''; return; }
+  // Distribute subLines roughly between letter rows in the empty bands
+  const rects = sample.lineRects;
+  const slots = [];
+  // top slot
+  if (rects[0].top > 40) slots.push({ y: rects[0].top * 0.45 });
+  for (let i=0;i<rects.length-1;i++){
+    slots.push({ y: (rects[i].bottom + rects[i+1].top) / 2 });
+  }
+  // bottom slot
+  slots.push({ y: rects[rects.length-1].bottom + 40 });
+
+  // assign subLines to slots
+  let html = '';
+  const offsets = [0.18, 0.34, 0.06, 0.42, 0.12, 0.30]; // varied left offsets
+  for (let i=0;i<Math.min(subLines.length, slots.length);i++){
+    const s = slots[i];
+    const left = (offsets[i % offsets.length] * 100).toFixed(1);
+    html += `<div class="l" style="top:${(s.y-14).toFixed(1)}px;left:${left}%">${escapeHtml(subLines[i])}</div>`;
+  }
+  linesEl.innerHTML = html;
+}
+function escapeHtml(s){return s.replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
+
+/* ────────── App ────────── */
+
+function App(){
+  const [t, setTweak] = useTweaks(window.TWEAK_DEFAULTS);
+  const wrapRef = useRef(null);
+  const linesRef = useRef(null);
+  const [stageW, setStageW] = useState(window.innerWidth - 112);
+
+  // header text edit state
+  const [editing, setEditing] = useState(false);
+
+  // recompute on resize
+  useEffect(()=>{
+    const onR = () => setStageW(Math.max(360, window.innerWidth - 112));
+    window.addEventListener('resize', onR);
+    return ()=>window.removeEventListener('resize', onR);
+  },[]);
+
+  // Wait for fonts to be ready, then render whenever inputs change
+  const [fontsReady, setFontsReady] = useState(false);
+  useEffect(()=>{
+    let cancelled = false;
+    document.fonts.ready.then(()=>{ if (!cancelled) setFontsReady(true); });
+    return ()=>{cancelled=true};
+  },[]);
+
+  // Also re-render when the selected font becomes loaded
+  useEffect(()=>{
+    if (!t.fontFamily) return;
+    document.fonts.load(`${t.fontWeight} 100px ${t.fontFamily}`).then(()=>setFontsReady(f=>!f?true:f));
+  },[t.fontFamily, t.fontWeight]);
+
+  useLayoutEffect(()=>{
+    if (!fontsReady) return;
+    if (!wrapRef.current) return;
+    const opts = {
+      fontFamily: t.fontFamily,
+      fontWeight: t.fontWeight,
+      letterSpacing: t.letterSpacing,
+      lineHeight: t.lineHeight,
+      postitSize: t.postitSize,
+      rotJitter: t.rotJitter,
+      posJitter: t.posJitter,
+      scaleJitter: t.scaleJitter,
+      sampleStep: Math.max(2, Math.round(t.postitSpacing)),
+      threshold: t.threshold,
+      maxWidth: stageW,
+      postit: t.postit,
+      borderColor: t.borderColor,
+      borderWidth: t.borderWidth,
+      // seed depends on inputs so different settings/text produce different (but stable) layouts
+      seed: 1 + (t.headline.length * 13) + Math.floor(t.postitSize*7) + Math.floor(t.rotJitter*11),
+    };
+    const sample = samplePostits(t.headline, opts);
+    renderPostits(wrapRef.current, sample, opts);
+    if (t.showLines && linesRef.current) placeLines(linesRef.current, t.subLines, sample, stageW);
+    else if (linesRef.current) linesRef.current.innerHTML='';
+  }, [t, stageW, fontsReady]);
+
+  // apply bg
+  useEffect(()=>{
+    document.documentElement.style.setProperty('--bg', t.bg);
+    document.documentElement.style.setProperty('--postit', t.postit);
+  },[t.bg, t.postit]);
+
+  return (
+    <>
+      {t.showEditor && (
+        <div className="editor">
+          <label>HEADLINE (Enter = 줄바꿈)</label>
+          <textarea
+            value={t.headline}
+            onChange={e=>setTweak('headline', e.target.value)}
+            spellCheck={false}
+          />
+          <label>SUB LINES (한 줄에 하나)</label>
+          <textarea
+            value={t.subLines.join('\n')}
+            onChange={e=>setTweak('subLines', e.target.value.split('\n'))}
+            spellCheck={false}
+          />
+          <div className="hint">우측 하단 ⚙️ Tweaks 로 폰트·사이즈·지터를 조절하세요.</div>
+        </div>
+      )}
+
+      <TweaksPanel>
+        <TweakSection label="Headline" />
+        <TweakText  label="Text (\\n for newline)" value={t.headline.replace(/\n/g,'\\n')}
+                    onChange={v=>setTweak('headline', v.replace(/\\n/g,'\n'))}/>
+        <TweakSelect label="Font"
+                    value={t.fontFamily}
+                    options={["Anton","Archivo Black","Bebas Neue","Bowlby One","Bungee","Black Han Sans","Do Hyeon","Jua","Inter","Noto Sans KR"]}
+                    onChange={v=>setTweak('fontFamily', v)}/>
+        <TweakRadio label="Weight" value={t.fontWeight}
+                    options={[400,700,900]}
+                    onChange={v=>setTweak('fontWeight', v)}/>
+        <TweakSlider label="Letter spacing" value={t.letterSpacing} min={-20} max={20} step={1}
+                    onChange={v=>setTweak('letterSpacing', v)}/>
+        <TweakSlider label="Line height" value={t.lineHeight} min={0.7} max={1.4} step={0.02}
+                    onChange={v=>setTweak('lineHeight', v)}/>
+
+        <TweakSection label="Post-it" />
+        <TweakSlider label="Size" value={t.postitSize} min={6} max={48} step={1} unit="px"
+                    onChange={v=>setTweak('postitSize', v)}/>
+        <TweakSlider label="Spacing" value={t.postitSpacing} min={4} max={60} step={1} unit="px"
+                    onChange={v=>setTweak('postitSpacing', v)}/>
+        <TweakSlider label="Rotation jitter" value={t.rotJitter} min={0} max={45} step={1} unit="°"
+                    onChange={v=>setTweak('rotJitter', v)}/>
+        <TweakSlider label="Position jitter" value={t.posJitter} min={0} max={20} step={0.5} unit="px"
+                    onChange={v=>setTweak('posJitter', v)}/>
+        <TweakSlider label="Size jitter" value={t.scaleJitter} min={0} max={0.5} step={0.02}
+                    onChange={v=>setTweak('scaleJitter', v)}/>
+        <TweakSlider label="Edge threshold" value={t.threshold} min={20} max={240} step={5}
+                    onChange={v=>setTweak('threshold', v)}/>
+
+        <TweakSection label="Colors" />
+        <TweakColor label="Background" value={t.bg}
+                    options={["#C8161D","#171717","#1A7CFF","#FFC600","#38AD0E","#E8178A","#FF6610","#F3F5F7"]}
+                    onChange={v=>setTweak('bg', v)}/>
+        <TweakColor label="Post-it" value={t.postit}
+                    options={["#FFFFFF","#FFF59A","#FFC600","#FF9DCB","#A6F4C5","#181A1C"]}
+                    onChange={v=>setTweak('postit', v)}/>
+        <TweakColor label="Border" value={t.borderColor}
+                    options={["#181A1C","#000000","#C8161D","#FFFFFF","#7E8082","#1A7CFF"]}
+                    onChange={v=>setTweak('borderColor', v)}/>
+        <TweakSlider label="Border width" value={t.borderWidth} min={0} max={4} step={0.5} unit="px"
+                    onChange={v=>setTweak('borderWidth', v)}/>
+
+        <TweakSection label="Display" />
+        <TweakToggle label="Show sub-lines" value={t.showLines}
+                    onChange={v=>setTweak('showLines', v)}/>
+        <TweakToggle label="Show inline editor" value={t.showEditor}
+                    onChange={v=>setTweak('showEditor', v)}/>
+      </TweaksPanel>
+
+      <div style={{display:'none'}} ref={wrapRef}></div>
+      <div style={{display:'none'}} ref={linesRef}></div>
+      <Mount wrapRef={wrapRef} linesRef={linesRef}/>
+    </>
+  );
+}
+
+// Tiny portal that grafts our two refs onto the actual DOM nodes in markup.
+function Mount({wrapRef, linesRef}){
+  useLayoutEffect(()=>{
+    wrapRef.current = document.getElementById('wrap');
+    linesRef.current = document.getElementById('lines');
+  },[]);
+  return null;
+}
+
+const root = ReactDOM.createRoot(document.createElement('div'));
+document.body.appendChild(root._internalRoot ? root._internalRoot.containerInfo : document.createElement('div'));
+ReactDOM.createRoot(document.body.appendChild(document.createElement('div'))).render(<App />);
+</script>
+</body>
+</html>
