@@ -508,11 +508,9 @@ hiddenInput.addEventListener('keydown', (e) => {
 });
 
 // ============================================
-// 클릭하면 주변 포스트잇 흩어졌다가 다시 모임
+// 클릭하면 주변 포스트잇 흩어졌다가 다시 모임 (블랙홀)
 // ============================================
-document.body.addEventListener('mousedown', (e) => {
-  hiddenInput.focus();
-  
+window.addEventListener('pointerdown', (e) => {
   const wrap = document.getElementById('wrap');
   const postits = wrap.querySelectorAll('.postit');
   if (postits.length === 0) return;
@@ -520,7 +518,7 @@ document.body.addEventListener('mousedown', (e) => {
   const rect = wrap.getBoundingClientRect();
   const clickX = e.clientX - rect.left;
   const clickY = e.clientY - rect.top;
-  const RADIUS = 200;
+  const RADIUS = 250;
   
   postits.forEach(p => {
     const px = parseFloat(p.style.left) + CONFIG.postitSize / 2;
@@ -551,6 +549,9 @@ document.body.addEventListener('mousedown', (e) => {
       }, 200 + Math.random() * 300);
     }
   });
+  
+  // 포커스 유지
+  setTimeout(() => hiddenInput.focus(), 10);
 });
 
 window.addEventListener('resize', () => {
