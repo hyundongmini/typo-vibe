@@ -54,11 +54,11 @@
       inset 0 0 0 0.5px rgba(0,0,0,0.05);
   }
 
-  /* 떨어지는 여분 종이 - 글자에서 떨어져 나옴 */
+  /* 떨어지는 포스트잇 - 글자에서 떨어져 나옴 */
   .paper-falling {
     position: fixed;
-    background: var(--postit);
-    border: 1px solid var(--border);
+    background: #FFFFFF;
+    border: 1px solid #1A7CFF;
     border-radius: 1px;
     pointer-events: none;
     transform-style: preserve-3d;
@@ -373,38 +373,42 @@ function render() {
 }
 
 // ============================================
-// 여분 종이 떨어뜨리기 (글자 구조 안에서 떨어짐)
+// 글자에 붙어있던 포스트잇이 떨어져 나감
 // ============================================
 function spawnFallingPapers(count) {
   const wrap = document.getElementById('wrap');
   const postits = wrap.querySelectorAll('.postit');
   
-  if (postits.length === 0) return;
+  if (postits.length < count) return;
   
   // 글자를 구성하는 포스트잇 중 랜덤으로 선택
-  for (let i = 0; i < count; i++) {
-    const sourceIdx = Math.floor(Math.random() * postits.length);
-    const source = postits[sourceIdx];
+  const indices = [];
+  while (indices.length < count) {
+    const idx = Math.floor(Math.random() * postits.length);
+    if (!indices.includes(idx)) indices.push(idx);
+  }
+  
+  indices.forEach((idx, i) => {
+    const source = postits[idx];
     const rect = source.getBoundingClientRect();
     
     const paper = document.createElement('div');
     paper.className = 'paper-falling';
     
-    // 원본 포스트잇과 동일한 크기
-    const size = CONFIG.postitSize;
-    const drift = (Math.random() - 0.5) * 120;
+    const drift = (Math.random() - 0.5) * 100;
     const rx = (Math.random() - 0.5) * 160;
     const ry = (Math.random() - 0.5) * 120;
     const rzStart = (Math.random() - 0.5) * 80;
     const rzEnd = (Math.random() - 0.5) * 60;
     const duration = 2.5 + Math.random() * 2;
-    const delay = i * 180;
+    const delay = i * 150;
 
+    // 원본 포스트잇 위치에서 시작
     paper.style.cssText = `
       left: ${rect.left}px;
       top: ${rect.top}px;
-      width: ${size}px;
-      height: ${size}px;
+      width: ${rect.width}px;
+      height: ${rect.height}px;
       --drift: ${drift.toFixed(0)}px;
       --rx: ${rx.toFixed(0)}deg;
       --ry: ${ry.toFixed(0)}deg;
@@ -418,7 +422,7 @@ function spawnFallingPapers(count) {
     requestAnimationFrame(() => paper.classList.add('animate'));
 
     setTimeout(() => paper.remove(), (duration * 1000) + delay + 200);
-  }
+  });
 }
 
 // ============================================
