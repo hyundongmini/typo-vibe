@@ -478,6 +478,7 @@ hiddenInput.focus();
 // input 이벤트로 한글 조합 처리
 hiddenInput.addEventListener('input', (e) => {
   hint.classList.add('hidden');
+  resetIdleTimer();
   
   const newText = hiddenInput.value;
   
@@ -511,6 +512,15 @@ hiddenInput.addEventListener('keydown', (e) => {
     hiddenInput.dispatchEvent(new Event('input'));
   }
   
+  // Escape = 우수수 떨어짐
+  if (e.key === 'Escape') {
+    dropAllPostits();
+    setTimeout(() => {
+      previousCount = 0;
+      render();
+    }, 1500);
+  }
+  
   // 스페이스바 = 우수수 떨어짐
   if (e.key === ' ') {
     e.preventDefault();
@@ -521,9 +531,6 @@ hiddenInput.addEventListener('keydown', (e) => {
       render();
     }, 1500);
   }
-  
-  // 타이핑 시 idle 타이머 리셋
-  resetIdleTimer();
 });
 
 // ============================================
