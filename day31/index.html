@@ -54,22 +54,19 @@
       inset 0 0 0 0.5px rgba(0,0,0,0.05);
   }
 
-  /* 떨어지는 여분 종이 - 더 입체적 */
+  /* 떨어지는 여분 종이 - 글자에서 떨어져 나옴 */
   .paper-falling {
     position: fixed;
     background: var(--postit);
-    border: 1px solid rgba(0,0,0,0.08);
+    border: 1px solid var(--border);
     border-radius: 1px;
     pointer-events: none;
     transform-style: preserve-3d;
     opacity: 0;
     z-index: 100;
-    /* 종이 질감: 그림자로 입체감 */
-    background: linear-gradient(135deg, #fff 0%, #f8f8f8 50%, #fff 100%);
     box-shadow: 
-      2px 3px 8px rgba(0,0,0,0.15),
-      0 0 0 0.5px rgba(0,0,0,0.05),
-      inset 0 1px 0 rgba(255,255,255,0.8);
+      1px 2px 4px rgba(0,0,0,0.15),
+      inset 0 0 0 0.5px rgba(0,0,0,0.05);
   }
 
   .paper-falling.animate {
@@ -85,8 +82,7 @@
         translateX(0)
         rotateX(0deg)
         rotateY(0deg)
-        rotateZ(0deg)
-        perspective(800px);
+        rotateZ(0deg);
     }
     10% {
       opacity: 1;
@@ -377,30 +373,38 @@ function render() {
 }
 
 // ============================================
-// 여분 종이 떨어뜨리기 (5~7장, 크고 확실하게)
+// 여분 종이 떨어뜨리기 (글자 구조 안에서 떨어짐)
 // ============================================
 function spawnFallingPapers(count) {
+  const wrap = document.getElementById('wrap');
+  const postits = wrap.querySelectorAll('.postit');
+  
+  if (postits.length === 0) return;
+  
+  // 글자를 구성하는 포스트잇 중 랜덤으로 선택
   for (let i = 0; i < count; i++) {
+    const sourceIdx = Math.floor(Math.random() * postits.length);
+    const source = postits[sourceIdx];
+    const rect = source.getBoundingClientRect();
+    
     const paper = document.createElement('div');
     paper.className = 'paper-falling';
     
-    // 큰 크기 (40~70px)
-    const size = 40 + Math.random() * 30;
-    // 화면 상단 랜덤 위치에서 시작
-    const startLeft = 20 + Math.random() * 60; // 20~80% 위치
-    const drift = (Math.random() - 0.5) * 150;
+    // 원본 포스트잇과 동일한 크기
+    const size = CONFIG.postitSize;
+    const drift = (Math.random() - 0.5) * 120;
     const rx = (Math.random() - 0.5) * 160;
     const ry = (Math.random() - 0.5) * 120;
     const rzStart = (Math.random() - 0.5) * 80;
     const rzEnd = (Math.random() - 0.5) * 60;
-    const duration = 3 + Math.random() * 2; // 3~5초 (느리게)
-    const delay = i * 200; // 200ms 간격
+    const duration = 2.5 + Math.random() * 2;
+    const delay = i * 180;
 
     paper.style.cssText = `
-      left: ${startLeft}%;
-      top: -${size + 20}px;
-      width: ${size.toFixed(0)}px;
-      height: ${size.toFixed(0)}px;
+      left: ${rect.left}px;
+      top: ${rect.top}px;
+      width: ${size}px;
+      height: ${size}px;
       --drift: ${drift.toFixed(0)}px;
       --rx: ${rx.toFixed(0)}deg;
       --ry: ${ry.toFixed(0)}deg;
@@ -411,11 +415,8 @@ function spawnFallingPapers(count) {
     `;
 
     document.body.appendChild(paper);
-    
-    // 클래스 추가로 애니메이션 시작
     requestAnimationFrame(() => paper.classList.add('animate'));
 
-    // 애니메이션 끝나면 제거
     setTimeout(() => paper.remove(), (duration * 1000) + delay + 200);
   }
 }
