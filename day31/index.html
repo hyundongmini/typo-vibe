@@ -510,16 +510,10 @@ hiddenInput.addEventListener('keydown', (e) => {
 // ============================================
 // 클릭하면 주변 포스트잇 흩어졌다가 다시 모임
 // ============================================
-document.addEventListener('click', (e) => {
-  const wrap = document.getElementById('wrap');
-  if (!wrap.contains(e.target) && e.target !== wrap) {
-    // wrap 바깥 클릭은 input 포커스만
-    hiddenInput.focus();
-    return;
-  }
-  
+document.querySelector('.stage').addEventListener('click', (e) => {
   hiddenInput.focus();
   
+  const wrap = document.getElementById('wrap');
   const postits = wrap.querySelectorAll('.postit:not(.gather)');
   if (postits.length === 0) return;
   
@@ -528,6 +522,7 @@ document.addEventListener('click', (e) => {
   const clickY = e.clientY - rect.top;
   const RADIUS = 200;
   
+  let hit = false;
   postits.forEach(p => {
     const px = parseFloat(p.style.left) + CONFIG.postitSize / 2;
     const py = parseFloat(p.style.top) + CONFIG.postitSize / 2;
@@ -537,6 +532,7 @@ document.addEventListener('click', (e) => {
     const dist = Math.sqrt(dx * dx + dy * dy);
     
     if (dist < RADIUS) {
+      hit = true;
       const force = (1 - dist / RADIUS) * 200;
       const angle = Math.atan2(dy, dx);
       const throwX = Math.cos(angle) * force;
