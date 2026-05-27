@@ -54,49 +54,52 @@
       inset 0 0 0 0.5px rgba(0,0,0,0.05);
   }
 
-  /* 글자에서 떨어지는 포스트잇 */
-  .paper-falling {
-    position: fixed;
-    background: #FFFFFF;
-    border: 1px solid #1A7CFF;
-    border-radius: 1px;
-    pointer-events: none;
-    transform-style: preserve-3d;
+  /* 새로 추가되는 포스트잇: 위에서 떨어져서 제자리에 안착 */
+  .postit.new {
     opacity: 0;
-    z-index: 100;
-    box-shadow: 
-      1px 2px 4px rgba(0,0,0,0.15),
-      inset 0 0 0 0.5px rgba(0,0,0,0.05);
+    animation: postit-land var(--fall-duration) cubic-bezier(0.2, 0.6, 0.4, 1) forwards;
+    animation-delay: var(--fall-delay);
   }
 
-  .paper-falling.animate {
-    animation: paper-fall var(--duration) cubic-bezier(0.2, 0.6, 0.4, 1) forwards;
-    animation-delay: var(--delay);
-  }
-
-  @keyframes paper-fall {
+  @keyframes postit-land {
     0% {
       opacity: 1;
-      transform: translateY(0) translateX(0) rotateZ(0deg) rotateX(0deg);
+      transform: 
+        translateY(var(--fall-from))
+        translateX(var(--fall-drift))
+        rotateZ(var(--fall-rz-start))
+        rotateX(25deg);
     }
-    15% {
+    30% {
       opacity: 1;
-      transform: translateY(10vh) translateX(var(--drift)) rotateZ(var(--rz-start)) rotateX(30deg);
+      transform: 
+        translateY(calc(var(--fall-from) * 0.4))
+        translateX(calc(var(--fall-drift) * -0.3))
+        rotateZ(calc(var(--fall-rz-start) * -0.5))
+        rotateX(-15deg);
     }
-    35% {
-      transform: translateY(28vh) translateX(calc(var(--drift) * -0.5)) rotateZ(calc(var(--rz-start) * -0.6)) rotateX(-20deg);
+    60% {
+      transform: 
+        translateY(calc(var(--fall-from) * 0.1))
+        translateX(calc(var(--fall-drift) * 0.15))
+        rotateZ(calc(var(--fall-rz-end) * 1.2))
+        rotateX(8deg);
     }
-    55% {
-      opacity: 0.85;
-      transform: translateY(48vh) translateX(calc(var(--drift) * 0.4)) rotateZ(var(--rz-end)) rotateX(15deg);
-    }
-    75% {
-      opacity: 0.5;
-      transform: translateY(68vh) translateX(calc(var(--drift) * -0.2)) rotateZ(calc(var(--rz-end) * -0.4)) rotateX(-10deg);
+    85% {
+      transform: 
+        translateY(-3px)
+        translateX(0)
+        rotateZ(var(--fall-rz-end))
+        rotateX(-3deg);
     }
     100% {
-      opacity: 0;
-      transform: translateY(100vh) translateX(0) rotateZ(var(--rz-end)) rotateX(0deg);
+      opacity: 1;
+      transform: 
+        translateY(0)
+        translateX(0)
+        rotateZ(var(--final-rot))
+        rotateX(0deg)
+        scale(var(--final-sc));
     }
   }
 
@@ -381,14 +384,41 @@ function render() {
     const px = it.x + ox - postitSize / 2;
     const py = it.y + oy - postitSize / 2;
 
-    // 모든 포스트잇 즉시 표시
-    html += `<div class="postit" style="
-      left:${px.toFixed(1)}px;
-      top:${py.toFixed(1)}px;
-      width:${postitSize}px;
-      height:${postitSize}px;
-      transform: rotateZ(${rot.toFixed(1)}deg) scale(${sc.toFixed(3)});
-    "></div>`;
+    const isNew = idx >= previousCount;
+
+    if (isNew) {
+      // 새 포스트잇: 위에서 떨어져서 제자리에 안착
+      const fallFrom = -150 - Math.random() * 200; // 위에서 시작
+      const fallDrift = (rng() * 2 - 1) * 50; // 좌우 흔들림
+      const fallRzStart = (rng() * 2 - 1) * 60;
+      const fallRzEnd = (rng() * 2 - 1) * 20;
+      const fallDelay = (idx - previousCount) * 8; // 8ms 간격
+      const fallDuration = 0.6 + rng() * 0.4; // 0.6~1초
+
+      html += `<div class="postit new" style="
+        left:${px.toFixed(1)}px;
+        top:${py.toFixed(1)}px;
+        width:${postitSize}px;
+        height:${postitSize}px;
+        --fall-from:${fallFrom.toFixed(0)}px;
+        --fall-drift:${fallDrift.toFixed(0)}px;
+        --fall-rz-start:${fallRzStart.toFixed(0)}deg;
+        --fall-rz-end:${fallRzEnd.toFixed(0)}deg;
+        --final-rot:${rot.toFixed(1)}deg;
+        --final-sc:${sc.toFixed(3)};
+        --fall-delay:${fallDelay}ms;
+        --fall-duration:${fallDuration.toFixed(2)}s;
+      "></div>`;
+    } else {
+      // 기존 포스트잇: 즉시 표시
+      html += `<div class="postit" style="
+        left:${px.toFixed(1)}px;
+        top:${py.toFixed(1)}px;
+        width:${postitSize}px;
+        height:${postitSize}px;
+        transform: rotateZ(${rot.toFixed(1)}deg) scale(${sc.toFixed(3)});
+      "></div>`;
+    }
   });
 
   wrap.style.width = sample.width + 'px';
@@ -396,52 +426,6 @@ function render() {
   wrap.innerHTML = html;
 
   previousCount = sample.items.length;
-}
-
-// ============================================
-// 글자에서 포스트잇 떨어뜨리기
-// ============================================
-function spawnFallingPapers(count) {
-  const wrap = document.getElementById('wrap');
-  const postits = wrap.querySelectorAll('.postit');
-  
-  if (postits.length < count) return;
-  
-  const indices = [];
-  while (indices.length < count) {
-    const idx = Math.floor(Math.random() * postits.length);
-    if (!indices.includes(idx)) indices.push(idx);
-  }
-  
-  indices.forEach((idx, i) => {
-    const source = postits[idx];
-    const rect = source.getBoundingClientRect();
-    
-    const paper = document.createElement('div');
-    paper.className = 'paper-falling';
-    
-    const drift = (Math.random() - 0.5) * 80;
-    const rzStart = (Math.random() - 0.5) * 40;
-    const rzEnd = (Math.random() - 0.5) * 30;
-    const duration = 3 + Math.random() * 2;
-    const delay = i * 150;
-
-    paper.style.cssText = `
-      left: ${rect.left}px;
-      top: ${rect.top}px;
-      width: ${rect.width}px;
-      height: ${rect.height}px;
-      --drift: ${drift.toFixed(0)}px;
-      --rz-start: ${rzStart.toFixed(0)}deg;
-      --rz-end: ${rzEnd.toFixed(0)}deg;
-      --duration: ${duration.toFixed(2)}s;
-      --delay: ${delay}ms;
-    `;
-
-    document.body.appendChild(paper);
-    requestAnimationFrame(() => paper.classList.add('animate'));
-    setTimeout(() => paper.remove(), (duration * 1000) + delay + 200);
-  });
 }
 
 // ============================================
@@ -468,11 +452,7 @@ hiddenInput.addEventListener('input', (e) => {
     
     cursorDisplay.innerHTML = currentText.replace(/\n/g, '↵') + '<span>|</span>';
     
-    // 글자가 추가됐을 때 렌더링 + 종이 떨어뜨리기
-    if (wasLonger && currentText.length > 0 && currentText.length % 3 === 0) {
-      setTimeout(() => spawnFallingPapers(5 + Math.floor(Math.random() * 3)), 100);
-    }
-    
+    // 글자가 추가됐을 때 렌더링
     if (renderTimeout) clearTimeout(renderTimeout);
     renderTimeout = setTimeout(() => render(), 30);
   }
