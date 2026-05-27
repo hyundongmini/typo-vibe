@@ -510,11 +510,11 @@ hiddenInput.addEventListener('keydown', (e) => {
 // ============================================
 // 클릭하면 주변 포스트잇 흩어졌다가 다시 모임
 // ============================================
-document.querySelector('.stage').addEventListener('click', (e) => {
+document.body.addEventListener('mousedown', (e) => {
   hiddenInput.focus();
   
   const wrap = document.getElementById('wrap');
-  const postits = wrap.querySelectorAll('.postit:not(.gather)');
+  const postits = wrap.querySelectorAll('.postit');
   if (postits.length === 0) return;
   
   const rect = wrap.getBoundingClientRect();
@@ -522,7 +522,6 @@ document.querySelector('.stage').addEventListener('click', (e) => {
   const clickY = e.clientY - rect.top;
   const RADIUS = 200;
   
-  let hit = false;
   postits.forEach(p => {
     const px = parseFloat(p.style.left) + CONFIG.postitSize / 2;
     const py = parseFloat(p.style.top) + CONFIG.postitSize / 2;
@@ -532,7 +531,6 @@ document.querySelector('.stage').addEventListener('click', (e) => {
     const dist = Math.sqrt(dx * dx + dy * dy);
     
     if (dist < RADIUS) {
-      hit = true;
       const force = (1 - dist / RADIUS) * 200;
       const angle = Math.atan2(dy, dx);
       const throwX = Math.cos(angle) * force;
