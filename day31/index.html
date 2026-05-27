@@ -470,8 +470,7 @@ const hint = document.getElementById('hint');
 const cursorDisplay = document.getElementById('cursor-display');
 const hiddenInput = document.getElementById('hidden-input');
 
-// 페이지 클릭 시 input에 포커스
-document.addEventListener('click', () => hiddenInput.focus());
+// 페이지 어디든 클릭 시 input에 포커스 (클릭 폭발과 별도)
 hiddenInput.focus();
 
 // input 이벤트로 한글 조합 처리
@@ -511,8 +510,16 @@ hiddenInput.addEventListener('keydown', (e) => {
 // ============================================
 // 클릭하면 주변 포스트잇 흩어졌다가 다시 모임
 // ============================================
-document.querySelector('.canvas-wrap').addEventListener('click', (e) => {
+document.addEventListener('click', (e) => {
   const wrap = document.getElementById('wrap');
+  if (!wrap.contains(e.target) && e.target !== wrap) {
+    // wrap 바깥 클릭은 input 포커스만
+    hiddenInput.focus();
+    return;
+  }
+  
+  hiddenInput.focus();
+  
   const postits = wrap.querySelectorAll('.postit:not(.gather)');
   if (postits.length === 0) return;
   
