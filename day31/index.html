@@ -284,6 +284,8 @@ const CONFIG = {
 let currentText = '';
 let previousCount = 0;
 let renderTimeout = null;
+let idleTimer = null;
+let idleInterval = null;
 
 // ============================================
 // 픽셀 샘플링
@@ -493,19 +495,97 @@ hiddenInput.addEventListener('input', (e) => {
     
     cursorDisplay.innerHTML = currentText.replace(/\n/g, '↵') + '<span>|</span>';
     
+    // idle 타이머 리셋
+    resetIdleTimer();
+    
     if (renderTimeout) clearTimeout(renderTimeout);
     renderTimeout = setTimeout(() => render(), wasShorter ? 400 : 30);
   }
 });
 
-// Enter 키 처리
+// Enter 키 처리 + 스페이스바 우수수
 hiddenInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') {
     e.preventDefault();
     hiddenInput.value += '\n';
     hiddenInput.dispatchEvent(new Event('input'));
   }
+  
+  // 스페이스바 = 우수수 떨어짐
+  if (e.key === ' ') {
+    e.preventDefault();
+    dropAllPostits();
+    // 1.5초 후 다시 모임
+    setTimeout(() => {
+      previousCount = 0;
+      render();
+    }, 1500);
+  }
+  
+  // 타이핑 시 idle 타이머 리셋
+  resetIdleTimer();
 });
+
+// ============================================
+// 스페이스바: 전부 우수수 떨어짐
+// ============================================
+function dropAllPostits() {
+  const wrap = document.getElementById('wrap');
+  const postits = wrap.querySelectorAll('.postit');
+  
+  postits.forEach((p, i) => {
+    const delay = Math.random() * 300;
+    const fallY = 300 + Math.random() * 400;
+    const fallX = (Math.random() - 0.5) * 100;
+    const rot = (Math.random() - 0.5) * 90;
+    
+    setTimeout(() => {
+      p.style.transition = `transform 0.6s cubic-bezier(0.4, 0, 1, 0.6), opacity 0.6s ease`;
+      p.style.transform = `translate(${fallX}px, ${fallY}px) rotateZ(${rot}deg) scale(0.8)`;
+      p.style.opacity = '0';
+    }, delay);
+  });
+}
+
+// ============================================
+// Idle: 5초 동안 안 치면 포스트잇 하나씩 떨어짐
+// ============================================
+function resetIdleTimer() {
+  if (idleTimer) clearTimeout(idleTimer);
+  if (idleInterval) clearInterval(idleInterval);
+  
+  idleTimer = setTimeout(() => {
+    startIdleDrop();
+  }, 5000);
+}
+
+function startIdleDrop() {
+  const wrap = document.getElementById('wrap');
+  
+  idleInterval = setInterval(() => {
+    const postits = wrap.querySelectorAll('.postit:not(.dropped)');
+    if (postits.length === 0) {
+      clearInterval(idleInterval);
+      return;
+    }
+    
+    // 랜덤으로 하나 선택
+    const idx = Math.floor(Math.random() * postits.length);
+    const p = postits[idx];
+    
+    const fallY = 300 + Math.random() * 300;
+    const fallX = (Math.random() - 0.5) * 60;
+    const rot = (Math.random() - 0.5) * 45;
+    
+    p.classList.add('dropped');
+    p.style.transition = `transform 1.2s cubic-bezier(0.4, 0, 0.7, 0.4), opacity 1.2s ease`;
+    p.style.transform = `translate(${fallX}px, ${fallY}px) rotateZ(${rot}deg)`;
+    p.style.opacity = '0.3';
+  }, 400); // 0.4초마다 하나씩
+}
+
+// 초기 idle 타이머 시작
+resetIdleTimer();
 
 window.addEventListener('resize', () => {
   previousCount = 0;
