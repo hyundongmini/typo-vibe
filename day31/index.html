@@ -57,7 +57,7 @@
   /* 새로 추가되는 포스트잇: 위에서 떨어져서 제자리에 안착 */
   .postit.new {
     opacity: 0;
-    animation: postit-land var(--fall-duration) cubic-bezier(0.2, 0.6, 0.4, 1) forwards;
+    animation: postit-land var(--fall-duration) cubic-bezier(0.4, 0, 0.2, 1) forwards;
     animation-delay: var(--fall-delay);
   }
 
@@ -67,30 +67,20 @@
       transform: 
         translateY(var(--fall-from))
         translateX(var(--fall-drift))
-        rotateZ(var(--fall-rz-start))
-        rotateX(25deg);
+        rotateZ(var(--fall-rz-start));
     }
-    30% {
+    40% {
       opacity: 1;
       transform: 
-        translateY(calc(var(--fall-from) * 0.4))
-        translateX(calc(var(--fall-drift) * -0.3))
-        rotateZ(calc(var(--fall-rz-start) * -0.5))
-        rotateX(-15deg);
+        translateY(calc(var(--fall-from) * 0.3))
+        translateX(calc(var(--fall-drift) * -0.4))
+        rotateZ(calc(var(--fall-rz-start) * -0.3));
     }
-    60% {
+    70% {
       transform: 
-        translateY(calc(var(--fall-from) * 0.1))
-        translateX(calc(var(--fall-drift) * 0.15))
-        rotateZ(calc(var(--fall-rz-end) * 1.2))
-        rotateX(8deg);
-    }
-    85% {
-      transform: 
-        translateY(-3px)
-        translateX(0)
-        rotateZ(var(--fall-rz-end))
-        rotateX(-3deg);
+        translateY(-5px)
+        translateX(calc(var(--fall-drift) * 0.1))
+        rotateZ(calc(var(--final-rot) + 3deg));
     }
     100% {
       opacity: 1;
@@ -98,7 +88,6 @@
         translateY(0)
         translateX(0)
         rotateZ(var(--final-rot))
-        rotateX(0deg)
         scale(var(--final-sc));
     }
   }
@@ -388,12 +377,11 @@ function render() {
 
     if (isNew) {
       // 새 포스트잇: 위에서 떨어져서 제자리에 안착
-      const fallFrom = -150 - Math.random() * 200; // 위에서 시작
-      const fallDrift = (rng() * 2 - 1) * 50; // 좌우 흔들림
-      const fallRzStart = (rng() * 2 - 1) * 60;
-      const fallRzEnd = (rng() * 2 - 1) * 20;
-      const fallDelay = (idx - previousCount) * 8; // 8ms 간격
-      const fallDuration = 0.6 + rng() * 0.4; // 0.6~1초
+      const fallFrom = -80 - Math.random() * 120;
+      const fallDrift = (rng() * 2 - 1) * 30;
+      const fallRzStart = (rng() * 2 - 1) * 30;
+      const fallDelay = (idx - previousCount) * 12;
+      const fallDuration = 0.5 + rng() * 0.3;
 
       html += `<div class="postit new" style="
         left:${px.toFixed(1)}px;
@@ -403,7 +391,6 @@ function render() {
         --fall-from:${fallFrom.toFixed(0)}px;
         --fall-drift:${fallDrift.toFixed(0)}px;
         --fall-rz-start:${fallRzStart.toFixed(0)}deg;
-        --fall-rz-end:${fallRzEnd.toFixed(0)}deg;
         --final-rot:${rot.toFixed(1)}deg;
         --final-sc:${sc.toFixed(3)};
         --fall-delay:${fallDelay}ms;
