@@ -380,8 +380,8 @@ function render() {
       const fallFrom = -80 - Math.random() * 120;
       const fallDrift = (rng() * 2 - 1) * 30;
       const fallRzStart = (rng() * 2 - 1) * 30;
-      const fallDelay = (idx - previousCount) * 12;
-      const fallDuration = 0.5 + rng() * 0.3;
+      const fallDelay = Math.floor(rng() * 300); // 랜덤 딜레이 (0~300ms)
+      const fallDuration = 0.4 + rng() * 0.3;
 
       html += `<div class="postit new" style="
         left:${px.toFixed(1)}px;
