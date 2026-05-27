@@ -54,6 +54,37 @@
       inset 0 0 0 0.5px rgba(0,0,0,0.05);
   }
 
+  /* 랜덤 위치에서 제자리로 모이는 애니메이션 */
+  .postit.gather {
+    opacity: 0;
+    animation: postit-gather var(--gather-duration) cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
+    animation-delay: var(--gather-delay);
+  }
+
+  @keyframes postit-gather {
+    0% {
+      opacity: 1;
+      transform: 
+        translate(var(--scatter-x), var(--scatter-y))
+        rotateZ(var(--scatter-rot))
+        scale(0.8);
+    }
+    70% {
+      opacity: 1;
+      transform: 
+        translate(calc(var(--scatter-x) * 0.05), calc(var(--scatter-y) * 0.05))
+        rotateZ(calc(var(--final-rot) * 1.1))
+        scale(1.02);
+    }
+    100% {
+      opacity: 1;
+      transform: 
+        translate(0, 0)
+        rotateZ(var(--final-rot))
+        scale(var(--final-sc));
+    }
+  }
+
   .paper-falling.animate {
     animation: paper-fall var(--duration) cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
     animation-delay: var(--delay);
@@ -335,14 +366,38 @@ function render() {
     const px = it.x + ox - postitSize / 2;
     const py = it.y + oy - postitSize / 2;
 
-    // 모든 포스트잇 즉시 표시 (애니메이션 없이)
-    html += `<div class="postit" style="
-      left:${px.toFixed(1)}px;
-      top:${py.toFixed(1)}px;
-      width:${postitSize}px;
-      height:${postitSize}px;
-      transform: rotateZ(${rot.toFixed(1)}deg) scale(${sc.toFixed(3)});
-    "></div>`;
+    const isNew = idx >= previousCount;
+
+    if (isNew) {
+      // 새 포스트잇: 랜덤 위치에서 제자리로 모임
+      const scatterX = (rng() * 2 - 1) * 300; // 넓게 흩어짐
+      const scatterY = (rng() * 2 - 1) * 300;
+      const scatterRot = (rng() * 2 - 1) * 180;
+      const gatherDelay = Math.floor(rng() * 200); // 0~200ms 랜덤
+      const gatherDuration = 0.5 + rng() * 0.3; // 0.5~0.8초
+
+      html += `<div class="postit gather" style="
+        left:${px.toFixed(1)}px;
+        top:${py.toFixed(1)}px;
+        width:${postitSize}px;
+        height:${postitSize}px;
+        --scatter-x:${scatterX.toFixed(0)}px;
+        --scatter-y:${scatterY.toFixed(0)}px;
+        --scatter-rot:${scatterRot.toFixed(0)}deg;
+        --final-rot:${rot.toFixed(1)}deg;
+        --final-sc:${sc.toFixed(3)};
+        --gather-delay:${gatherDelay}ms;
+        --gather-duration:${gatherDuration.toFixed(2)}s;
+      "></div>`;
+    } else {
+      html += `<div class="postit" style="
+        left:${px.toFixed(1)}px;
+        top:${py.toFixed(1)}px;
+        width:${postitSize}px;
+        height:${postitSize}px;
+        transform: rotateZ(${rot.toFixed(1)}deg) scale(${sc.toFixed(3)});
+      "></div>`;
+    }
   });
 
   wrap.style.width = sample.width + 'px';
