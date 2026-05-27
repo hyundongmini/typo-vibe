@@ -54,6 +54,52 @@
       inset 0 0 0 0.5px rgba(0,0,0,0.05);
   }
 
+  /* 글자에서 떨어지는 포스트잇 */
+  .paper-falling {
+    position: fixed;
+    background: #FFFFFF;
+    border: 1px solid #1A7CFF;
+    border-radius: 1px;
+    pointer-events: none;
+    transform-style: preserve-3d;
+    opacity: 0;
+    z-index: 100;
+    box-shadow: 
+      1px 2px 4px rgba(0,0,0,0.15),
+      inset 0 0 0 0.5px rgba(0,0,0,0.05);
+  }
+
+  .paper-falling.animate {
+    animation: paper-fall var(--duration) cubic-bezier(0.2, 0.6, 0.4, 1) forwards;
+    animation-delay: var(--delay);
+  }
+
+  @keyframes paper-fall {
+    0% {
+      opacity: 1;
+      transform: translateY(0) translateX(0) rotateZ(0deg) rotateX(0deg);
+    }
+    15% {
+      opacity: 1;
+      transform: translateY(10vh) translateX(var(--drift)) rotateZ(var(--rz-start)) rotateX(30deg);
+    }
+    35% {
+      transform: translateY(28vh) translateX(calc(var(--drift) * -0.5)) rotateZ(calc(var(--rz-start) * -0.6)) rotateX(-20deg);
+    }
+    55% {
+      opacity: 0.85;
+      transform: translateY(48vh) translateX(calc(var(--drift) * 0.4)) rotateZ(var(--rz-end)) rotateX(15deg);
+    }
+    75% {
+      opacity: 0.5;
+      transform: translateY(68vh) translateX(calc(var(--drift) * -0.2)) rotateZ(calc(var(--rz-end) * -0.4)) rotateX(-10deg);
+    }
+    100% {
+      opacity: 0;
+      transform: translateY(100vh) translateX(0) rotateZ(var(--rz-end)) rotateX(0deg);
+    }
+  }
+
   .paper-falling.animate {
     animation: paper-fall var(--duration) cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
     animation-delay: var(--delay);
@@ -353,6 +399,52 @@ function render() {
 }
 
 // ============================================
+// 글자에서 포스트잇 떨어뜨리기
+// ============================================
+function spawnFallingPapers(count) {
+  const wrap = document.getElementById('wrap');
+  const postits = wrap.querySelectorAll('.postit');
+  
+  if (postits.length < count) return;
+  
+  const indices = [];
+  while (indices.length < count) {
+    const idx = Math.floor(Math.random() * postits.length);
+    if (!indices.includes(idx)) indices.push(idx);
+  }
+  
+  indices.forEach((idx, i) => {
+    const source = postits[idx];
+    const rect = source.getBoundingClientRect();
+    
+    const paper = document.createElement('div');
+    paper.className = 'paper-falling';
+    
+    const drift = (Math.random() - 0.5) * 80;
+    const rzStart = (Math.random() - 0.5) * 40;
+    const rzEnd = (Math.random() - 0.5) * 30;
+    const duration = 3 + Math.random() * 2;
+    const delay = i * 150;
+
+    paper.style.cssText = `
+      left: ${rect.left}px;
+      top: ${rect.top}px;
+      width: ${rect.width}px;
+      height: ${rect.height}px;
+      --drift: ${drift.toFixed(0)}px;
+      --rz-start: ${rzStart.toFixed(0)}deg;
+      --rz-end: ${rzEnd.toFixed(0)}deg;
+      --duration: ${duration.toFixed(2)}s;
+      --delay: ${delay}ms;
+    `;
+
+    document.body.appendChild(paper);
+    requestAnimationFrame(() => paper.classList.add('animate'));
+    setTimeout(() => paper.remove(), (duration * 1000) + delay + 200);
+  });
+}
+
+// ============================================
 // 키보드 입력 (한글 조합 지원)
 // ============================================
 const hint = document.getElementById('hint');
@@ -376,7 +468,11 @@ hiddenInput.addEventListener('input', (e) => {
     
     cursorDisplay.innerHTML = currentText.replace(/\n/g, '↵') + '<span>|</span>';
     
-    // 글자가 추가됐을 때 렌더링
+    // 글자가 추가됐을 때 렌더링 + 종이 떨어뜨리기
+    if (wasLonger && currentText.length > 0 && currentText.length % 3 === 0) {
+      setTimeout(() => spawnFallingPapers(5 + Math.floor(Math.random() * 3)), 100);
+    }
+    
     if (renderTimeout) clearTimeout(renderTimeout);
     renderTimeout = setTimeout(() => render(), 30);
   }
