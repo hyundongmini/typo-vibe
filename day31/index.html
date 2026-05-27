@@ -54,21 +54,26 @@
       inset 0 0 0 0.5px rgba(0,0,0,0.05);
   }
 
-  /* 떨어지는 여분 종이 */
+  /* 떨어지는 여분 종이 - 더 입체적 */
   .paper-falling {
     position: fixed;
     background: var(--postit);
-    border: 1px solid rgba(0,0,0,0.1);
+    border: 1px solid rgba(0,0,0,0.08);
     border-radius: 1px;
     pointer-events: none;
     transform-style: preserve-3d;
-    box-shadow: 2px 4px 12px rgba(0,0,0,0.2);
     opacity: 0;
     z-index: 100;
+    /* 종이 질감: 그림자로 입체감 */
+    background: linear-gradient(135deg, #fff 0%, #f8f8f8 50%, #fff 100%);
+    box-shadow: 
+      2px 3px 8px rgba(0,0,0,0.15),
+      0 0 0 0.5px rgba(0,0,0,0.05),
+      inset 0 1px 0 rgba(255,255,255,0.8);
   }
 
   .paper-falling.animate {
-    animation: paper-fall var(--duration) ease-in-out forwards;
+    animation: paper-fall var(--duration) cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
     animation-delay: var(--delay);
   }
 
@@ -80,48 +85,65 @@
         translateX(0)
         rotateX(0deg)
         rotateY(0deg)
-        rotateZ(0deg);
+        rotateZ(0deg)
+        perspective(800px);
     }
-    15% {
+    10% {
       opacity: 1;
       transform: 
-        translateY(12vh)
+        translateY(8vh)
+        translateX(calc(var(--drift) * 0.3))
+        rotateX(calc(var(--rx) * 0.8))
+        rotateY(calc(var(--ry) * 0.4))
+        rotateZ(calc(var(--rz-start) * 0.5));
+    }
+    25% {
+      transform: 
+        translateY(20vh)
         translateX(var(--drift))
-        rotateX(var(--rx))
-        rotateY(calc(var(--ry) * 0.5))
+        rotateX(calc(var(--rx) * -0.6))
+        rotateY(var(--ry))
         rotateZ(var(--rz-start));
     }
-    35% {
-      opacity: 1;
+    40% {
       transform: 
-        translateY(30vh)
-        translateX(calc(var(--drift) * -0.6))
-        rotateX(calc(var(--rx) * -0.7))
-        rotateY(var(--ry))
-        rotateZ(calc(var(--rz-start) * -0.5));
+        translateY(35vh)
+        translateX(calc(var(--drift) * -0.4))
+        rotateX(calc(var(--rx) * 0.5))
+        rotateY(calc(var(--ry) * -0.7))
+        rotateZ(calc(var(--rz-end) * 0.6));
     }
     55% {
       opacity: 0.9;
       transform: 
         translateY(50vh)
-        translateX(calc(var(--drift) * 0.4))
-        rotateX(calc(var(--rx) * 0.4))
-        rotateY(calc(var(--ry) * -0.6))
-        rotateZ(var(--rz-end));
+        translateX(calc(var(--drift) * 0.5))
+        rotateX(calc(var(--rx) * -0.3))
+        rotateY(calc(var(--ry) * 0.5))
+        rotateZ(calc(var(--rz-start) * -0.4));
     }
-    75% {
+    70% {
       opacity: 0.7;
       transform: 
-        translateY(72vh)
+        translateY(65vh)
         translateX(calc(var(--drift) * -0.2))
-        rotateX(calc(var(--rx) * -0.2))
-        rotateY(calc(var(--ry) * 0.3))
+        rotateX(calc(var(--rx) * 0.2))
+        rotateY(calc(var(--ry) * -0.3))
+        rotateZ(var(--rz-end));
+    }
+    85% {
+      opacity: 0.4;
+      transform: 
+        translateY(82vh)
+        translateX(calc(var(--drift) * 0.1))
+        rotateX(calc(var(--rx) * -0.1))
+        rotateY(calc(var(--ry) * 0.1))
         rotateZ(calc(var(--rz-end) * -0.3));
     }
     100% {
       opacity: 0;
       transform: 
-        translateY(100vh)
+        translateY(105vh)
         translateX(0)
         rotateX(0deg)
         rotateY(0deg)
@@ -192,6 +214,10 @@
 
 <div class="input-hint" id="hint">타이핑하세요</div>
 <div class="cursor-display" id="cursor-display"><span>|</span></div>
+
+<!-- 숨겨진 input (한글 조합 처리용) -->
+<input type="text" id="hidden-input" autocomplete="off" autofocus
+       style="position:fixed;top:-100px;left:0;opacity:0;pointer-events:none;">
 
 <div class="footnote">
   WELTFORM.AT<br/>
@@ -395,33 +421,46 @@ function spawnFallingPapers(count) {
 }
 
 // ============================================
-// 키보드 입력
+// 키보드 입력 (한글 조합 지원)
 // ============================================
 const hint = document.getElementById('hint');
 const cursorDisplay = document.getElementById('cursor-display');
+const hiddenInput = document.getElementById('hidden-input');
 
-document.addEventListener('keydown', (e) => {
-  if (e.ctrlKey || e.metaKey || e.altKey) return;
-  if (e.key === 'Tab' || e.key === 'Escape') return;
+// 페이지 클릭 시 input에 포커스
+document.addEventListener('click', () => hiddenInput.focus());
+hiddenInput.focus();
 
+// input 이벤트로 한글 조합 처리
+hiddenInput.addEventListener('input', (e) => {
   hint.classList.add('hidden');
-
-  if (e.key === 'Backspace') {
-    currentText = currentText.slice(0, -1);
-    previousCount = 0; // 전체 다시 그리기 (떨어지는 효과 없이)
-  } else if (e.key === 'Enter') {
-    currentText += '\n';
-  } else if (e.key.length === 1) {
-    currentText += e.key;
-  } else {
-    return;
+  
+  const newText = hiddenInput.value;
+  
+  // 텍스트가 변경됐을 때만 렌더링
+  if (newText !== currentText) {
+    const wasLonger = newText.length > currentText.length;
+    currentText = newText;
+    
+    cursorDisplay.innerHTML = currentText.replace(/\n/g, '↵') + '<span>|</span>';
+    
+    // 글자가 추가됐을 때만 종이 떨어뜨리기
+    if (wasLonger && currentText.length > 0 && currentText.length % 2 === 0) {
+      spawnFallingPapers(5 + Math.floor(Math.random() * 3));
+    }
+    
+    if (renderTimeout) clearTimeout(renderTimeout);
+    renderTimeout = setTimeout(() => render(), 30);
   }
+});
 
-  cursorDisplay.innerHTML = currentText.replace(/\n/g, '↵') + '<span>|</span>';
-
-  // 디바운스 (빠른 타이핑 대응)
-  if (renderTimeout) clearTimeout(renderTimeout);
-  renderTimeout = setTimeout(() => render(), 50);
+// Enter 키 처리
+hiddenInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    hiddenInput.value += '\n';
+    hiddenInput.dispatchEvent(new Event('input'));
+  }
 });
 
 // 폰트 로드 후 대기
