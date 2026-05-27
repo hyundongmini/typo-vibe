@@ -54,7 +54,35 @@
       inset 0 0 0 0.5px rgba(0,0,0,0.05);
   }
 
-  /* 랜덤 위치에서 제자리로 모이는 애니메이션 */
+  /* 글자 지울 때: 포스트잇이 내던져짐 */
+  .postit.throw {
+    animation: postit-throw var(--throw-duration) cubic-bezier(0.2, 0, 0.8, 0.2) forwards;
+    animation-delay: var(--throw-delay);
+  }
+
+  @keyframes postit-throw {
+    0% {
+      opacity: 1;
+      transform: 
+        translate(0, 0)
+        rotateZ(var(--final-rot))
+        scale(var(--final-sc));
+    }
+    30% {
+      opacity: 1;
+      transform: 
+        translate(calc(var(--throw-x) * 0.4), calc(var(--throw-y) * 0.3))
+        rotateZ(calc(var(--throw-rot) * 0.5))
+        scale(1.1);
+    }
+    100% {
+      opacity: 0;
+      transform: 
+        translate(var(--throw-x), var(--throw-y))
+        rotateZ(var(--throw-rot))
+        scale(0.6);
+    }
+  }
   .postit.gather {
     opacity: 0;
     animation: postit-gather var(--gather-duration) cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
@@ -408,6 +436,34 @@ function render() {
 }
 
 // ============================================
+// 내던지기 효과 (Backspace 시)
+// ============================================
+function throwPostits() {
+  const wrap = document.getElementById('wrap');
+  const postits = wrap.querySelectorAll('.postit');
+  
+  // 마지막 글자 영역의 포스트잇 일부를 내던짐
+  const count = Math.min(postits.length, 15 + Math.floor(Math.random() * 10));
+  const startIdx = Math.max(0, postits.length - count);
+  
+  for (let i = startIdx; i < postits.length; i++) {
+    const p = postits[i];
+    const throwX = (Math.random() - 0.5) * 600;
+    const throwY = (Math.random() - 0.3) * 500; // 약간 위로 더
+    const throwRot = (Math.random() - 0.5) * 360;
+    const throwDelay = Math.floor(Math.random() * 100);
+    const throwDuration = 0.4 + Math.random() * 0.3;
+    
+    p.style.setProperty('--throw-x', throwX.toFixed(0) + 'px');
+    p.style.setProperty('--throw-y', throwY.toFixed(0) + 'px');
+    p.style.setProperty('--throw-rot', throwRot.toFixed(0) + 'deg');
+    p.style.setProperty('--throw-delay', throwDelay + 'ms');
+    p.style.setProperty('--throw-duration', throwDuration.toFixed(2) + 's');
+    p.classList.add('throw');
+  }
+}
+
+// ============================================
 // 키보드 입력 (한글 조합 지원)
 // ============================================
 const hint = document.getElementById('hint');
@@ -427,13 +483,19 @@ hiddenInput.addEventListener('input', (e) => {
   // 텍스트가 변경됐을 때만 렌더링
   if (newText !== currentText) {
     const wasLonger = newText.length > currentText.length;
+    const wasShorter = newText.length < currentText.length;
+    
+    // 글자 지울 때: 내던지기 효과
+    if (wasShorter && currentText.length > 0) {
+      throwPostits();
+    }
+    
     currentText = newText;
     
     cursorDisplay.innerHTML = currentText.replace(/\n/g, '↵') + '<span>|</span>';
     
-    // 글자가 추가됐을 때 렌더링
     if (renderTimeout) clearTimeout(renderTimeout);
-    renderTimeout = setTimeout(() => render(), 30);
+    renderTimeout = setTimeout(() => render(), wasShorter ? 400 : 30);
   }
 });
 
