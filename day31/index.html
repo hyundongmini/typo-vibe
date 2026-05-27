@@ -531,23 +531,24 @@ document.body.addEventListener('mousedown', (e) => {
     const dist = Math.sqrt(dx * dx + dy * dy);
     
     if (dist < RADIUS) {
-      const force = (1 - dist / RADIUS) * 200;
-      const angle = Math.atan2(dy, dx);
-      const throwX = Math.cos(angle) * force;
-      const throwY = Math.sin(angle) * force;
-      const throwRot = (Math.random() - 0.5) * 180;
+      const force = (1 - dist / RADIUS);
+      // 클릭 지점으로 빨려들어감
+      const pullX = -dx * force * 0.8;
+      const pullY = -dy * force * 0.8;
+      const spinRot = (Math.random() - 0.5) * 360 * force;
+      const shrink = 0.2 + (1 - force) * 0.6;
       
       p.style.transition = 'none';
-      p.style.transform = `translate(${throwX}px, ${throwY}px) rotateZ(${throwRot}deg) scale(0.8)`;
-      p.style.opacity = '0.7';
+      p.style.transform = `translate(${pullX}px, ${pullY}px) rotateZ(${spinRot}deg) scale(${shrink})`;
+      p.style.opacity = String(0.3 + (1 - force) * 0.7);
       
-      // 다시 모이기
+      // 다시 퍼지기
       setTimeout(() => {
-        const returnDuration = 0.4 + Math.random() * 0.3;
+        const returnDuration = 0.5 + Math.random() * 0.4;
         p.style.transition = `transform ${returnDuration}s cubic-bezier(0.2, 0.8, 0.3, 1), opacity ${returnDuration}s ease`;
         p.style.transform = `rotateZ(${p.dataset.rot || '0'}deg) scale(${p.dataset.sc || '1'})`;
         p.style.opacity = '1';
-      }, 100 + Math.random() * 200);
+      }, 200 + Math.random() * 300);
     }
   });
 });
