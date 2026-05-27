@@ -257,7 +257,7 @@
 
 <!-- 숨겨진 input (한글 조합 처리용) -->
 <input type="text" id="hidden-input" autocomplete="off" autofocus
-       style="position:fixed;top:-100px;left:0;opacity:0;pointer-events:none;">
+       style="position:fixed;top:0;left:0;width:100%;height:100%;opacity:0;border:none;outline:none;z-index:1;cursor:default;">
 
 <div class="footnote">
   WELTFORM.AT<br/>
@@ -508,9 +508,9 @@ hiddenInput.addEventListener('keydown', (e) => {
 });
 
 // ============================================
-// 클릭하면 주변 포스트잇 흩어졌다가 다시 모임 (블랙홀)
+// 클릭하면 주변 포스트잇 블랙홀 효과
 // ============================================
-window.addEventListener('pointerdown', (e) => {
+hiddenInput.addEventListener('pointerdown', (e) => {
   const wrap = document.getElementById('wrap');
   const postits = wrap.querySelectorAll('.postit');
   if (postits.length === 0) return;
@@ -530,7 +530,6 @@ window.addEventListener('pointerdown', (e) => {
     
     if (dist < RADIUS) {
       const force = (1 - dist / RADIUS);
-      // 클릭 지점으로 빨려들어감
       const pullX = -dx * force * 0.8;
       const pullY = -dy * force * 0.8;
       const spinRot = (Math.random() - 0.5) * 360 * force;
@@ -540,7 +539,6 @@ window.addEventListener('pointerdown', (e) => {
       p.style.transform = `translate(${pullX}px, ${pullY}px) rotateZ(${spinRot}deg) scale(${shrink})`;
       p.style.opacity = String(0.3 + (1 - force) * 0.7);
       
-      // 다시 퍼지기
       setTimeout(() => {
         const returnDuration = 0.5 + Math.random() * 0.4;
         p.style.transition = `transform ${returnDuration}s cubic-bezier(0.2, 0.8, 0.3, 1), opacity ${returnDuration}s ease`;
@@ -549,9 +547,6 @@ window.addEventListener('pointerdown', (e) => {
       }, 200 + Math.random() * 300);
     }
   });
-  
-  // 포커스 유지
-  setTimeout(() => hiddenInput.focus(), 10);
 });
 
 window.addEventListener('resize', () => {
