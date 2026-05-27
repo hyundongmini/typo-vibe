@@ -56,60 +56,73 @@
 
   /* 떨어지는 여분 종이 */
   .paper-falling {
-    position: absolute;
+    position: fixed;
     background: var(--postit);
-    border: 1px solid var(--border);
+    border: 1px solid rgba(0,0,0,0.1);
     border-radius: 1px;
     pointer-events: none;
     transform-style: preserve-3d;
-    box-shadow: 1px 2px 6px rgba(0,0,0,0.2);
-    animation: paper-fall var(--duration) ease-in forwards;
-    animation-delay: var(--delay);
+    box-shadow: 2px 4px 12px rgba(0,0,0,0.2);
     opacity: 0;
+    z-index: 100;
+  }
+
+  .paper-falling.animate {
+    animation: paper-fall var(--duration) ease-in-out forwards;
+    animation-delay: var(--delay);
   }
 
   @keyframes paper-fall {
     0% {
       opacity: 1;
       transform: 
-        translateY(var(--start-y))
-        translateX(var(--start-x))
-        rotateX(var(--rx))
-        rotateY(var(--ry))
-        rotateZ(var(--rz-start));
+        translateY(0)
+        translateX(0)
+        rotateX(0deg)
+        rotateY(0deg)
+        rotateZ(0deg);
     }
-    25% {
+    15% {
       opacity: 1;
       transform: 
-        translateY(calc(var(--start-y) + 25vh))
-        translateX(calc(var(--start-x) + var(--drift)))
-        rotateX(calc(var(--rx) * -0.5))
-        rotateY(calc(var(--ry) * -0.7))
-        rotateZ(calc(var(--rz-start) * -0.3));
+        translateY(12vh)
+        translateX(var(--drift))
+        rotateX(var(--rx))
+        rotateY(calc(var(--ry) * 0.5))
+        rotateZ(var(--rz-start));
     }
-    50% {
+    35% {
+      opacity: 1;
+      transform: 
+        translateY(30vh)
+        translateX(calc(var(--drift) * -0.6))
+        rotateX(calc(var(--rx) * -0.7))
+        rotateY(var(--ry))
+        rotateZ(calc(var(--rz-start) * -0.5));
+    }
+    55% {
       opacity: 0.9;
       transform: 
-        translateY(calc(var(--start-y) + 55vh))
-        translateX(calc(var(--start-x) - var(--drift) * 0.5))
-        rotateX(calc(var(--rx) * 0.3))
-        rotateY(calc(var(--ry) * 0.5))
+        translateY(50vh)
+        translateX(calc(var(--drift) * 0.4))
+        rotateX(calc(var(--rx) * 0.4))
+        rotateY(calc(var(--ry) * -0.6))
         rotateZ(var(--rz-end));
     }
     75% {
       opacity: 0.7;
       transform: 
-        translateY(calc(var(--start-y) + 80vh))
-        translateX(calc(var(--start-x) + var(--drift) * 0.3))
+        translateY(72vh)
+        translateX(calc(var(--drift) * -0.2))
         rotateX(calc(var(--rx) * -0.2))
-        rotateY(calc(var(--ry) * -0.3))
-        rotateZ(calc(var(--rz-end) * -0.5));
+        rotateY(calc(var(--ry) * 0.3))
+        rotateZ(calc(var(--rz-end) * -0.3));
     }
     100% {
       opacity: 0;
       transform: 
-        translateY(calc(var(--start-y) + 110vh))
-        translateX(var(--start-x))
+        translateY(100vh)
+        translateX(0)
         rotateX(0deg)
         rotateY(0deg)
         rotateZ(var(--rz-end));
@@ -194,12 +207,12 @@ const CONFIG = {
   fontWeight: 900,
   letterSpacing: -3,
   lineHeight: 1.06,
-  postitSize: 22,
-  postitSpacing: 13,
+  postitSize: 28,
+  postitSpacing: 20,
   rotJitter: 34,
   posJitter: 6,
   scaleJitter: 0.16,
-  threshold: 140,
+  threshold: 160,
 };
 
 let currentText = '';
@@ -338,34 +351,30 @@ function render() {
 }
 
 // ============================================
-// 여분 종이 떨어뜨리기 (5~7장)
+// 여분 종이 떨어뜨리기 (5~7장, 크고 확실하게)
 // ============================================
 function spawnFallingPapers(count) {
-  const wrap = document.getElementById('wrap');
-  const wrapRect = wrap.getBoundingClientRect();
-  
   for (let i = 0; i < count; i++) {
     const paper = document.createElement('div');
     paper.className = 'paper-falling';
     
-    const size = CONFIG.postitSize * (0.8 + Math.random() * 0.6); // 크기 랜덤
-    const startX = (Math.random() - 0.5) * wrapRect.width * 0.8;
-    const startY = -50 - Math.random() * 100;
-    const drift = (Math.random() - 0.5) * 100;
-    const rx = (Math.random() - 0.5) * 180;
+    // 큰 크기 (40~70px)
+    const size = 40 + Math.random() * 30;
+    // 화면 상단 랜덤 위치에서 시작
+    const startLeft = 20 + Math.random() * 60; // 20~80% 위치
+    const drift = (Math.random() - 0.5) * 150;
+    const rx = (Math.random() - 0.5) * 160;
     const ry = (Math.random() - 0.5) * 120;
-    const rzStart = (Math.random() - 0.5) * 90;
+    const rzStart = (Math.random() - 0.5) * 80;
     const rzEnd = (Math.random() - 0.5) * 60;
-    const duration = 2 + Math.random() * 1.5; // 2~3.5초
-    const delay = i * 150; // 150ms 간격
+    const duration = 3 + Math.random() * 2; // 3~5초 (느리게)
+    const delay = i * 200; // 200ms 간격
 
     paper.style.cssText = `
-      left: 50%;
-      top: 0;
+      left: ${startLeft}%;
+      top: -${size + 20}px;
       width: ${size.toFixed(0)}px;
       height: ${size.toFixed(0)}px;
-      --start-x: ${startX.toFixed(0)}px;
-      --start-y: ${startY.toFixed(0)}px;
       --drift: ${drift.toFixed(0)}px;
       --rx: ${rx.toFixed(0)}deg;
       --ry: ${ry.toFixed(0)}deg;
@@ -373,14 +382,15 @@ function spawnFallingPapers(count) {
       --rz-end: ${rzEnd.toFixed(0)}deg;
       --duration: ${duration.toFixed(2)}s;
       --delay: ${delay}ms;
-      animation-delay: ${delay}ms;
-      animation-duration: ${duration.toFixed(2)}s;
     `;
 
-    wrap.appendChild(paper);
+    document.body.appendChild(paper);
+    
+    // 클래스 추가로 애니메이션 시작
+    requestAnimationFrame(() => paper.classList.add('animate'));
 
     // 애니메이션 끝나면 제거
-    setTimeout(() => paper.remove(), (duration + delay / 1000) * 1000 + 200);
+    setTimeout(() => paper.remove(), (duration * 1000) + delay + 200);
   }
 }
 
