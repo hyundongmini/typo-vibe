@@ -507,48 +507,6 @@ hiddenInput.addEventListener('keydown', (e) => {
   }
 });
 
-// ============================================
-// 클릭하면 주변 포스트잇 블랙홀 효과
-// ============================================
-hiddenInput.addEventListener('pointerdown', (e) => {
-  const wrap = document.getElementById('wrap');
-  const postits = wrap.querySelectorAll('.postit');
-  if (postits.length === 0) return;
-  
-  const rect = wrap.getBoundingClientRect();
-  const clickX = e.clientX - rect.left;
-  const clickY = e.clientY - rect.top;
-  const RADIUS = 250;
-  
-  postits.forEach(p => {
-    const px = parseFloat(p.style.left) + CONFIG.postitSize / 2;
-    const py = parseFloat(p.style.top) + CONFIG.postitSize / 2;
-    
-    const dx = px - clickX;
-    const dy = py - clickY;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    
-    if (dist < RADIUS) {
-      const force = (1 - dist / RADIUS);
-      const pullX = -dx * force * 0.8;
-      const pullY = -dy * force * 0.8;
-      const spinRot = (Math.random() - 0.5) * 360 * force;
-      const shrink = 0.2 + (1 - force) * 0.6;
-      
-      p.style.transition = 'none';
-      p.style.transform = `translate(${pullX}px, ${pullY}px) rotateZ(${spinRot}deg) scale(${shrink})`;
-      p.style.opacity = String(0.3 + (1 - force) * 0.7);
-      
-      setTimeout(() => {
-        const returnDuration = 0.5 + Math.random() * 0.4;
-        p.style.transition = `transform ${returnDuration}s cubic-bezier(0.2, 0.8, 0.3, 1), opacity ${returnDuration}s ease`;
-        p.style.transform = `rotateZ(${p.dataset.rot || '0'}deg) scale(${p.dataset.sc || '1'})`;
-        p.style.opacity = '1';
-      }, 200 + Math.random() * 300);
-    }
-  });
-});
-
 window.addEventListener('resize', () => {
   previousCount = 0;
   render();
