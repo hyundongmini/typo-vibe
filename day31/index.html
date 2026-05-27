@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8" />
-<title>판단의언어란 — Post-it Type</title>
+<title>Post-it Type</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -26,6 +26,7 @@
     align-items: center;
     justify-content: center;
     min-height: 100vh;
+    perspective: 1200px;
   }
 
   .stage {
@@ -39,6 +40,7 @@
     position: relative;
     width: 100%;
     margin: 0 auto;
+    transform-style: preserve-3d;
   }
 
   .postit {
@@ -47,30 +49,81 @@
     border: 1px solid var(--border);
     border-radius: 1px;
     pointer-events: none;
-    opacity: 0;
-    animation: flutter-down 0.8s ease-out forwards;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    transform-style: preserve-3d;
+    backface-visibility: visible;
+    /* 그림자로 입체감 */
+    box-shadow: 
+      1px 2px 4px rgba(0,0,0,0.15),
+      inset 0 0 0 0.5px rgba(0,0,0,0.05);
   }
 
-  @keyframes flutter-down {
+  /* 개별 포스트잇 떨어지는 애니메이션 */
+  .postit.falling {
+    animation: paper-fall var(--duration) cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
+    animation-delay: var(--delay);
+    opacity: 0;
+  }
+
+  @keyframes paper-fall {
     0% {
-      opacity: 0;
-      transform: translateY(-60px) rotate(var(--start-rot)) scale(0.5);
-    }
-    30% {
       opacity: 1;
-      transform: translateY(-20px) rotate(calc(var(--start-rot) * -0.5)) scale(1.05);
+      transform: 
+        translateY(calc(-100vh + var(--start-y)))
+        translateX(var(--drift-x))
+        rotateX(var(--rx-start))
+        rotateY(var(--ry-start))
+        rotateZ(var(--rz-start))
+        scale(0.9);
     }
-    60% {
-      transform: translateY(5px) rotate(calc(var(--end-rot) * 1.2)) scale(0.98);
+    20% {
+      opacity: 1;
+      transform: 
+        translateY(calc(-60vh + var(--start-y)))
+        translateX(calc(var(--drift-x) * -0.5))
+        rotateX(var(--rx-mid))
+        rotateY(var(--ry-mid))
+        rotateZ(var(--rz-mid))
+        scale(1);
+    }
+    50% {
+      transform: 
+        translateY(calc(-20vh + var(--start-y)))
+        translateX(calc(var(--drift-x) * 0.3))
+        rotateX(calc(var(--rx-mid) * -0.5))
+        rotateY(calc(var(--ry-mid) * -0.3))
+        rotateZ(calc(var(--rz-end) * 0.7))
+        scale(1.02);
     }
     80% {
-      transform: translateY(-2px) rotate(calc(var(--end-rot) * 0.8)) scale(1.01);
+      transform: 
+        translateY(5px)
+        translateX(calc(var(--drift-x) * -0.1))
+        rotateX(calc(var(--rx-end) * 1.2))
+        rotateY(calc(var(--ry-end) * 1.1))
+        rotateZ(calc(var(--rz-end) * 1.1))
+        scale(0.99);
     }
     100% {
       opacity: 1;
-      transform: translateY(0) rotate(var(--end-rot)) scale(var(--end-sc));
+      transform: 
+        translateY(0)
+        translateX(0)
+        rotateX(var(--rx-end))
+        rotateY(var(--ry-end))
+        rotateZ(var(--rz-end))
+        scale(var(--end-sc));
     }
+  }
+
+  /* 안착 후 미세 흔들림 */
+  .postit.settled {
+    animation: micro-sway 3s ease-in-out infinite;
+    animation-delay: var(--sway-delay);
+  }
+
+  @keyframes micro-sway {
+    0%, 100% { transform: rotateZ(var(--rz-end)) scale(var(--end-sc)); }
+    50% { transform: rotateZ(calc(var(--rz-end) + 1deg)) scale(var(--end-sc)); }
   }
 
   .footnote {
@@ -91,15 +144,14 @@
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    color: rgba(255,255,255,0.3);
-    font-size: 24px;
-    letter-spacing: 0.05em;
+    color: rgba(255,255,255,0.25);
+    font-size: 20px;
+    letter-spacing: 0.1em;
     pointer-events: none;
     transition: opacity 0.5s;
   }
   .input-hint.hidden { opacity: 0; }
 
-  /* 비네팅 */
   .stage::after {
     content: "";
     position: fixed;
@@ -110,14 +162,15 @@
 
   #sampler { position: absolute; left: -99999px; top: 0; }
 
-  /* 커서 깜빡임 */
-  .cursor-blink {
+  .cursor-display {
     position: fixed;
     bottom: 30px;
     right: 40px;
-    color: rgba(255,255,255,0.6);
-    font-size: 13px;
+    color: rgba(255,255,255,0.5);
+    font-size: 12px;
     letter-spacing: 0.03em;
+  }
+  .cursor-display span {
     animation: blink 1s step-end infinite;
   }
   @keyframes blink {
@@ -134,8 +187,8 @@
   <div class="canvas-wrap" id="wrap"></div>
 </div>
 
-<div class="input-hint" id="hint">타이핑하세요...</div>
-<div class="cursor-blink" id="cursor-display">|</div>
+<div class="input-hint" id="hint">타이핑하세요</div>
+<div class="cursor-display" id="cursor-display"><span>|</span></div>
 
 <div class="footnote">
   WELTFORM.AT<br/>
@@ -160,7 +213,8 @@ const CONFIG = {
 };
 
 let currentText = '';
-let previousPostits = 0;
+let previousCount = 0;
+let renderTimeout = null;
 
 // ============================================
 // 픽셀 샘플링
@@ -236,7 +290,14 @@ function samplePostits(text, maxWidth) {
 }
 
 // ============================================
-// 렌더링 (새 포스트잇만 애니메이션)
+// 시드 랜덤
+// ============================================
+function makeRng(seed) {
+  return () => { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; };
+}
+
+// ============================================
+// 렌더링
 // ============================================
 function render() {
   const wrap = document.getElementById('wrap');
@@ -246,16 +307,14 @@ function render() {
     wrap.innerHTML = '';
     wrap.style.width = '0';
     wrap.style.height = '0';
-    previousPostits = 0;
+    previousCount = 0;
     return;
   }
 
   const sample = samplePostits(currentText, stageW);
   const { postitSize, rotJitter, posJitter, scaleJitter } = CONFIG;
 
-  // 시드 기반 랜덤
-  let seed = 1 + (currentText.length * 13) + Math.floor(postitSize * 7);
-  const rng = () => { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; };
+  const rng = makeRng(1 + (currentText.length * 13) + Math.floor(postitSize * 7));
 
   let html = '';
   sample.items.forEach((it, idx) => {
@@ -266,28 +325,67 @@ function render() {
     const px = it.x + ox - postitSize / 2;
     const py = it.y + oy - postitSize / 2;
 
-    // 새로 추가된 포스트잇만 애니메이션
-    const isNew = idx >= previousPostits;
-    const delay = isNew ? (idx - previousPostits) * 3 : 0; // 3ms 간격
-    const startRot = (rng() * 2 - 1) * 60;
+    const isNew = idx >= previousCount;
 
-    html += `<div class="postit" style="
-      left:${px.toFixed(1)}px;
-      top:${py.toFixed(1)}px;
-      width:${postitSize}px;
-      height:${postitSize}px;
-      --start-rot:${startRot.toFixed(1)}deg;
-      --end-rot:${rot.toFixed(1)}deg;
-      --end-sc:${sc.toFixed(3)};
-      ${isNew ? `animation-delay:${delay}ms;` : `opacity:1;transform:rotate(${rot.toFixed(1)}deg) scale(${sc.toFixed(3)});`}
-    "></div>`;
+    if (isNew) {
+      // 3D 회전값 (입체적 팔랑임)
+      const rxStart = (rng() * 2 - 1) * 180; // X축 뒤집힘
+      const ryStart = (rng() * 2 - 1) * 120; // Y축 회전
+      const rzStart = (rng() * 2 - 1) * 90;
+      const rxMid = (rng() * 2 - 1) * 60;
+      const ryMid = (rng() * 2 - 1) * 45;
+      const rzMid = (rng() * 2 - 1) * 30;
+      const rxEnd = (rng() * 2 - 1) * 5; // 최종은 거의 평평
+      const ryEnd = (rng() * 2 - 1) * 5;
+      const driftX = (rng() * 2 - 1) * 80; // 좌우 흔들림
+      const startY = rng() * 200; // 시작 높이 랜덤
+      const delay = (idx - previousCount) * 5; // 5ms 간격
+      const duration = 1.2 + rng() * 0.8; // 1.2~2초
+
+      html += `<div class="postit falling" style="
+        left:${px.toFixed(1)}px;
+        top:${py.toFixed(1)}px;
+        width:${postitSize}px;
+        height:${postitSize}px;
+        --rx-start:${rxStart.toFixed(0)}deg;
+        --ry-start:${ryStart.toFixed(0)}deg;
+        --rz-start:${rzStart.toFixed(0)}deg;
+        --rx-mid:${rxMid.toFixed(0)}deg;
+        --ry-mid:${ryMid.toFixed(0)}deg;
+        --rz-mid:${rzMid.toFixed(0)}deg;
+        --rx-end:${rxEnd.toFixed(1)}deg;
+        --ry-end:${ryEnd.toFixed(1)}deg;
+        --rz-end:${rot.toFixed(1)}deg;
+        --end-sc:${sc.toFixed(3)};
+        --drift-x:${driftX.toFixed(0)}px;
+        --start-y:${startY.toFixed(0)}px;
+        --delay:${delay}ms;
+        --duration:${duration.toFixed(2)}s;
+        --sway-delay:${(rng() * 3).toFixed(2)}s;
+        animation-delay:${delay}ms;
+        animation-duration:${duration.toFixed(2)}s;
+      "></div>`;
+    } else {
+      // 기존 포스트잇: 즉시 표시
+      html += `<div class="postit" style="
+        left:${px.toFixed(1)}px;
+        top:${py.toFixed(1)}px;
+        width:${postitSize}px;
+        height:${postitSize}px;
+        --rz-end:${rot.toFixed(1)}deg;
+        --end-sc:${sc.toFixed(3)};
+        --sway-delay:${(rng() * 3).toFixed(2)}s;
+        opacity:1;
+        transform: rotateZ(${rot.toFixed(1)}deg) scale(${sc.toFixed(3)});
+      "></div>`;
+    }
   });
 
   wrap.style.width = sample.width + 'px';
   wrap.style.height = sample.height + 'px';
   wrap.innerHTML = html;
 
-  previousPostits = sample.items.length;
+  previousCount = sample.items.length;
 }
 
 // ============================================
@@ -297,7 +395,6 @@ const hint = document.getElementById('hint');
 const cursorDisplay = document.getElementById('cursor-display');
 
 document.addEventListener('keydown', (e) => {
-  // 무시할 키
   if (e.ctrlKey || e.metaKey || e.altKey) return;
   if (e.key === 'Tab' || e.key === 'Escape') return;
 
@@ -305,7 +402,7 @@ document.addEventListener('keydown', (e) => {
 
   if (e.key === 'Backspace') {
     currentText = currentText.slice(0, -1);
-    previousPostits = 0; // 전체 다시 그리기
+    previousCount = 0; // 전체 다시 그리기 (떨어지는 효과 없이)
   } else if (e.key === 'Enter') {
     currentText += '\n';
   } else if (e.key.length === 1) {
@@ -314,25 +411,20 @@ document.addEventListener('keydown', (e) => {
     return;
   }
 
-  // 커서 표시 업데이트
-  cursorDisplay.textContent = currentText.replace(/\n/g, '↵') + '|';
+  cursorDisplay.innerHTML = currentText.replace(/\n/g, '↵') + '<span>|</span>';
 
-  render();
+  // 디바운스 (빠른 타이핑 대응)
+  if (renderTimeout) clearTimeout(renderTimeout);
+  renderTimeout = setTimeout(() => render(), 50);
 });
 
-// 초기 텍스트로 시작
-currentText = '판단의\n언어란';
-hint.classList.add('hidden');
-cursorDisplay.textContent = currentText.replace(/\n/g, '↵') + '|';
-
-// 폰트 로드 후 렌더링
+// 폰트 로드 후 대기
 document.fonts.ready.then(() => {
-  render();
+  // 빈 상태로 시작
 });
 
-// 리사이즈
 window.addEventListener('resize', () => {
-  previousPostits = 0;
+  previousCount = 0;
   render();
 });
 </script>
