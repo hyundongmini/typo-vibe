@@ -49,17 +49,21 @@
     border: 1px solid var(--border);
     border-radius: 1px;
     pointer-events: none;
-    transform-style: preserve-3d;
-    backface-visibility: visible;
-    /* 그림자로 입체감 */
     box-shadow: 
       1px 2px 4px rgba(0,0,0,0.15),
       inset 0 0 0 0.5px rgba(0,0,0,0.05);
   }
 
-  /* 개별 포스트잇 떨어지는 애니메이션 */
-  .postit.falling {
-    animation: paper-fall var(--duration) cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
+  /* 떨어지는 여분 종이 */
+  .paper-falling {
+    position: absolute;
+    background: var(--postit);
+    border: 1px solid var(--border);
+    border-radius: 1px;
+    pointer-events: none;
+    transform-style: preserve-3d;
+    box-shadow: 1px 2px 6px rgba(0,0,0,0.2);
+    animation: paper-fall var(--duration) ease-in forwards;
     animation-delay: var(--delay);
     opacity: 0;
   }
@@ -68,62 +72,48 @@
     0% {
       opacity: 1;
       transform: 
-        translateY(calc(-100vh + var(--start-y)))
-        translateX(var(--drift-x))
-        rotateX(var(--rx-start))
-        rotateY(var(--ry-start))
-        rotateZ(var(--rz-start))
-        scale(0.9);
+        translateY(var(--start-y))
+        translateX(var(--start-x))
+        rotateX(var(--rx))
+        rotateY(var(--ry))
+        rotateZ(var(--rz-start));
     }
-    20% {
+    25% {
       opacity: 1;
       transform: 
-        translateY(calc(-60vh + var(--start-y)))
-        translateX(calc(var(--drift-x) * -0.5))
-        rotateX(var(--rx-mid))
-        rotateY(var(--ry-mid))
-        rotateZ(var(--rz-mid))
-        scale(1);
+        translateY(calc(var(--start-y) + 25vh))
+        translateX(calc(var(--start-x) + var(--drift)))
+        rotateX(calc(var(--rx) * -0.5))
+        rotateY(calc(var(--ry) * -0.7))
+        rotateZ(calc(var(--rz-start) * -0.3));
     }
     50% {
+      opacity: 0.9;
       transform: 
-        translateY(calc(-20vh + var(--start-y)))
-        translateX(calc(var(--drift-x) * 0.3))
-        rotateX(calc(var(--rx-mid) * -0.5))
-        rotateY(calc(var(--ry-mid) * -0.3))
-        rotateZ(calc(var(--rz-end) * 0.7))
-        scale(1.02);
+        translateY(calc(var(--start-y) + 55vh))
+        translateX(calc(var(--start-x) - var(--drift) * 0.5))
+        rotateX(calc(var(--rx) * 0.3))
+        rotateY(calc(var(--ry) * 0.5))
+        rotateZ(var(--rz-end));
     }
-    80% {
+    75% {
+      opacity: 0.7;
       transform: 
-        translateY(5px)
-        translateX(calc(var(--drift-x) * -0.1))
-        rotateX(calc(var(--rx-end) * 1.2))
-        rotateY(calc(var(--ry-end) * 1.1))
-        rotateZ(calc(var(--rz-end) * 1.1))
-        scale(0.99);
+        translateY(calc(var(--start-y) + 80vh))
+        translateX(calc(var(--start-x) + var(--drift) * 0.3))
+        rotateX(calc(var(--rx) * -0.2))
+        rotateY(calc(var(--ry) * -0.3))
+        rotateZ(calc(var(--rz-end) * -0.5));
     }
     100% {
-      opacity: 1;
+      opacity: 0;
       transform: 
-        translateY(0)
-        translateX(0)
-        rotateX(var(--rx-end))
-        rotateY(var(--ry-end))
-        rotateZ(var(--rz-end))
-        scale(var(--end-sc));
+        translateY(calc(var(--start-y) + 110vh))
+        translateX(var(--start-x))
+        rotateX(0deg)
+        rotateY(0deg)
+        rotateZ(var(--rz-end));
     }
-  }
-
-  /* 안착 후 미세 흔들림 */
-  .postit.settled {
-    animation: micro-sway 3s ease-in-out infinite;
-    animation-delay: var(--sway-delay);
-  }
-
-  @keyframes micro-sway {
-    0%, 100% { transform: rotateZ(var(--rz-end)) scale(var(--end-sc)); }
-    50% { transform: rotateZ(calc(var(--rz-end) + 1deg)) scale(var(--end-sc)); }
   }
 
   .footnote {
@@ -297,7 +287,7 @@ function makeRng(seed) {
 }
 
 // ============================================
-// 렌더링
+// 렌더링 (글자는 즉시, 여분 종이만 떨어짐)
 // ============================================
 function render() {
   const wrap = document.getElementById('wrap');
@@ -325,67 +315,73 @@ function render() {
     const px = it.x + ox - postitSize / 2;
     const py = it.y + oy - postitSize / 2;
 
-    const isNew = idx >= previousCount;
-
-    if (isNew) {
-      // 3D 회전값 (입체적 팔랑임)
-      const rxStart = (rng() * 2 - 1) * 180; // X축 뒤집힘
-      const ryStart = (rng() * 2 - 1) * 120; // Y축 회전
-      const rzStart = (rng() * 2 - 1) * 90;
-      const rxMid = (rng() * 2 - 1) * 60;
-      const ryMid = (rng() * 2 - 1) * 45;
-      const rzMid = (rng() * 2 - 1) * 30;
-      const rxEnd = (rng() * 2 - 1) * 5; // 최종은 거의 평평
-      const ryEnd = (rng() * 2 - 1) * 5;
-      const driftX = (rng() * 2 - 1) * 80; // 좌우 흔들림
-      const startY = rng() * 200; // 시작 높이 랜덤
-      const delay = (idx - previousCount) * 5; // 5ms 간격
-      const duration = 1.2 + rng() * 0.8; // 1.2~2초
-
-      html += `<div class="postit falling" style="
-        left:${px.toFixed(1)}px;
-        top:${py.toFixed(1)}px;
-        width:${postitSize}px;
-        height:${postitSize}px;
-        --rx-start:${rxStart.toFixed(0)}deg;
-        --ry-start:${ryStart.toFixed(0)}deg;
-        --rz-start:${rzStart.toFixed(0)}deg;
-        --rx-mid:${rxMid.toFixed(0)}deg;
-        --ry-mid:${ryMid.toFixed(0)}deg;
-        --rz-mid:${rzMid.toFixed(0)}deg;
-        --rx-end:${rxEnd.toFixed(1)}deg;
-        --ry-end:${ryEnd.toFixed(1)}deg;
-        --rz-end:${rot.toFixed(1)}deg;
-        --end-sc:${sc.toFixed(3)};
-        --drift-x:${driftX.toFixed(0)}px;
-        --start-y:${startY.toFixed(0)}px;
-        --delay:${delay}ms;
-        --duration:${duration.toFixed(2)}s;
-        --sway-delay:${(rng() * 3).toFixed(2)}s;
-        animation-delay:${delay}ms;
-        animation-duration:${duration.toFixed(2)}s;
-      "></div>`;
-    } else {
-      // 기존 포스트잇: 즉시 표시
-      html += `<div class="postit" style="
-        left:${px.toFixed(1)}px;
-        top:${py.toFixed(1)}px;
-        width:${postitSize}px;
-        height:${postitSize}px;
-        --rz-end:${rot.toFixed(1)}deg;
-        --end-sc:${sc.toFixed(3)};
-        --sway-delay:${(rng() * 3).toFixed(2)}s;
-        opacity:1;
-        transform: rotateZ(${rot.toFixed(1)}deg) scale(${sc.toFixed(3)});
-      "></div>`;
-    }
+    // 모든 포스트잇 즉시 표시
+    html += `<div class="postit" style="
+      left:${px.toFixed(1)}px;
+      top:${py.toFixed(1)}px;
+      width:${postitSize}px;
+      height:${postitSize}px;
+      transform: rotateZ(${rot.toFixed(1)}deg) scale(${sc.toFixed(3)});
+    "></div>`;
   });
 
   wrap.style.width = sample.width + 'px';
   wrap.style.height = sample.height + 'px';
   wrap.innerHTML = html;
 
+  // 새 글자가 추가됐을 때만 여분 종이 떨어뜨리기
+  if (sample.items.length > previousCount && previousCount >= 0) {
+    spawnFallingPapers(5 + Math.floor(Math.random() * 3)); // 5~7장
+  }
+
   previousCount = sample.items.length;
+}
+
+// ============================================
+// 여분 종이 떨어뜨리기 (5~7장)
+// ============================================
+function spawnFallingPapers(count) {
+  const wrap = document.getElementById('wrap');
+  const wrapRect = wrap.getBoundingClientRect();
+  
+  for (let i = 0; i < count; i++) {
+    const paper = document.createElement('div');
+    paper.className = 'paper-falling';
+    
+    const size = CONFIG.postitSize * (0.8 + Math.random() * 0.6); // 크기 랜덤
+    const startX = (Math.random() - 0.5) * wrapRect.width * 0.8;
+    const startY = -50 - Math.random() * 100;
+    const drift = (Math.random() - 0.5) * 100;
+    const rx = (Math.random() - 0.5) * 180;
+    const ry = (Math.random() - 0.5) * 120;
+    const rzStart = (Math.random() - 0.5) * 90;
+    const rzEnd = (Math.random() - 0.5) * 60;
+    const duration = 2 + Math.random() * 1.5; // 2~3.5초
+    const delay = i * 150; // 150ms 간격
+
+    paper.style.cssText = `
+      left: 50%;
+      top: 0;
+      width: ${size.toFixed(0)}px;
+      height: ${size.toFixed(0)}px;
+      --start-x: ${startX.toFixed(0)}px;
+      --start-y: ${startY.toFixed(0)}px;
+      --drift: ${drift.toFixed(0)}px;
+      --rx: ${rx.toFixed(0)}deg;
+      --ry: ${ry.toFixed(0)}deg;
+      --rz-start: ${rzStart.toFixed(0)}deg;
+      --rz-end: ${rzEnd.toFixed(0)}deg;
+      --duration: ${duration.toFixed(2)}s;
+      --delay: ${delay}ms;
+      animation-delay: ${delay}ms;
+      animation-duration: ${duration.toFixed(2)}s;
+    `;
+
+    wrap.appendChild(paper);
+
+    // 애니메이션 끝나면 제거
+    setTimeout(() => paper.remove(), (duration + delay / 1000) * 1000 + 200);
+  }
 }
 
 // ============================================
