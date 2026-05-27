@@ -424,7 +424,7 @@ function render() {
         width:${postitSize}px;
         height:${postitSize}px;
         transform: rotateZ(${rot.toFixed(1)}deg) scale(${sc.toFixed(3)});
-      "></div>`;
+      " data-rot="${rot.toFixed(1)}" data-sc="${sc.toFixed(3)}"></div>`;
     }
   });
 
@@ -508,9 +508,47 @@ hiddenInput.addEventListener('keydown', (e) => {
   }
 });
 
-// 폰트 로드 후 대기
-document.fonts.ready.then(() => {
-  // 빈 상태로 시작
+// ============================================
+// 클릭하면 주변 포스트잇 흩어졌다가 다시 모임
+// ============================================
+document.querySelector('.canvas-wrap').addEventListener('click', (e) => {
+  const wrap = document.getElementById('wrap');
+  const postits = wrap.querySelectorAll('.postit:not(.gather)');
+  if (postits.length === 0) return;
+  
+  const rect = wrap.getBoundingClientRect();
+  const clickX = e.clientX - rect.left;
+  const clickY = e.clientY - rect.top;
+  const RADIUS = 200;
+  
+  postits.forEach(p => {
+    const px = parseFloat(p.style.left) + CONFIG.postitSize / 2;
+    const py = parseFloat(p.style.top) + CONFIG.postitSize / 2;
+    
+    const dx = px - clickX;
+    const dy = py - clickY;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    
+    if (dist < RADIUS) {
+      const force = (1 - dist / RADIUS) * 200;
+      const angle = Math.atan2(dy, dx);
+      const throwX = Math.cos(angle) * force;
+      const throwY = Math.sin(angle) * force;
+      const throwRot = (Math.random() - 0.5) * 180;
+      
+      p.style.transition = 'none';
+      p.style.transform = `translate(${throwX}px, ${throwY}px) rotateZ(${throwRot}deg) scale(0.8)`;
+      p.style.opacity = '0.7';
+      
+      // 다시 모이기
+      setTimeout(() => {
+        const returnDuration = 0.4 + Math.random() * 0.3;
+        p.style.transition = `transform ${returnDuration}s cubic-bezier(0.2, 0.8, 0.3, 1), opacity ${returnDuration}s ease`;
+        p.style.transform = `rotateZ(${p.dataset.rot || '0'}deg) scale(${p.dataset.sc || '1'})`;
+        p.style.opacity = '1';
+      }, 100 + Math.random() * 200);
+    }
+  });
 });
 
 window.addEventListener('resize', () => {
