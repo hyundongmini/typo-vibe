@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 17 — 온라인 전시회 v2</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden}
+body{background:#fff;font-family:'Pretendard',sans-serif}
+
+.poster{position:fixed;inset:0;overflow:hidden}
+
+/* Typography */
+.title-top{position:absolute;top:clamp(20px,4vh,50px);left:clamp(20px,4vw,50px);z-index:5}
+.title-top h1{font-size:clamp(42px,10vw,120px);font-weight:900;letter-spacing:-.04em;
+  line-height:.9;color:#000}
+.title-bottom{position:absolute;bottom:clamp(20px,4vh,50px);left:clamp(20px,4vw,50px);z-index:5}
+.title-bottom h2{font-size:clamp(28px,6vw,80px);font-weight:200;letter-spacing:-.02em;
+  color:#000;font-style:italic}
+.side-left{position:absolute;left:clamp(12px,2vw,24px);top:50%;transform:translateY(-50%);
+  writing-mode:vertical-rl;font-size:clamp(10px,1.1vw,13px);color:rgba(0,0,0,.2);
+  letter-spacing:2px;font-weight:300;z-index:5}
+.side-right{position:absolute;right:clamp(12px,2vw,24px);top:50%;transform:translateY(-50%);
+  writing-mode:vertical-rl;font-size:clamp(10px,1.1vw,13px);color:rgba(0,0,0,.2);
+  letter-spacing:2px;font-weight:300;z-index:5}
+
+/* Photo tiles */
+.tile{
+  position:absolute;
+  overflow:hidden;
+  box-shadow:0 2px 8px rgba(0,0,0,.08);
+  transition:box-shadow .3s;
+  will-change:transform;
+}
+.tile img{width:100%;height:100%;object-fit:cover;display:block}
+.tile:hover{box-shadow:0 8px 24px rgba(0,0,0,.15);z-index:100}
+
+/* UI */
+.bk{position:fixed;top:16px;right:16px;z-index:200;
+  padding:6px 12px;color:rgba(0,0,0,.15);font-size:11px;text-decoration:none;
+  border:1px solid rgba(0,0,0,.06);border-radius:100px}
+.bk:hover{color:rgba(0,0,0,.5)}
+.bk svg{stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.tag{position:fixed;bottom:14px;right:18px;font:10px/1 monospace;color:rgba(0,0,0,.06);z-index:10}
+</style>
+</head>
+<body>
+<div class="poster" id="poster">
+  <div class="title-top"><h1>온라인<br>전시회</h1></div>
+  <div class="title-bottom"><h2>Online Exhibition</h2></div>
+  <div class="side-left">화면 너머의 산책이 만드는 나</div>
+  <div class="side-right">하루하루의 기록이 모인 전시</div>
+</div>
+<a href="../" class="bk"><svg viewBox="0 0 24 24" width="12" height="12"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></a>
+<div class="tag">day 17 / typo-vibe</div>
+
+<script>
+const poster = document.getElementById('poster');
+const W = () => innerWidth;
+const H = () => innerHeight;
+const IMG_COUNT = 50; // use 50 of 73 images
+const TOTAL_IMGS = 73;
+
+// ── Human silhouette coordinates (walking pose) ──
+// Normalized 0~1, will be scaled to viewport
+function humanCoords(count) {
+  const pts = [];
+  // Head (circle, top center)
+  for (let i = 0; i < 6; i++) {
+    const a = (i/6) * Math.PI * 2;
+    pts.push({ x: 0.5 + Math.cos(a)*0.04, y: 0.12 + Math.sin(a)*0.04 });
+  }
+  // Neck
+  pts.push({ x: 0.5, y: 0.19 });
+  // Torso (wider rectangle)
+  for (let i = 0; i < 10; i++) {
+    const t = i / 9;
+    const x = 0.5 + (Math.random()-0.5)*0.08;
+    const y = 0.22 + t * 0.22;
+    pts.push({ x, y });
+  }
+  // Left arm (reaching out)
+  for (let i = 0; i < 5; i++) {
+    const t = i / 4;
+    pts.push({ x: 0.42 - t*0.12, y: 0.26 + t*0.08 });
+  }
+  // Right arm (down)
+  for (let i = 0; i < 5; i++) {
+    const t = i / 4;
+    pts.push({ x: 0.58 + t*0.10, y: 0.28 + t*0.10 });
+  }
+  // Left leg (forward stride)
+  for (let i = 0; i < 8; i++) {
+    const t = i / 7;
+    pts.push({ x: 0.46 - t*0.10, y: 0.46 + t*0.30 });
+  }
+  // Right leg (back stride)
+  for (let i = 0; i < 8; i++) {
+    const t = i / 7;
+    pts.push({ x: 0.54 + t*0.08, y: 0.46 + t*0.32 });
+  }
+
+  // Shuffle and take what we need
+  while (pts.length < count) {
+    pts.push({
+      x: 0.5 + (Math.random()-0.5)*0.15,
+      y: 0.2 + Math.random()*0.5
+    });
+  }
+  return pts.slice(0, count);
+}
+
+// ── Create tiles ──
+const coords = humanCoords(IMG_COUNT);
+const tiles = [];
+
+// Shuffle image indices
+const imgIndices = Array.from({length:TOTAL_IMGS},(_,i)=>i+1);
+for(let i=imgIndices.length-1;i>0;i--){const j=Math.random()*i|0;[imgIndices[i],imgIndices[j]]=[imgIndices[j],imgIndices[i]];}
+
+for (let i = 0; i < IMG_COUNT; i++) {
+  const el = document.createElement('div');
+  el.className = 'tile';
+  const size = 40 + Math.random() * 50; // 40~90px
+  const aspect = 0.7 + Math.random() * 0.6; // varying aspect
+  const w = size, h = size * aspect;
+  el.style.width = w + 'px';
+  el.style.height = h + 'px';
+
+  const img = document.createElement('img');
+  img.src = `img/${String(imgIndices[i]).padStart(2,'0')}.png`;
+  img.loading = 'lazy';
+  el.appendChild(img);
+  poster.appendChild(el);
+
+  // Target position (human silhouette)
+  const target = coords[i];
+  const tx = target.x * W() - w/2;
+  const ty = target.y * H() - h/2;
+
+  // Start position (random scatter)
+  const sx = Math.random() * W();
+  const sy = Math.random() * H();
+
+  tiles.push({
+    el, w, h,
+    // Current position
+    x: sx, y: sy,
+    // Target
+    tx, ty,
+    // Velocity
+    vx: 0, vy: 0,
+    // Rotation
+    rot: (Math.random()-0.5) * 8,
+    targetRot: (Math.random()-0.5) * 3,
+    // Delay for staggered entry
+    delay: Math.random() * 1.5,
+    arrived: false,
+  });
+
+  el.style.transform = `translate(${sx}px,${sy}px) rotate(${tiles[i].rot}deg)`;
+}
+
+// ── Animation loop ──
+let startTime = performance.now();
+let mx = -9999, my = -9999;
+
+document.addEventListener('mousemove', e => { mx = e.clientX; my = e.clientY; });
+document.addEventListener('mouseleave', () => { mx = -9999; my = -9999; });
+
+function animate() {
+  const now = performance.now();
+  const elapsed = (now - startTime) / 1000;
+
+  for (const t of tiles) {
+    if (elapsed < t.delay) continue;
+
+    // Spring toward target
+    const spring = 0.04;
+    const damp = 0.88;
+
+    let targetX = t.tx;
+    let targetY = t.ty;
+
+    // Mouse repulsion
+    if (mx > -9000) {
+      const cx = t.x + t.w/2;
+      const cy = t.y + t.h/2;
+      const dx = cx - mx;
+      const dy = cy - my;
+      const dist = Math.hypot(dx, dy);
+      const radius = 130;
+      if (dist < radius && dist > 0) {
+        const force = (radius - dist) / radius * 40;
+        targetX += (dx / dist) * force;
+        targetY += (dy / dist) * force;
+      }
+    }
+
+    t.vx += (targetX - t.x) * spring;
+    t.vy += (targetY - t.y) * spring;
+    t.vx *= damp;
+    t.vy *= damp;
+    t.x += t.vx;
+    t.y += t.vy;
+
+    // Rotation spring
+    t.rot += (t.targetRot - t.rot) * 0.05;
+
+    t.el.style.transform = `translate(${t.x.toFixed(1)}px,${t.y.toFixed(1)}px) rotate(${t.rot.toFixed(1)}deg)`;
+  }
+
+  requestAnimationFrame(animate);
+}
+
+// ── Resize handler ──
+function onResize() {
+  const newCoords = humanCoords(IMG_COUNT);
+  for (let i = 0; i < tiles.length; i++) {
+    const target = newCoords[i];
+    tiles[i].tx = target.x * W() - tiles[i].w/2;
+    tiles[i].ty = target.y * H() - tiles[i].h/2;
+  }
+}
+addEventListener('resize', onResize);
+
+animate();
+</script>
+</body>
+</html>

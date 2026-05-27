@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 16 — 온라인 전시회</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html{cursor:none}
+body{background:#fff;color:#000;font-family:'Inter',sans-serif;
+  min-height:250vh;overflow-x:hidden;cursor:none}
+
+/* Typography background */
+.typo-bg{position:fixed;inset:0;z-index:1;pointer-events:none;
+  display:flex;flex-direction:column;justify-content:center;
+  padding:0 clamp(16px,3vw,40px)}
+.typo-bg .line{
+  font-family:'Bebas Neue',sans-serif;
+  font-size:clamp(70px,14vw,180px);
+  font-weight:900;line-height:0.88;
+  letter-spacing:-0.02em;color:#000;
+  width:100%;
+}
+.typo-bg .line.sub{
+  font-family:'Inter',sans-serif;
+  font-size:clamp(12px,1.5vw,18px);
+  font-weight:300;line-height:1.6;
+  margin-top:clamp(20px,3vh,40px);
+  letter-spacing:0.5px;color:rgba(0,0,0,.4);
+}
+.typo-bg .line.num{
+  position:fixed;bottom:clamp(20px,4vh,60px);left:clamp(16px,3vw,40px);
+  font-family:'Bebas Neue',sans-serif;
+  font-size:clamp(60px,12vw,160px);
+  line-height:1;color:rgba(0,0,0,.08);
+}
+
+/* Floating images */
+.float-img{
+  position:absolute;z-index:3;
+  overflow:hidden;
+  transition:transform .3s ease, z-index 0s;
+  will-change:transform;
+}
+.float-img img{
+  width:100%;height:100%;object-fit:cover;
+  display:block;
+  transition:transform .3s ease;
+}
+.float-img:hover{z-index:100}
+.float-img:hover img{transform:scale(1.03)}
+
+/* Custom cursor */
+.cursor{
+  position:fixed;z-index:9999;pointer-events:none;
+  width:20px;height:20px;
+  border:1.5px solid #000;border-radius:50%;
+  transform:translate(-50%,-50%);
+  transition:width .2s cubic-bezier(.4,0,.2,1),height .2s cubic-bezier(.4,0,.2,1),
+             background .2s,border-color .2s;
+  display:flex;align-items:center;justify-content:center;
+  background:transparent;
+}
+.cursor.expand{
+  width:80px;height:80px;
+  background:rgba(0,0,0,.9);border-color:transparent;
+}
+.cursor .label{
+  font-family:'Inter',sans-serif;font-size:10px;font-weight:500;
+  color:#fff;letter-spacing:2px;text-transform:uppercase;
+  opacity:0;transition:opacity .2s;
+}
+.cursor.expand .label{opacity:1}
+
+/* UI */
+.bk{position:fixed;top:20px;left:20px;z-index:200;
+  display:inline-flex;align-items:center;gap:6px;padding:8px 14px 8px 12px;
+  background:rgba(255,255,255,.8);color:rgba(0,0,0,.3);
+  font:500 12px/1 'Inter',sans-serif;text-decoration:none;
+  border:1px solid rgba(0,0,0,.06);border-radius:100px;backdrop-filter:blur(8px);
+  cursor:none}
+.bk:hover{color:#000}
+.bk svg{stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+
+.footer-text{
+  position:fixed;bottom:clamp(20px,3vh,40px);right:clamp(16px,3vw,40px);
+  z-index:2;max-width:280px;text-align:right;
+  font:300 clamp(10px,1.1vw,13px)/1.7 'Inter',sans-serif;
+  color:rgba(0,0,0,.3);pointer-events:none;
+}
+
+.tag{position:fixed;bottom:14px;left:50%;transform:translateX(-50%);
+  font:11px/1 monospace;color:rgba(0,0,0,.06);z-index:10}
+</style>
+</head>
+<body>
+
+<!-- Custom cursor -->
+<div class="cursor" id="cursor"><span class="label">VIEW</span></div>
+
+<!-- Typography background (fixed) -->
+<div class="typo-bg" id="typoBg">
+  <div class="line">온라인</div>
+  <div class="line">전시회</div>
+  <div class="line sub">2026 — 타이포그래피 실험</div>
+  <div class="line num">0110</div>
+</div>
+
+<!-- Floating images (absolute, parallax) -->
+<div class="float-img" data-speed="0.15" style="top:8vh;left:42vw;width:28vw;height:35vh">
+  <img src="https://picsum.photos/600/750?grayscale&random=1" alt="">
+</div>
+<div class="float-img" data-speed="0.35" style="top:30vh;left:12vw;width:36vw;height:45vh">
+  <img src="https://picsum.photos/700/900?grayscale&random=2" alt="">
+</div>
+<div class="float-img" data-speed="0.2" style="top:55vh;left:52vw;width:26vw;height:32vh">
+  <img src="https://picsum.photos/500/650?grayscale&random=3" alt="">
+</div>
+<div class="float-img" data-speed="0.45" style="top:85vh;left:22vw;width:40vw;height:50vh">
+  <img src="https://picsum.photos/800/1000?grayscale&random=4" alt="">
+</div>
+<div class="float-img" data-speed="0.1" style="top:120vh;left:8vw;width:22vw;height:28vh">
+  <img src="https://picsum.photos/450/560?grayscale&random=5" alt="">
+</div>
+<div class="float-img" data-speed="0.55" style="top:140vh;left:55vw;width:30vw;height:38vh">
+  <img src="https://picsum.photos/600/760?grayscale&random=6" alt="">
+</div>
+
+<!-- UI -->
+<a href="../" class="bk"><svg viewBox="0 0 24 24" width="14" height="14"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>back</a>
+<div class="footer-text">온라인 전시회란 무엇인가.<br>화면 너머의 공간.<br>2026.</div>
+<div class="tag">day 16 / typo-vibe</div>
+
+<script>
+// ── Custom cursor ──
+const cursor = document.getElementById('cursor');
+const imgs = document.querySelectorAll('.float-img');
+
+document.addEventListener('mousemove', e => {
+  cursor.style.left = e.clientX + 'px';
+  cursor.style.top = e.clientY + 'px';
+});
+
+imgs.forEach(img => {
+  img.addEventListener('mouseenter', () => cursor.classList.add('expand'));
+  img.addEventListener('mouseleave', () => cursor.classList.remove('expand'));
+});
+
+// ── Parallax ──
+const typoBg = document.getElementById('typoBg');
+let ticking = false;
+
+function updateParallax() {
+  const scrollY = window.scrollY;
+
+  imgs.forEach(img => {
+    const speed = parseFloat(img.dataset.speed) || 0.2;
+    const y = scrollY * speed;
+    img.style.transform = `translateY(${-y}px)`;
+  });
+
+  // Subtle counter-movement on text
+  typoBg.style.transform = `translateY(${scrollY * 0.03}px)`;
+
+  ticking = false;
+}
+
+window.addEventListener('scroll', () => {
+  if (!ticking) {
+    requestAnimationFrame(updateParallax);
+    ticking = true;
+  }
+});
+</script>
+</body>
+</html>

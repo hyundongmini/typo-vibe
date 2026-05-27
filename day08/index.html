@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 08 - 도동이 복복복 쓰다듬기</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/fonts-archive/BMEuljiro@1.0/BMEuljiro.css">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;overflow:hidden}
+body{
+  background:#faf9f6;font-family:'BMEuljiro','Pretendard',sans-serif;color:#111;
+  -webkit-font-smoothing:antialiased;
+  display:flex;align-items:center;justify-content:center;
+  user-select:none;-webkit-user-select:none;
+  transition:background-color .8s ease;
+}
+body.danger-bg{background:#f5ebe8}
+body.happy-bg{background:#f0f7f0}
+
+/* HUD */
+.hud{position:fixed;top:0;left:0;right:0;display:flex;justify-content:space-between;align-items:flex-start;padding:20px 24px;z-index:50}
+.score-wrap{display:flex;align-items:baseline;gap:4px}
+.score{font-size:48px;font-weight:900;letter-spacing:-0.03em;color:#111;font-variant-numeric:tabular-nums;
+  transition:color .15s}
+.score.hot{color:#22c55e}
+.mult{font-size:18px;font-weight:800;color:#f59e0b;transition:color .2s,transform .2s}
+.mult.x2{color:#22c55e;transform:scale(1.2)}
+.mult.x3{color:#3b82f6;transform:scale(1.3)}
+.best{font-size:12px;color:rgba(0,0,0,0.3);font-family:'Pretendard',sans-serif;font-weight:500;margin-top:2px}
+.state-indicator{
+  padding:6px 16px;border-radius:100px;font-size:13px;font-weight:700;
+  font-family:'Pretendard',sans-serif;letter-spacing:-0.01em;
+  transition:all .2s;
+}
+.state-indicator.safe{background:#dcfce7;color:#16a34a}
+.state-indicator.danger{background:#fef2f2;color:#dc2626;animation:dangerPulse .4s ease infinite alternate}
+.state-indicator.happy{background:#dbeafe;color:#2563eb}
+@keyframes dangerPulse{0%{transform:scale(1)}100%{transform:scale(1.05);box-shadow:0 0 12px rgba(220,38,38,0.3)}}
+
+/* Cat */
+.cat-wrap{
+  position:relative;width:340px;height:340px;
+  display:flex;align-items:center;justify-content:center;
+  cursor:url("cursor_hand.png") 16 16, pointer;
+  transition:transform .1s;
+}
+.cat-wrap.petting{cursor:url("cursor_hand.png") 16 16, grab}
+.cat-img{max-width:100%;max-height:100%;object-fit:contain;pointer-events:none;position:absolute;
+  transition:opacity .3s ease,transform .3s ease}
+.cat-img.hidden{opacity:0;transform:scale(0.95)}
+.cat-img.active{opacity:1;transform:scale(1)}
+
+/* Danger state — cat shakes subtly */
+.cat-wrap.danger-mode{animation:catTwitch .15s ease infinite alternate}
+@keyframes catTwitch{0%{transform:rotate(-0.5deg)}100%{transform:rotate(0.5deg)}}
+
+/* Fur — realistic hair strands */
+.fur{position:fixed;pointer-events:none;z-index:55;
+  animation:furFall 1.2s ease-out forwards}
+.fur.strand{
+  width:2px;border-radius:1px;
+  background:linear-gradient(to bottom,var(--fur-c1),var(--fur-c2));
+  transform-origin:50% 0%;
+}
+.fur.clump{
+  border-radius:40%;
+  background:radial-gradient(ellipse at 30% 30%,var(--fur-c1),var(--fur-c2));
+}
+@keyframes furFall{
+  0%{opacity:0.9;transform:translate(0,0) rotate(var(--fr)) scale(1)}
+  40%{opacity:0.7}
+  100%{opacity:0;transform:translate(var(--fx),var(--fy)) rotate(var(--fr2)) scale(0.4)}
+}
+
+/* Particles */
+.particle{position:fixed;font-size:24px;pointer-events:none;z-index:60;animation:pUp .7s ease-out forwards}
+@keyframes pUp{0%{opacity:1;transform:translateY(0) scale(1)}100%{opacity:0;transform:translateY(-50px) scale(0.4)}}
+
+/* Screen flash */
+.flash{position:fixed;inset:0;pointer-events:none;z-index:150;opacity:0;transition:opacity .05s}
+.flash.red{background:#ff0000;opacity:0.3}
+.flash.green{background:#00ff00;opacity:0.15}
+
+/* Vignette for danger */
+.vignette{position:fixed;inset:0;pointer-events:none;z-index:5;opacity:0;
+  transition:opacity .6s ease;
+  background:radial-gradient(ellipse at center,transparent 40%,rgba(0,0,0,0.4) 100%)}
+.vignette.active{opacity:1}
+
+/* Timer */
+.timer{position:fixed;bottom:40px;left:0;right:0;text-align:center;
+  font-size:20px;font-weight:800;color:rgba(0,0,0,0.15);
+  font-variant-numeric:tabular-nums;font-family:'Pretendard',sans-serif;
+  letter-spacing:0.05em;z-index:10;transition:color .3s}
+.timer.danger{color:rgba(220,38,38,0.3)}
+
+/* NEW BEST */
+.new-best{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) scale(0);
+  font-size:clamp(40px,8vw,64px);font-weight:900;color:#f59e0b;
+  text-shadow:0 0 30px rgba(245,158,11,0.4);
+  pointer-events:none;z-index:180;opacity:0;
+  transition:transform .4s cubic-bezier(.2,1,.3,1),opacity .4s}
+.new-best.show{transform:translate(-50%,-50%) scale(1);opacity:1}
+
+/* Screen shake */
+body.screen-shake{animation:screenShake .3s ease}
+@keyframes screenShake{
+  0%,100%{transform:translate(0)}
+  10%{transform:translate(-6px,4px)}
+  20%{transform:translate(6px,-4px)}
+  30%{transform:translate(-4px,6px)}
+  40%{transform:translate(4px,-2px)}
+  50%{transform:translate(-2px,4px)}
+  60%{transform:translate(4px,-4px)}
+  70%{transform:translate(-6px,2px)}
+  80%{transform:translate(2px,-6px)}
+  90%{transform:translate(-2px,2px)}
+}
+
+/* Game over */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,0.92);display:flex;flex-direction:column;
+  align-items:center;justify-content:center;z-index:200;transition:opacity .3s;padding:24px;text-align:center}
+.overlay.hidden{opacity:0;pointer-events:none}
+.overlay.start-screen{background:rgba(250,249,246,0.96)}
+.overlay h1{font-size:clamp(32px,7vw,56px);font-weight:900;letter-spacing:-0.02em;line-height:1.15;margin-bottom:12px}
+.overlay .sub{font-size:15px;color:rgba(255,255,255,0.5);font-weight:400;margin-bottom:36px;line-height:1.5;
+  font-family:'Pretendard',sans-serif}
+.overlay.start-screen .sub{color:rgba(0,0,0,0.5)}
+.overlay .final-score{font-size:80px;font-weight:900;letter-spacing:-0.04em;margin-bottom:4px;color:#ef4444}
+.overlay .best-score{font-size:14px;color:rgba(255,255,255,0.4);margin-bottom:28px;font-family:'Pretendard',sans-serif}
+.overlay .btn{padding:16px 40px;background:#fff;color:#111;font:700 16px/1 'BMEuljiro',sans-serif;
+  border:none;border-radius:100px;cursor:pointer;transition:transform .15s,box-shadow .15s}
+.overlay .btn:hover{transform:scale(1.05);box-shadow:0 4px 20px rgba(255,255,255,0.2)}
+.overlay.start-screen .btn{background:#111;color:#fff}
+.overlay .result-img{width:200px;height:200px;object-fit:contain;margin-bottom:16px;
+  animation:resultBounce .5s ease-out}
+@keyframes resultBounce{0%{transform:scale(0.3) rotate(-10deg);opacity:0}
+  60%{transform:scale(1.1) rotate(3deg);opacity:1}100%{transform:scale(1) rotate(0deg)}}
+.overlay h1.fail-title{color:#ef4444;text-shadow:0 0 40px rgba(239,68,68,0.5)}
+
+/* Status */
+.status{position:fixed;bottom:80px;left:0;right:0;text-align:center;
+  font-size:14px;font-weight:600;color:rgba(0,0,0,0.4);font-family:'Pretendard',sans-serif;
+  transition:all .2s;z-index:10}
+.status.danger-text{font-size:22px;font-weight:900;color:#dc2626;
+  font-family:'BMEuljiro',sans-serif;animation:dangerBlink .5s ease infinite alternate}
+@keyframes dangerBlink{0%{opacity:1}100%{opacity:0.5}}
+
+/* Back */
+.back-to-archive{position:fixed;top:16px;left:16px;z-index:9999;display:inline-flex;align-items:center;gap:6px;
+  padding:8px 14px 8px 12px;background:rgba(255,255,255,0.9);color:#111;
+  font:500 12px/1 'Pretendard',sans-serif;text-decoration:none;
+  border:1px solid rgba(0,0,0,0.08);border-radius:100px;box-shadow:0 2px 8px rgba(0,0,0,0.12);
+  backdrop-filter:blur(10px);transition:background .2s,transform .2s}
+.back-to-archive:hover{background:#fff;transform:translateX(-2px)}
+.back-to-archive svg{flex:none;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.day-tag{position:fixed;bottom:14px;right:18px;font:11px/1 monospace;color:rgba(0,0,0,0.2);pointer-events:none;z-index:99}
+
+@media(max-width:480px){.cat-wrap{width:280px;height:280px}.score{font-size:36px}}
+</style>
+</head>
+<body>
+<a href="../" class="back-to-archive">
+  <svg viewBox="0 0 24 24" width="14" height="14"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+  <span>뒤로가기</span>
+</a>
+<div class="hud">
+  <div>
+    <div class="score-wrap"><span class="score" id="scoreEl">0</span><span class="mult" id="multEl">x1</span></div>
+    <div class="best" id="bestEl">BEST: 0</div>
+  </div>
+  <div class="state-indicator safe" id="stateInd">안전</div>
+</div>
+<div class="cat-wrap" id="catWrap">
+  <img class="cat-img active" id="imgDefault" src="도동이_기본.png" alt="" draggable="false">
+  <img class="cat-img hidden" id="imgHappy1" src="도동이_긍정1단계.png" alt="" draggable="false">
+  <img class="cat-img hidden" id="imgHappy2" src="도동이_긍정2단계.png" alt="" draggable="false">
+  <img class="cat-img hidden" id="imgAngry1" src="도동이_분노1단계.png" alt="" draggable="false">
+  <img class="cat-img hidden" id="imgAngry2" src="도동이_분노2단계.png" alt="" draggable="false">
+</div>
+<div class="status" id="statusEl">도동이를 쓰다듬어주세요</div>
+<div class="timer" id="timerEl">0.0s</div>
+<div class="flash" id="flash"></div>
+<div class="vignette" id="vignette"></div>
+<div class="new-best" id="newBest">NEW BEST!</div>
+
+<div class="overlay start-screen" id="startOverlay">
+  <h1>도동이<br>복복복<br>쓰다듬기</h1>
+  <p class="sub">🟢 안전할 때 → 쓰다듬기 (점수 UP)<br>🔴 째려볼 때 → 손 떼기! (만지면 게임오버)<br>오래 버틸수록 난이도 UP 🐱</p>
+  <button class="btn" id="startBtn">시작하기</button>
+</div>
+<div class="overlay hidden" id="endOverlay">
+  <img class="result-img" id="resultImg" src="도동이_분노2단계.png" alt="">
+  <h1 class="fail-title" id="resultTitle">하악!!</h1>
+  <p class="sub" id="resultSub">도동이가 화났어요!</p>
+  <div class="final-score" id="finalScore">0</div>
+  <div class="best-score" id="bestScoreEnd">BEST: 0</div>
+  <div class="best-score" id="survivalTime" style="margin-top:-20px;margin-bottom:20px">생존: 0.0초</div>
+  <button class="btn" id="retryBtn">다시 하기</button>
+</div>
+<div class="day-tag">day 08 / typo-vibe</div>
+</body>
+</html>
+
+<script>
+/* ================================================================
+   도동이 복복복 쓰다듬기 — v2 Enhanced
+   
+   핵심 루프:
+   1. 기본(안전) → 쓰다듬으면 프레임마다 점수 증가 (속도 기반)
+   2. 랜덤 위험 패턴: 경고→위험, 즉시 위험(서프라이즈), 페이크(페인트)
+   3. 콤보 시스템: 위험 생존 시 콤보 +1, 점수 배율에 반영
+   4. 안전 복귀 후 30% 확률로 즉시 재위험 (더블탭)
+   5. 긍정1(x2, 200스트로크)→긍정2(x3, 500스트로크)
+   ================================================================ */
+
+const catWrap=document.getElementById('catWrap');
+const scoreEl=document.getElementById('scoreEl');
+const multEl=document.getElementById('multEl');
+const bestEl=document.getElementById('bestEl');
+const stateInd=document.getElementById('stateInd');
+const statusEl=document.getElementById('statusEl');
+const flash=document.getElementById('flash');
+const vignette=document.getElementById('vignette');
+const timerEl=document.getElementById('timerEl');
+const newBestEl=document.getElementById('newBest');
+const startOverlay=document.getElementById('startOverlay');
+const endOverlay=document.getElementById('endOverlay');
+
+const imgs={
+  default:document.getElementById('imgDefault'),
+  happy1:document.getElementById('imgHappy1'),
+  happy2:document.getElementById('imgHappy2'),
+  angry1:document.getElementById('imgAngry1'),
+  angry2:document.getElementById('imgAngry2'),
+};
+
+let score=0, bestScore=parseInt(localStorage.getItem('dodong_best')||'0');
+let gameActive=false, petting=false, currentState='default';
+let multiplier=1, comboStrokes=0, gameStartTime=0;
+let combo=0; // danger survival combo
+let stateTimer=null, dangerGraceTimer=null;
+let lastX=0, lastY=0, lastMoveTime=0, petSpeed=0;
+let loopAudio=null;
+let timerInterval=null;
+let scoreLoopRAF=null;
+let feinting=false; // feint state flag
+let pendingDoubleTap=false;
+
+bestEl.textContent='BEST: '+bestScore;
+
+/* ======= Audio ======= */
+let audioCtx=null;
+function ensureAudio(){
+  if(audioCtx)return;
+  const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return;
+  audioCtx=new AC();
+}
+function stopLoop(){if(loopAudio){loopAudio.pause();loopAudio.currentTime=0;loopAudio=null}}
+function playLoop(file,vol){
+  stopLoop();
+  const a=new Audio(file);a.loop=true;a.volume=vol||0.4;a.play().catch(()=>{});
+  loopAudio=a;
+}
+function playOnce(file,vol){
+  const a=new Audio(file);a.loop=false;a.volume=vol||0.4;a.play().catch(()=>{});
+  return a;
+}
+const hissSounds=['hiss.mp3','hiss_growl1.mp3','hiss_growl2.mp3','hiss_complain.mp3'];
+function playHiss(){
+  const file=hissSounds[Math.floor(Math.random()*hissSounds.length)];
+  const a=new Audio(file);a.volume=0.8;a.play().catch(()=>{});
+}
+
+/* Petting sound — brown noise bandpass filtered, volume tied to pet speed */
+let petNoiseNode=null, petNoiseGain=null;
+function startPetSound(){
+  ensureAudio();if(!audioCtx)return;
+  if(petNoiseNode)return;
+  const bufSize=audioCtx.sampleRate*2;
+  const buf=audioCtx.createBuffer(1,bufSize,audioCtx.sampleRate);
+  const d=buf.getChannelData(0);
+  let last=0;
+  for(let i=0;i<bufSize;i++){last=(last+(Math.random()*2-1))*0.995;d[i]=last*0.5;}
+  // normalize
+  let mx=0;for(let i=0;i<bufSize;i++)mx=Math.max(mx,Math.abs(d[i]));
+  if(mx>0)for(let i=0;i<bufSize;i++)d[i]/=mx;
+
+  petNoiseNode=audioCtx.createBufferSource();petNoiseNode.buffer=buf;petNoiseNode.loop=true;
+  const bp=audioCtx.createBiquadFilter();bp.type='bandpass';bp.frequency.value=1200;bp.Q.value=2;
+  petNoiseGain=audioCtx.createGain();petNoiseGain.gain.value=0;
+  petNoiseNode.connect(bp).connect(petNoiseGain).connect(audioCtx.destination);
+  petNoiseNode.start();
+}
+function updatePetSoundVolume(speed){
+  if(!petNoiseGain||!audioCtx)return;
+  const vol=Math.min(0.18, speed/800*0.18);
+  petNoiseGain.gain.setTargetAtTime(vol,audioCtx.currentTime,0.05);
+}
+function stopPetSound(){
+  if(petNoiseNode){try{petNoiseNode.stop();}catch(e){}petNoiseNode=null;}
+  petNoiseGain=null;
+}
+
+/* Danger enter — sharp rising tone */
+function playDangerTone(){
+  ensureAudio();if(!audioCtx)return;
+  const o=audioCtx.createOscillator();const g=audioCtx.createGain();
+  o.type='sawtooth';
+  const t=audioCtx.currentTime;
+  o.frequency.setValueAtTime(300,t);
+  o.frequency.exponentialRampToValueAtTime(900,t+0.15);
+  g.gain.setValueAtTime(0.12,t);
+  g.gain.linearRampToValueAtTime(0,t+0.2);
+  o.connect(g).connect(audioCtx.destination);
+  o.start(t);o.stop(t+0.2);
+}
+
+/* Feint sound — short "mrr?" */
+function playFeintSound(){
+  ensureAudio();if(!audioCtx)return;
+  const o=audioCtx.createOscillator();const g=audioCtx.createGain();
+  o.type='triangle';
+  const t=audioCtx.currentTime;
+  o.frequency.setValueAtTime(220,t);
+  o.frequency.linearRampToValueAtTime(350,t+0.12);
+  o.frequency.linearRampToValueAtTime(280,t+0.2);
+  g.gain.setValueAtTime(0.08,t);
+  g.gain.linearRampToValueAtTime(0.06,t+0.1);
+  g.gain.linearRampToValueAtTime(0,t+0.25);
+  o.connect(g).connect(audioCtx.destination);
+  o.start(t);o.stop(t+0.25);
+}
+
+/* Warning twitch sound */
+function playWarningTone(){
+  ensureAudio();if(!audioCtx)return;
+  const o=audioCtx.createOscillator();const g=audioCtx.createGain();
+  o.type='sine';o.frequency.value=400;g.gain.value=0;
+  o.connect(g).connect(audioCtx.destination);
+  const t=audioCtx.currentTime;
+  g.gain.linearRampToValueAtTime(0.04,t+0.05);
+  g.gain.linearRampToValueAtTime(0,t+0.3);
+  o.start(t);o.stop(t+0.3);
+}
+
+/* ======= VFX ======= */
+const furColors=[
+  ['#e8ddd4','#d4c8bb'],['#d4c8bb','#bfb0a0'],['#c9baa8','#a89888'],
+  ['#f0e8df','#e0d4c8'],['#3a3530','#2a2520'],['#555049','#3a3530'],
+  ['#fff','#e8ddd4'],['#f5f0eb','#d4c8bb']
+];
+function spawnFur(x,y){
+  const count=2+Math.floor(Math.random()*3);
+  for(let i=0;i<count;i++){
+    const el=document.createElement('div');
+    const pair=furColors[Math.floor(Math.random()*furColors.length)];
+    const isClump=Math.random()<0.15;
+
+    if(isClump){
+      el.className='fur clump';
+      const s=4+Math.random()*6;
+      el.style.width=s*1.5+'px';
+      el.style.height=s+'px';
+    }else{
+      el.className='fur strand';
+      const len=8+Math.random()*18;
+      const curve=Math.random()<0.5;
+      el.style.width=(1.5+Math.random()*1.5)+'px';
+      el.style.height=len+'px';
+      if(curve)el.style.borderRadius='0 0 50% 50%';
+    }
+
+    el.style.setProperty('--fur-c1',pair[0]);
+    el.style.setProperty('--fur-c2',pair[1]);
+    el.style.left=(x+(Math.random()-0.5)*24)+'px';
+    el.style.top=(y+(Math.random()-0.5)*16)+'px';
+    el.style.setProperty('--fx',(Math.random()-0.5)*70+'px');
+    el.style.setProperty('--fy',(20+Math.random()*50)+'px');
+    el.style.setProperty('--fr',(Math.random()*90-45)+'deg');
+    el.style.setProperty('--fr2',(Math.random()*180-90)+'deg');
+    document.body.appendChild(el);
+    setTimeout(()=>el.remove(),1200);
+  }
+}
+function spawnScorePop(x,y,n){
+  const el=document.createElement('div');el.className='score-pop';
+  el.textContent=(n>0?'+':'')+Math.floor(n);
+  el.style.color=n>0?'#22c55e':'#ef4444';
+  el.style.left=x+'px';el.style.top=y+'px';
+  document.body.appendChild(el);setTimeout(()=>el.remove(),600);
+}
+function screenFlash(color){
+  flash.className='flash '+color;
+  setTimeout(()=>{flash.className='flash'},120);
+}
+function screenShake(){
+  document.body.classList.remove('screen-shake');
+  void document.body.offsetWidth;
+  document.body.classList.add('screen-shake');
+  setTimeout(()=>document.body.classList.remove('screen-shake'),300);
+}
+
+/* ======= State machine ======= */
+function showImg(s){
+  Object.values(imgs).forEach(i=>{i.classList.remove('active');i.classList.add('hidden')});
+  const m={default:imgs.default,happy1:imgs.happy1,happy2:imgs.happy2,angry1:imgs.angry1,angry2:imgs.angry2};
+  if(m[s]){m[s].classList.remove('hidden');m[s].classList.add('active')}
+}
+
+function updateComboDisplay(){
+  if(combo>0){
+    multEl.textContent='\uD83D\uDD25'+combo+' x'+multiplier;
+  }else{
+    multEl.textContent='x'+multiplier;
+  }
+  if(multiplier>=3)multEl.className='mult x3';
+  else if(multiplier>=2)multEl.className='mult x2';
+  else multEl.className='mult';
+}
+
+function enterState(s){
+  if(s===currentState&&s!=='default')return;
+  const prev=currentState;
+  currentState=s;
+  showImg(s==='feint'?'angry1':s);
+
+  if(s==='default'){
+    stateInd.className='state-indicator safe';stateInd.textContent='안전';
+    statusEl.textContent='쓰다듬어주세요!';statusEl.style.color='rgba(0,0,0,0.4)';
+    statusEl.classList.remove('danger-text');
+    catWrap.classList.remove('danger-mode');
+    document.body.classList.remove('danger-bg');
+    document.body.classList.remove('happy-bg');
+    vignette.classList.remove('active');
+    timerEl.classList.remove('danger');
+    feinting=false;
+
+    // survived danger → combo up + purr
+    if(prev==='angry1'){
+      combo++;
+      updateComboDisplay();
+      playOnce('purr.mp3',0.35);
+    }
+
+    // 30% chance of immediate double-tap danger
+    if(prev==='angry1'&&Math.random()<0.3){
+      pendingDoubleTap=true;
+      setTimeout(()=>{
+        if(!gameActive||currentState!=='default'){pendingDoubleTap=false;return;}
+        pendingDoubleTap=false;
+        triggerDanger();
+      },150+Math.random()*300);
+    }else{
+      scheduleNextDanger();
+    }
+  }else if(s==='happy1'){
+    stateInd.className='state-indicator happy';stateInd.textContent='기분 좋음 x2';
+    statusEl.textContent='도동이가 골골거려요~';statusEl.style.color='#22c55e';
+    multiplier=2;updateComboDisplay();
+    document.body.classList.add('happy-bg');
+    playLoop('purr.mp3',0.5);
+    screenFlash('green');
+  }else if(s==='happy2'){
+    stateInd.className='state-indicator happy';stateInd.textContent='최고 기분 x3';
+    statusEl.textContent='도동이가 코~ 자고 있어요 zzZ';statusEl.style.color='#3b82f6';
+    multiplier=3;updateComboDisplay();
+    playLoop('snore.mp3',0.4);
+    screenFlash('green');
+  }else if(s==='angry1'){
+    stateInd.className='state-indicator danger';stateInd.textContent='⚠ 째려보는 중';
+    statusEl.textContent='손 떼!!';statusEl.style.color='#dc2626';
+    statusEl.classList.add('danger-text');
+    catWrap.classList.add('danger-mode');
+    document.body.classList.add('danger-bg');
+    document.body.classList.remove('happy-bg');
+    vignette.classList.add('active');
+    timerEl.classList.add('danger');
+    stopLoop();
+    playDangerTone();
+    // reset happy multiplier on danger
+    multiplier=1;updateComboDisplay();
+    comboStrokes=0;
+
+    // grace period: 2-5s scaling down with time, min 1.2s
+    clearTimeout(dangerGraceTimer);
+    const elapsed=(Date.now()-gameStartTime)/1000;
+    const grace=2000+Math.random()*3000-Math.min(elapsed*25,2500);
+    const actualGrace=Math.max(1200,grace);
+    dangerGraceTimer=setTimeout(()=>{
+      if(!gameActive||currentState!=='angry1')return;
+      if(!petting)enterState('default');
+      else gameOver();
+    },actualGrace);
+  }else if(s==='angry2'){
+    gameOver();
+  }
+}
+
+/* ======= Feint (fake danger) ======= */
+function triggerFeint(){
+  if(!gameActive||currentState==='angry1')return;
+  feinting=true;
+  const prevState=currentState;
+  // show angry face briefly
+  showImg('angry1');
+  stateInd.className='state-indicator danger';stateInd.textContent='⚠ ...?!';
+  statusEl.textContent='손 떼!!';statusEl.style.color='#dc2626';
+  statusEl.classList.add('danger-text');
+  document.body.classList.add('danger-bg');
+  vignette.classList.add('active');
+  timerEl.classList.add('danger');
+  playFeintSound();
+
+  // after 0.5s, return to previous state
+  setTimeout(()=>{
+    if(!gameActive){feinting=false;return;}
+    feinting=false;
+    showImg(prevState);
+    statusEl.classList.remove('danger-text');
+    document.body.classList.remove('danger-bg');
+    vignette.classList.remove('active');
+    timerEl.classList.remove('danger');
+    // restore state indicator
+    if(prevState==='happy1'){
+      stateInd.className='state-indicator happy';stateInd.textContent='기분 좋음 x2';
+      statusEl.textContent='도동이가 골골거려요~';statusEl.style.color='#22c55e';
+    }else if(prevState==='happy2'){
+      stateInd.className='state-indicator happy';stateInd.textContent='최고 기분 x3';
+      statusEl.textContent='도동이가 코~ 자고 있어요 zzZ';statusEl.style.color='#3b82f6';
+    }else{
+      stateInd.className='state-indicator safe';stateInd.textContent='안전';
+      statusEl.textContent='쓰다듬어주세요!';statusEl.style.color='rgba(0,0,0,0.4)';
+    }
+    scheduleNextDanger();
+  },500);
+}
+
+/* ======= Danger scheduling — truly random ======= */
+let warningTimer=null;
+
+function triggerDanger(){
+  if(!gameActive)return;
+  catWrap.style.transform='';
+  enterState('angry1');
+}
+
+function scheduleNextDanger(){
+  clearTimeout(stateTimer);clearTimeout(warningTimer);
+  if(!gameActive||pendingDoubleTap)return;
+
+  // truly random safe interval: 2s to 15s, no linear pattern
+  const elapsed=(Date.now()-gameStartTime)/1000;
+  // base range shrinks with time but stays unpredictable
+  const minSafe=Math.max(2000, 4000-elapsed*30);
+  const maxSafe=Math.max(4000, 15000-elapsed*80);
+  const safeTime=minSafe+Math.random()*Math.random()*(maxSafe-minSafe); // double random for non-uniform distribution
+
+  // decide danger pattern: warned(40%), surprise(30%), feint(30%)
+  const roll=Math.random();
+
+  if(roll<0.4){
+    // WARNED: 1-second warning then danger
+    warningTimer=setTimeout(()=>{
+      if(!gameActive||currentState==='angry1')return;
+      stateInd.className='state-indicator danger';stateInd.textContent='...?';
+      statusEl.textContent='도동이가 뭔가 느끼고 있어요...';statusEl.style.color='#f59e0b';
+      catWrap.style.transition='transform .1s';
+      catWrap.style.transform='rotate(-1deg)';
+      setTimeout(()=>{if(catWrap.style.transform==='rotate(-1deg)')catWrap.style.transform='rotate(0.5deg)'},150);
+      playWarningTone();
+    }, safeTime-1000);
+
+    stateTimer=setTimeout(()=>{
+      if(!gameActive)return;
+      triggerDanger();
+    },safeTime);
+  }else if(roll<0.7){
+    // SURPRISE: instant danger, no warning!
+    stateTimer=setTimeout(()=>{
+      if(!gameActive)return;
+      triggerDanger();
+    },safeTime);
+  }else{
+    // FEINT: fake danger
+    stateTimer=setTimeout(()=>{
+      if(!gameActive)return;
+      triggerFeint();
+    },safeTime);
+  }
+}
+
+/* ======= Score loop — frame-based scoring ======= */
+let lastScoreFrame=0;
+function scoreLoop(ts){
+  if(!gameActive){scoreLoopRAF=null;return;}
+  if(!lastScoreFrame)lastScoreFrame=ts;
+  const dt=(ts-lastScoreFrame)/1000; // seconds
+  lastScoreFrame=ts;
+
+  if(petting&&currentState!=='angry1'&&!feinting){
+    // speedFactor: 0.5 to 2.0 based on pet speed
+    const speedFactor=Math.max(0.5,Math.min(2.0,petSpeed/300));
+    const comboMult=combo>0?combo:1;
+    const pts=multiplier*comboMult*speedFactor*dt*60; // ~60fps normalized
+    score+=pts;
+    scoreEl.textContent=Math.floor(score);
+    scoreEl.classList.add('hot');
+    updatePetSoundVolume(petSpeed);
+  }else{
+    scoreEl.classList.remove('hot');
+    if(petNoiseGain&&audioCtx){
+      petNoiseGain.gain.setTargetAtTime(0,audioCtx.currentTime,0.1);
+    }
+  }
+
+  scoreLoopRAF=requestAnimationFrame(scoreLoop);
+}
+
+/* ======= Petting ======= */
+function onPetStart(x,y){
+  if(!gameActive)return;
+  ensureAudio();if(audioCtx&&audioCtx.state==='suspended')audioCtx.resume();
+  petting=true;lastX=x;lastY=y;lastMoveTime=performance.now();petSpeed=0;
+  catWrap.classList.add('petting');
+  startPetSound();
+
+  // touching during danger → game over
+  if(currentState==='angry1'){
+    gameOver();
+  }
+}
+
+function onPetMove(x,y){
+  if(!petting||!gameActive)return;
+  const dist=Math.hypot(x-lastX,y-lastY);
+  lastX=x;lastY=y;
+  if(dist<2)return;
+
+  const now=performance.now();
+  const dt=Math.max(1,now-lastMoveTime);
+  lastMoveTime=now;
+  petSpeed=dist/dt*1000; // pixels per second
+  comboStrokes++;
+
+  // touching during danger → game over
+  if(currentState==='angry1'){gameOver();return}
+
+  // fur effect
+  if(comboStrokes%3===0)spawnFur(x,y);
+
+  // happy thresholds: 200 for happy1, 500 for happy2
+  if(currentState==='default'&&comboStrokes>200){
+    enterState('happy1');
+  }else if(currentState==='happy1'&&comboStrokes>500){
+    enterState('happy2');
+  }
+}
+
+function onPetEnd(){
+  if(!petting)return;
+  petting=false;petSpeed=0;
+  catWrap.classList.remove('petting');
+  scoreEl.classList.remove('hot');
+  stopPetSound();
+}
+
+/* ======= Game over ======= */
+function gameOver(){
+  gameActive=false;petting=false;
+  catWrap.classList.remove('petting','danger-mode');
+  catWrap.style.transform='';
+  clearTimeout(stateTimer);clearTimeout(dangerGraceTimer);clearTimeout(warningTimer);
+  clearInterval(timerInterval);
+  if(scoreLoopRAF){cancelAnimationFrame(scoreLoopRAF);scoreLoopRAF=null;}
+  stopLoop();stopPetSound();
+  document.body.classList.remove('danger-bg','happy-bg');
+  vignette.classList.remove('active');
+  statusEl.classList.remove('danger-text');
+  timerEl.classList.remove('danger');
+  feinting=false;pendingDoubleTap=false;
+
+  // impact!
+  playHiss();
+  screenShake();
+  screenFlash('red');
+  showImg('angry2');
+
+  const finalScoreVal=Math.floor(score);
+  const survived=((Date.now()-gameStartTime)/1000).toFixed(1);
+
+  // best score
+  const isNewBest=finalScoreVal>bestScore;
+  if(isNewBest){
+    bestScore=finalScoreVal;
+    localStorage.setItem('dodong_best',bestScore);
+  }
+
+  setTimeout(()=>{
+    document.getElementById('finalScore').textContent=finalScoreVal;
+    document.getElementById('bestScoreEnd').textContent='BEST: '+bestScore;
+    document.getElementById('survivalTime').textContent='생존: '+survived+'초';
+    bestEl.textContent='BEST: '+bestScore;
+    endOverlay.classList.remove('hidden');
+    if(isNewBest&&finalScoreVal>0){
+      newBestEl.classList.add('show');
+      setTimeout(()=>newBestEl.classList.remove('show'),2000);
+    }
+  },600);
+}
+
+/* ======= Game start ======= */
+function startGame(){
+  score=0;comboStrokes=0;multiplier=1;combo=0;currentState='';gameActive=true;
+  gameStartTime=Date.now();petSpeed=0;feinting=false;pendingDoubleTap=false;
+  clearTimeout(stateTimer);clearTimeout(dangerGraceTimer);clearTimeout(warningTimer);
+  stopLoop();stopPetSound();
+  if(scoreLoopRAF){cancelAnimationFrame(scoreLoopRAF);scoreLoopRAF=null;}
+  scoreEl.textContent='0';scoreEl.classList.remove('hot');
+  multEl.textContent='x1';multEl.className='mult';
+  startOverlay.classList.add('hidden');
+  endOverlay.classList.add('hidden');
+  document.body.classList.remove('danger-bg','happy-bg');
+  vignette.classList.remove('active');
+  timerEl.classList.remove('danger');
+  statusEl.classList.remove('danger-text');
+  timerEl.textContent='0.0s';
+  clearInterval(timerInterval);
+  timerInterval=setInterval(()=>{
+    if(!gameActive)return;
+    const t=((Date.now()-gameStartTime)/1000).toFixed(1);
+    timerEl.textContent=t+'s';
+  },100);
+  lastScoreFrame=0;
+  scoreLoopRAF=requestAnimationFrame(scoreLoop);
+  enterState('default');
+}
+
+/* ======= Events ======= */
+catWrap.addEventListener('mousedown',(e)=>{e.preventDefault();onPetStart(e.clientX,e.clientY)});
+window.addEventListener('mousemove',(e)=>onPetMove(e.clientX,e.clientY));
+window.addEventListener('mouseup',()=>onPetEnd());
+catWrap.addEventListener('touchstart',(e)=>{e.preventDefault();const t=e.touches[0];if(t)onPetStart(t.clientX,t.clientY)},{passive:false});
+window.addEventListener('touchmove',(e)=>{const t=e.touches[0];if(t)onPetMove(t.clientX,t.clientY)},{passive:true});
+window.addEventListener('touchend',()=>onPetEnd());
+document.getElementById('startBtn').addEventListener('click',startGame);
+document.getElementById('retryBtn').addEventListener('click',startGame);
+</script>

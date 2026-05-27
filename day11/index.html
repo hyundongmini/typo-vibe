@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 11 - 등고선으로 만든 산</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;overflow:hidden}
+body{background:#0a0a0a;font-family:'Pretendard',sans-serif}
+canvas#main{position:fixed;inset:0;z-index:1}
+.back-to-archive{
+  position:fixed;top:16px;left:16px;z-index:9999;
+  display:inline-flex;align-items:center;gap:6px;
+  padding:8px 14px 8px 12px;
+  background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.5);
+  font:500 12px/1 'Pretendard',sans-serif;
+  text-decoration:none;border:1px solid rgba(255,255,255,0.08);border-radius:100px;
+  backdrop-filter:blur(10px);transition:background .2s,transform .2s;
+}
+.back-to-archive:hover{background:rgba(255,255,255,0.12);transform:translateX(-2px)}
+.back-to-archive svg{flex:none;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.day-tag{position:fixed;bottom:14px;right:18px;font:11px/1 monospace;color:rgba(255,255,255,0.12);pointer-events:none;z-index:99}
+.hint{position:fixed;bottom:36px;left:0;right:0;text-align:center;font:10px/1 monospace;color:rgba(255,255,255,0.15);pointer-events:none;z-index:99;letter-spacing:2px}
+</style>
+</head>
+<body>
+<a href="../" class="back-to-archive">
+  <svg viewBox="0 0 24 24" width="14" height="14"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+  <span>뒤로가기</span>
+</a>
+<canvas id="main"></canvas>
+<div class="hint">MOVE mouse to shift terrain · SCROLL to change elevation</div>
+<div class="day-tag">day 11 / typo-vibe</div>
+
+<script>
+// ── Simplex 2D Noise ──
+const noise2D = (function() {
+  const F2 = 0.5 * (Math.sqrt(3) - 1);
+  const G2 = (3 - Math.sqrt(3)) / 6;
+  const grad = [[1,1],[-1,1],[1,-1],[-1,-1],[1,0],[-1,0],[0,1],[0,-1]];
+  const perm = new Uint8Array(512);
+  const gradIdx = new Uint8Array(512);
+  const p = new Uint8Array(256);
+  for (let i = 0; i < 256; i++) p[i] = i;
+  for (let i = 255; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const tmp = p[i]; p[i] = p[j]; p[j] = tmp;
+  }
+  for (let i = 0; i < 512; i++) {
+    perm[i] = p[i & 255];
+    gradIdx[i] = perm[i] % 8;
+  }
+  return function(xin, yin) {
+    const s = (xin + yin) * F2;
+    const i = Math.floor(xin + s), j = Math.floor(yin + s);
+    const t = (i + j) * G2;
+    const x0 = xin - (i - t), y0 = yin - (j - t);
+    const i1 = x0 > y0 ? 1 : 0, j1 = x0 > y0 ? 0 : 1;
+    const x1 = x0 - i1 + G2, y1 = y0 - j1 + G2;
+    const x2 = x0 - 1 + 2 * G2, y2 = y0 - 1 + 2 * G2;
+    const ii = i & 255, jj = j & 255;
+    let n0 = 0, n1 = 0, n2 = 0;
+    let t0 = 0.5 - x0 * x0 - y0 * y0;
+    if (t0 > 0) { t0 *= t0; const gi = gradIdx[ii + perm[jj]]; n0 = t0 * t0 * (grad[gi][0] * x0 + grad[gi][1] * y0); }
+    let t1 = 0.5 - x1 * x1 - y1 * y1;
+    if (t1 > 0) { t1 *= t1; const gi = gradIdx[ii + i1 + perm[jj + j1]]; n1 = t1 * t1 * (grad[gi][0] * x1 + grad[gi][1] * y1); }
+    let t2 = 0.5 - x2 * x2 - y2 * y2;
+    if (t2 > 0) { t2 *= t2; const gi = gradIdx[ii + 1 + perm[jj + 1]]; n2 = t2 * t2 * (grad[gi][0] * x2 + grad[gi][1] * y2); }
+    return 70 * (n0 + n1 + n2);
+  };
+})();
+
+// ── State ──
+const canvas = document.getElementById('main');
+const ctx = canvas.getContext('2d');
+let W, H, heightfield, hfW, hfH, pixelScale;
+let mouseX = 0.5, mouseY = 0.5;
+let elevationOffset = 0;
+let needsRender = true;
+
+// ── Build heightfield from text ──
+function buildHeightfield() {
+  const off = document.createElement('canvas');
+  pixelScale = 2;
+  hfW = Math.ceil(W / pixelScale);
+  hfH = Math.ceil(H / pixelScale);
+  off.width = hfW;
+  off.height = hfH;
+  const oc = off.getContext('2d');
+
+  oc.fillStyle = '#000';
+  oc.fillRect(0, 0, hfW, hfH);
+
+  // Size font to fill ~70% of viewport width
+  const text = '등고선으로 만든 산';
+  let fs = Math.floor(hfW * 0.09);
+  oc.font = `900 ${fs}px 'Pretendard',sans-serif`;
+  const measured = oc.measureText(text).width;
+  fs = Math.floor(fs * (hfW * 0.7) / measured);
+  oc.font = `900 ${fs}px 'Pretendard',sans-serif`;
+
+  oc.fillStyle = '#fff';
+  oc.textAlign = 'center';
+  oc.textBaseline = 'middle';
+  oc.fillText(text, hfW / 2, hfH / 2);
+
+  const imgData = oc.getImageData(0, 0, hfW, hfH);
+  const px = imgData.data;
+
+  // Binary mask: inside text = 1, outside = 0
+  const mask = new Uint8Array(hfW * hfH);
+  for (let i = 0; i < hfW * hfH; i++) {
+    mask[i] = px[i * 4] > 128 ? 1 : 0;
+  }
+
+  // Approximate SDF using distance transform (chamfer 3-4-3)
+  const INF = hfW + hfH;
+  const dist = new Float32Array(hfW * hfH);
+
+  // Distance for pixels INSIDE text (distance to nearest edge from inside)
+  const distIn = new Float32Array(hfW * hfH);
+  for (let i = 0; i < hfW * hfH; i++) distIn[i] = mask[i] ? INF : 0;
+  chamferDT(distIn, hfW, hfH);
+
+  // Distance for pixels OUTSIDE text (distance to nearest edge from outside)
+  const distOut = new Float32Array(hfW * hfH);
+  for (let i = 0; i < hfW * hfH; i++) distOut[i] = mask[i] ? 0 : INF;
+  chamferDT(distOut, hfW, hfH);
+
+  // Signed distance: positive inside, negative outside
+  const maxDist = Math.max(fs * 0.5, 1);
+  for (let i = 0; i < hfW * hfH; i++) {
+    const d = (distIn[i] - distOut[i]);
+    dist[i] = Math.max(0, d) / maxDist; // normalize, clamp outside to 0
+  }
+
+  heightfield = dist;
+}
+
+// Chamfer distance transform (approximate EDT)
+function chamferDT(grid, w, h) {
+  const d1 = 1.0, d2 = 1.414;
+  // Forward pass
+  for (let y = 1; y < h - 1; y++) {
+    for (let x = 1; x < w - 1; x++) {
+      const i = y * w + x;
+      grid[i] = Math.min(grid[i],
+        grid[(y-1)*w + (x-1)] + d2,
+        grid[(y-1)*w + x] + d1,
+        grid[(y-1)*w + (x+1)] + d2,
+        grid[y*w + (x-1)] + d1
+      );
+    }
+  }
+  // Backward pass
+  for (let y = h - 2; y >= 1; y--) {
+    for (let x = w - 2; x >= 1; x--) {
+      const i = y * w + x;
+      grid[i] = Math.min(grid[i],
+        grid[y*w + (x+1)] + d1,
+        grid[(y+1)*w + (x-1)] + d2,
+        grid[(y+1)*w + x] + d1,
+        grid[(y+1)*w + (x+1)] + d2
+      );
+    }
+  }
+}
+
+// ── Marching Squares ──
+function marchingSquares(field, w, h, threshold) {
+  const segs = [];
+  for (let y = 0; y < h - 1; y++) {
+    for (let x = 0; x < w - 1; x++) {
+      const tl = field[y * w + x];
+      const tr = field[y * w + x + 1];
+      const br = field[(y+1) * w + x + 1];
+      const bl = field[(y+1) * w + x];
+
+      let code = 0;
+      if (tl >= threshold) code |= 8;
+      if (tr >= threshold) code |= 4;
+      if (br >= threshold) code |= 2;
+      if (bl >= threshold) code |= 1;
+
+      if (code === 0 || code === 15) continue;
+
+      const lerp = (a, b, va, vb) => {
+        if (Math.abs(vb - va) < 1e-10) return (a + b) * 0.5;
+        const t = (threshold - va) / (vb - va);
+        return a + (b - a) * Math.max(0, Math.min(1, t));
+      };
+
+      const top    = { x: lerp(x, x+1, tl, tr), y: y };
+      const right  = { x: x+1, y: lerp(y, y+1, tr, br) };
+      const bottom = { x: lerp(x, x+1, bl, br), y: y+1 };
+      const left   = { x: x, y: lerp(y, y+1, tl, bl) };
+
+      const add = (a, b) => segs.push(a.x, a.y, b.x, b.y);
+
+      switch (code) {
+        case 1: case 14: add(left, bottom); break;
+        case 2: case 13: add(bottom, right); break;
+        case 3: case 12: add(left, right); break;
+        case 4: case 11: add(top, right); break;
+        case 5: add(left, top); add(bottom, right); break;
+        case 6: case 9: add(top, bottom); break;
+        case 7: case 8: add(left, top); break;
+        case 10: add(top, right); add(left, bottom); break;
+      }
+    }
+  }
+  return segs;
+}
+
+// ── Color palette ──
+function contourColor(t) {
+  const colors = [
+    [0.10, 0.16, 0.29],
+    [0.11, 0.22, 0.40],
+    [0.14, 0.30, 0.45],
+    [0.20, 0.40, 0.45],
+    [0.35, 0.50, 0.42],
+    [0.55, 0.58, 0.42],
+    [0.72, 0.66, 0.50],
+    [0.85, 0.78, 0.65],
+    [0.94, 0.91, 0.85],
+  ];
+  const idx = t * (colors.length - 1);
+  const i = Math.floor(idx);
+  const f = idx - i;
+  const c0 = colors[Math.min(i, colors.length - 1)];
+  const c1 = colors[Math.min(i + 1, colors.length - 1)];
+  return [
+    c0[0] + (c1[0] - c0[0]) * f,
+    c0[1] + (c1[1] - c0[1]) * f,
+    c0[2] + (c1[2] - c0[2]) * f,
+  ];
+}
+
+// ── Render ──
+function render() {
+  if (!heightfield) return;
+
+  ctx.fillStyle = '#0a0a0a';
+  ctx.fillRect(0, 0, W, H);
+
+  // Build noised heightfield
+  const noised = new Float32Array(hfW * hfH);
+  const nScale = 0.015;
+  const nAmp = 0.12;
+  const ox = (mouseX - 0.5) * 4.0;
+  const oy = (mouseY - 0.5) * 4.0;
+
+  let minV = Infinity, maxV = -Infinity;
+  for (let y = 0; y < hfH; y++) {
+    for (let x = 0; x < hfW; x++) {
+      const idx = y * hfW + x;
+      const base = heightfield[idx];
+      const n = noise2D(x * nScale + ox, y * nScale + oy);
+      const v = base + n * nAmp;
+      noised[idx] = v;
+      if (v < minV) minV = v;
+      if (v > maxV) maxV = v;
+    }
+  }
+
+  const numLevels = 18;
+  const range = maxV - minV;
+  if (range < 0.001) return;
+
+  // Only draw contours in the text region (skip the flat zero area)
+  const startT = 0.05;
+  const shift = elevationOffset * 0.12;
+
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  for (let l = 0; l < numLevels; l++) {
+    const t = (l + 1) / (numLevels + 1);
+    const threshold = minV + range * (startT + (1 - startT) * t + shift);
+
+    if (threshold > maxV || threshold < minV) continue;
+
+    const segs = marchingSquares(noised, hfW, hfH, threshold);
+    if (segs.length === 0) continue;
+
+    const [cr, cg, cb] = contourColor(t);
+    const alpha = 0.25 + t * 0.7;
+    const r255 = Math.round(cr * 255);
+    const g255 = Math.round(cg * 255);
+    const b255 = Math.round(cb * 255);
+
+    ctx.strokeStyle = `rgba(${r255},${g255},${b255},${alpha.toFixed(2)})`;
+    ctx.lineWidth = 0.7 + t * 0.8;
+
+    // Subtle glow on highest contours
+    if (t > 0.7) {
+      ctx.shadowColor = `rgba(${r255},${g255},${b255},${((t - 0.7) * 2).toFixed(2)})`;
+      ctx.shadowBlur = 3 + t * 8;
+    } else {
+      ctx.shadowColor = 'transparent';
+      ctx.shadowBlur = 0;
+    }
+
+    ctx.beginPath();
+    for (let i = 0; i < segs.length; i += 4) {
+      ctx.moveTo(segs[i] * pixelScale, segs[i+1] * pixelScale);
+      ctx.lineTo(segs[i+2] * pixelScale, segs[i+3] * pixelScale);
+    }
+    ctx.stroke();
+  }
+
+  ctx.shadowColor = 'transparent';
+  ctx.shadowBlur = 0;
+}
+
+// ── Events ──
+function requestRender() { needsRender = true; }
+
+canvas.addEventListener('mousemove', e => {
+  mouseX = e.clientX / W;
+  mouseY = e.clientY / H;
+  requestRender();
+});
+
+canvas.addEventListener('touchmove', e => {
+  e.preventDefault();
+  const touch = e.touches[0];
+  mouseX = touch.clientX / W;
+  mouseY = touch.clientY / H;
+  requestRender();
+}, { passive: false });
+
+window.addEventListener('wheel', e => {
+  elevationOffset += e.deltaY * 0.002;
+  elevationOffset = Math.max(-1.5, Math.min(1.5, elevationOffset));
+  requestRender();
+}, { passive: true });
+
+function resize() {
+  W = window.innerWidth;
+  H = window.innerHeight;
+  canvas.width = W;
+  canvas.height = H;
+  buildHeightfield();
+  requestRender();
+}
+
+// ── Loop ──
+function loop() {
+  requestAnimationFrame(loop);
+  if (needsRender) {
+    needsRender = false;
+    render();
+  }
+}
+
+// ── Init ──
+document.fonts.ready.then(() => {
+  resize();
+  loop();
+});
+window.addEventListener('resize', resize);
+</script>
+</body>
+</html>

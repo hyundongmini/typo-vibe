@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pencil Domino</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { height: 100%; overflow: hidden; background: #f9f7f3; }
+    canvas { display: block; }
+    #info {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+      color: #666;
+      text-align: center;
+      pointer-events: none;
+      z-index: 10;
+    }
+    #info strong { color: #222; }
+  </style>
+</head>
+<body>
+  <div id="info">
+    <strong>클릭</strong>하면 도미노가 넘어집니다 · 드래그로 회전 · 스크롤로 줌 · <strong>스페이스바</strong>로 리셋
+  </div>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+    import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+    import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+    import * as CANNON from 'https://cdn.jsdelivr.net/npm/cannon-es@0.20.0/dist/cannon-es.js';
+
+    // ===== Pencil Lines Shader =====
+    const PencilLinesShader = {
+      uniforms: {
+        tDiffuse: { value: null },
+        uResolution: { value: new THREE.Vector2() },
+        uTime: { value: 0 },
+      },
+      vertexShader: `
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform sampler2D tDiffuse;
+        uniform vec2 uResolution;
+        uniform float uTime;
+        varying vec2 vUv;
+
+        float hash(vec2 p) {
+          p = 50.0 * fract(p * 0.3183099 + vec2(0.71, 0.113));
+          return -1.0 + 2.0 * fract(p.x * p.y * (p.x + p.y));
+        }
+
+        float noise(vec2 p) {
+          vec2 i = floor(p);
+          vec2 f = fract(p);
+          vec2 u = f * f * (3.0 - 2.0 * f);
+          return mix(mix(hash(i), hash(i + vec2(1,0)), u.x),
+                     mix(hash(i + vec2(0,1)), hash(i + vec2(1,1)), u.x), u.y);
+        }
+
+        float getLuma(vec2 uv) {
+          return dot(texture2D(tDiffuse, uv).rgb, vec3(0.299, 0.587, 0.114));
+        }
+
+        void main() {
+          vec2 texel = 1.0 / uResolution;
+
+          float tl = getLuma(vUv + texel * vec2(-1,-1));
+          float t  = getLuma(vUv + texel * vec2( 0,-1));
+          float tr = getLuma(vUv + texel * vec2( 1,-1));
+          float l  = getLuma(vUv + texel * vec2(-1, 0));
+          float r  = getLuma(vUv + texel * vec2( 1, 0));
+          float bl = getLuma(vUv + texel * vec2(-1, 1));
+          float b  = getLuma(vUv + texel * vec2( 0, 1));
+          float br = getLuma(vUv + texel * vec2( 1, 1));
+
+          float gx = -tl - 2.0*l - bl + tr + 2.0*r + br;
+          float gy = -tl - 2.0*t - tr + bl + 2.0*b + br;
+          float edge = sqrt(gx*gx + gy*gy);
+
+          float n = noise(gl_FragCoord.xy * 0.8 + uTime * 0.3);
+          edge += n * 0.04;
+          edge = smoothstep(0.04, 0.18, edge);
+
+          vec3 paper = vec3(0.976, 0.953, 0.918);
+          vec3 ink = vec3(0.12, 0.06, 0.08);
+          float grain = noise(gl_FragCoord.xy * 1.5) * 0.025;
+
+          vec3 color = mix(paper + grain, ink, edge * 0.9);
+
+          float luma = getLuma(vUv);
+          float hatch = 0.0;
+          if (luma < 0.45) {
+            float l1 = abs(sin((gl_FragCoord.x + gl_FragCoord.y) * 0.4 + n * 2.0));
+            hatch = smoothstep(0.35, 0.55, l1) * (0.45 - luma) * 0.5;
+          }
+          if (luma < 0.28) {
+            float l2 = abs(sin((gl_FragCoord.x - gl_FragCoord.y) * 0.4 + n * 1.5));
+            hatch += smoothstep(0.35, 0.55, l2) * (0.28 - luma) * 0.4;
+          }
+
+          color = mix(color, ink, hatch);
+          gl_FragColor = vec4(color, 1.0);
+        }
+      `
+    };
+
+    // ===== Scene Setup =====
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0xf9f7f3);
+
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+    camera.position.set(8, 6, 12);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    document.body.appendChild(renderer.domElement);
+
+    // Post-processing
+    const composer = new EffectComposer(renderer);
+    composer.addPass(new RenderPass(scene, camera));
+    const pencilPass = new ShaderPass(PencilLinesShader);
+    pencilPass.uniforms.uResolution.value.set(
+      window.innerWidth * renderer.getPixelRatio(),
+      window.innerHeight * renderer.getPixelRatio()
+    );
+    composer.addPass(pencilPass);
+
+    // Controls
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.08;
+    controls.target.set(0, 0.5, 0);
+    controls.minDistance = 4;
+    controls.maxDistance = 25;
+
+    // Lighting
+    scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+    const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    dirLight.position.set(5, 10, 7);
+    dirLight.castShadow = true;
+    dirLight.shadow.mapSize.set(1024, 1024);
+    const s = 10;
+    dirLight.shadow.camera.left = -s;
+    dirLight.shadow.camera.right = s;
+    dirLight.shadow.camera.top = s;
+    dirLight.shadow.camera.bottom = -s;
+    scene.add(dirLight);
+
+    // ===== Physics =====
+    const world = new CANNON.World({ gravity: new CANNON.Vec3(0, -9.82, 0) });
+    world.broadphase = new CANNON.SAPBroadphase(world);
+    world.allowSleep = true;
+
+    // Ground
+    const groundMesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(30, 30),
+      new THREE.MeshStandardMaterial({ color: 0xe8e4dc, roughness: 1 })
+    );
+    groundMesh.rotation.x = -Math.PI / 2;
+    groundMesh.receiveShadow = true;
+    scene.add(groundMesh);
+
+    const groundBody = new CANNON.Body({ mass: 0, shape: new CANNON.Plane() });
+    groundBody.quaternion.setFromEuler(-Math.PI / 2, 0, 0);
+    world.addBody(groundBody);
+
+    // ===== Dominoes =====
+    const DW = 0.15, DH = 1.0, DD = 0.5;
+    const COUNT = 40;
+    const dominoes = [];
+
+    function getPos(i) {
+      const t = i / COUNT;
+      const angle = t * Math.PI * 2;
+      const radius = 3.5;
+      // Domino faces along the tangent so it falls toward the next one
+      const faceAngle = angle + Math.PI / 2;
+      return {
+        x: Math.cos(angle) * radius,
+        z: Math.sin(angle) * radius,
+        angle: faceAngle
+      };
+    }
+
+    const dominoGeo = new THREE.BoxGeometry(DW, DH, DD);
+
+    for (let i = 0; i < COUNT; i++) {
+      const p = getPos(i);
+
+      const mat = new THREE.MeshStandardMaterial({
+        color: new THREE.Color().setHSL(0, 0, 0.92 + Math.random() * 0.06),
+        roughness: 0.9
+      });
+      const mesh = new THREE.Mesh(dominoGeo, mat);
+      mesh.position.set(p.x, DH / 2, p.z);
+      mesh.rotation.y = p.angle;
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      scene.add(mesh);
+
+      const body = new CANNON.Body({
+        mass: 0.8,
+        shape: new CANNON.Box(new CANNON.Vec3(DW/2, DH/2, DD/2)),
+        position: new CANNON.Vec3(p.x, DH/2, p.z),
+        sleepSpeedLimit: 0.05,
+        sleepTimeLimit: 2
+      });
+      body.quaternion.setFromEuler(0, p.angle, 0);
+      world.addBody(body);
+
+      dominoes.push({ mesh, body });
+    }
+
+    // ===== Center Text: "긴축 도미노" =====
+    const textCanvas = document.createElement('canvas');
+    textCanvas.width = 512;
+    textCanvas.height = 512;
+    const ctx = textCanvas.getContext('2d');
+    ctx.fillStyle = '#f9f7f3';
+    ctx.fillRect(0, 0, 512, 512);
+    ctx.fillStyle = '#111';
+    ctx.font = '900 72px Pretendard, Noto Sans KR, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('긴축', 256, 220);
+    ctx.fillText('도미노', 256, 310);
+
+    const textTexture = new THREE.CanvasTexture(textCanvas);
+    const textPlane = new THREE.Mesh(
+      new THREE.PlaneGeometry(2.5, 2.5),
+      new THREE.MeshBasicMaterial({ map: textTexture, transparent: true, opacity: 0.9 })
+    );
+    textPlane.rotation.x = -Math.PI / 2;
+    textPlane.position.set(0, 0.01, 0);
+    scene.add(textPlane);
+
+    // ===== Interaction =====
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+
+    renderer.domElement.addEventListener('click', (e) => {
+      mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+      mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+      raycaster.setFromCamera(mouse, camera);
+
+      const hits = raycaster.intersectObjects(dominoes.map(d => d.mesh));
+      const idx = hits.length > 0 ? dominoes.findIndex(d => d.mesh === hits[0].object) : 0;
+      pushDomino(idx);
+    });
+
+    function pushDomino(idx) {
+      const body = dominoes[idx].body;
+      const p = getPos(idx);
+      body.wakeUp();
+      body.applyImpulse(
+        new CANNON.Vec3(Math.cos(p.angle) * 2, 0.5, Math.sin(p.angle) * 2),
+        new CANNON.Vec3(0, DH * 0.45, 0)
+      );
+    }
+
+    function resetDominoes() {
+      dominoes.forEach((d, i) => {
+        const p = getPos(i);
+        d.body.position.set(p.x, DH/2, p.z);
+        d.body.quaternion.setFromEuler(0, p.angle, 0);
+        d.body.velocity.setZero();
+        d.body.angularVelocity.setZero();
+        d.body.sleepState = 0;
+        d.body.wakeUp();
+      });
+    }
+
+    // ===== Keyboard: Space to reset =====
+    document.addEventListener('keydown', (e) => {
+      if (e.code === 'Space') {
+        e.preventDefault();
+        resetDominoes();
+      }
+    });
+
+    // ===== Animate =====
+    const clock = new THREE.Clock();
+
+    function animate() {
+      requestAnimationFrame(animate);
+      const dt = clock.getDelta();
+
+      world.step(1/60, dt, 3);
+      dominoes.forEach(d => {
+        d.mesh.position.copy(d.body.position);
+        d.mesh.quaternion.copy(d.body.quaternion);
+      });
+
+      pencilPass.uniforms.uTime.value = clock.getElapsedTime();
+      controls.update();
+      composer.render();
+    }
+    animate();
+
+    // Resize
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      composer.setSize(window.innerWidth, window.innerHeight);
+      pencilPass.uniforms.uResolution.value.set(
+        window.innerWidth * renderer.getPixelRatio(),
+        window.innerHeight * renderer.getPixelRatio()
+      );
+    });
+  </script>
+</body>
+</html>
