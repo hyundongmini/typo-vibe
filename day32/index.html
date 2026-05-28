@@ -55,7 +55,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 // ============================================
 const CONFIG = {
   bgColor: '#763934',       // 배경색
-  symbolColor: '#723630',   // 심볼색
+  symbolColor: '#D8EB91',   // 심볼색
   cellSize: 14,             // 초기 셀 크기 (px)
   symbolCount: 8,           // 심볼 개수
   minCell: 6,               // 줌 아웃 시 최소 셀
@@ -236,7 +236,7 @@ const postMaterial = new THREE.ShaderMaterial({
       float symbolMask = texture2D(symbolAtlas, atlasUV).a;
       
       // 8. 배경 + 심볼 합성
-      vec3 symbolCol = vec3(0.447, 0.212, 0.188); // #723630
+      vec3 symbolCol = vec3(0.847, 0.922, 0.569); // #D8EB91
       vec3 finalColor = mix(bgColor, symbolCol, symbolMask);
       gl_FragColor = vec4(finalColor, 1.0);
     }
@@ -271,7 +271,7 @@ loader.load(CONFIG.glbPath, (gltf) => {
   scene.add(catModel);
   
   // 모델이 뒤집혀 있으면 보정
-  catModel.rotation.x = -Math.PI / 2; // 앞으로 눕혀서 세우기
+  catModel.rotation.x = -Math.PI; // X축 위쪽으로 90도 더 올림
   
   modelInfo = fitCameraToObject(camera, catModel, controls);
 }, undefined, (err) => {
