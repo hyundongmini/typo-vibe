@@ -138,16 +138,12 @@ const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.dampingFactor = 0.08;
 
-// 조명 (더 강한 대비)
-const dirLight = new THREE.DirectionalLight(0xffffff, 2.0);
-dirLight.position.set(2, 4, 3);
+// 조명 (옆에서 강하게 — 극적 명암)
+const dirLight = new THREE.DirectionalLight(0xffffff, 2.5);
+dirLight.position.set(3, 2, 1);
 scene.add(dirLight);
 
-const dirLight2 = new THREE.DirectionalLight(0xffffff, 0.5);
-dirLight2.position.set(-3, -1, -2);
-scene.add(dirLight2);
-
-scene.add(new THREE.AmbientLight(0xffffff, 0.15));
+scene.add(new THREE.AmbientLight(0xffffff, 0.08));
 
 // 오프스크린 렌더 타겟 (Pass 1 결과)
 let renderTarget = new THREE.WebGLRenderTarget(
@@ -199,9 +195,14 @@ const postMaterial = new THREE.ShaderMaterial({
       // Y축 뒤집기 (WebGL 좌표계)
       cellCenter.y = 1.0 - cellCenter.y;
       
-      // 3. 셀 중심에서 명암 샘플링
+      // 3. 셀 중심에서 명암 샘플링 + contrast 부스트
       vec3 sceneColor = texture2D(sceneTexture, cellCenter).rgb;
       float brightness = dot(sceneColor, vec3(0.299, 0.587, 0.114));
+      
+      // 감마 커브로 대비 강화 (어두운 곳 더 어둡게, 밝은 곳 더 밝게)
+      brightness = pow(brightness, 1.8);
+      // 추가 contrast stretch
+      brightness = smoothstep(0.05, 0.85, brightness);
       
       // 4. 배경이면 노란색 출력
       if (brightness > 0.92) {
@@ -256,13 +257,13 @@ const loader = new GLTFLoader();
 loader.load(CONFIG.glbPath, (gltf) => {
   catModel = gltf.scene;
 
-  // 머티리얼 강제 교체 (흰색 단색)
+  // 머티리얼 강제 교체 (Toon — 단계적 명암으로 대비 강화)
   catModel.traverse((child) => {
     if (child.isMesh) {
-      child.material = new THREE.MeshStandardMaterial({
+      child.material = new THREE.MeshPhongMaterial({
         color: 0xffffff,
-        roughness: 0.6,
-        metalness: 0.0,
+        shininess: 5,
+        specular: 0x111111,
       });
     }
   });
