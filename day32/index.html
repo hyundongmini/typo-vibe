@@ -270,7 +270,7 @@ loader.load(CONFIG.glbPath, (gltf) => {
   scene.add(catModel);
   
   // 모델이 뒤집혀 있으면 보정
-  catModel.rotation.x = Math.PI; // 180도 회전
+  catModel.rotation.x = -Math.PI / 2; // 앞으로 눕혀서 세우기
   
   modelInfo = fitCameraToObject(camera, catModel, controls);
 }, undefined, (err) => {
