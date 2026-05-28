@@ -138,11 +138,16 @@ const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.dampingFactor = 0.08;
 
-// 조명
-const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
+// 조명 (더 강한 대비)
+const dirLight = new THREE.DirectionalLight(0xffffff, 2.0);
 dirLight.position.set(2, 4, 3);
 scene.add(dirLight);
-scene.add(new THREE.AmbientLight(0xffffff, 0.3));
+
+const dirLight2 = new THREE.DirectionalLight(0xffffff, 0.5);
+dirLight2.position.set(-3, -1, -2);
+scene.add(dirLight2);
+
+scene.add(new THREE.AmbientLight(0xffffff, 0.15));
 
 // 오프스크린 렌더 타겟 (Pass 1 결과)
 let renderTarget = new THREE.WebGLRenderTarget(
@@ -208,13 +213,25 @@ const postMaterial = new THREE.ShaderMaterial({
       float idx = floor((1.0 - brightness) * symbolCount);
       idx = clamp(idx, 0.0, symbolCount - 1.0);
       
-      // 6. 셀 내부 UV
+      // 6. 셀 내부 UV + 크기 스케일링 (어두울수록 크게, 밝을수록 작게)
       vec2 cellUV = (fragCoord - cellOrigin) / cellSize;
+      
+      // 밝기에 따른 심볼 크기 (0.3 ~ 1.0)
+      float symbolScale = 0.3 + (1.0 - brightness) * 0.7;
+      
+      // 셀 중심 기준으로 스케일 적용
+      vec2 scaledUV = (cellUV - 0.5) / symbolScale + 0.5;
+      
+      // 스케일된 UV가 0~1 범위 밖이면 배경
+      if (scaledUV.x < 0.0 || scaledUV.x > 1.0 || scaledUV.y < 0.0 || scaledUV.y > 1.0) {
+        gl_FragColor = vec4(bgColor, 1.0);
+        return;
+      }
       
       // 7. 심볼 아틀라스에서 샘플링
       vec2 atlasUV = vec2(
-        (idx + cellUV.x) / symbolCount,
-        1.0 - cellUV.y  // Y 뒤집기
+        (idx + scaledUV.x) / symbolCount,
+        1.0 - scaledUV.y  // Y 뒤집기
       );
       float symbolMask = texture2D(symbolAtlas, atlasUV).a;
       
