@@ -6,7 +6,7 @@
 <title>Pictogram Halftone Cat</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { overflow: hidden; background: #EEFF00; }
+  body { overflow: hidden; background: #763934; }
   canvas { display: block; }
   
   /* GUI */
@@ -54,8 +54,8 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 // CONFIG
 // ============================================
 const CONFIG = {
-  bgColor: '#EEFF00',       // 배경 노란색
-  symbolColor: '#000000',   // 심볼 검정
+  bgColor: '#763934',       // 배경색
+  symbolColor: '#723630',   // 심볼색
   cellSize: 14,             // 초기 셀 크기 (px)
   symbolCount: 8,           // 심볼 개수
   minCell: 6,               // 줌 아웃 시 최소 셀
@@ -110,7 +110,7 @@ function fitCameraToObject(camera, object, controls) {
   const fov = camera.fov * (Math.PI / 180);
   const dist = maxDim / (2 * Math.tan(fov / 2)) * 1.5;
 
-  camera.position.set(center.x, center.y, center.z + dist);
+  camera.position.set(center.x, center.y + maxDim * 0.1, center.z + dist);
   camera.lookAt(center);
   controls.up = new THREE.Vector3(0, 1, 0);
 
@@ -235,8 +235,9 @@ const postMaterial = new THREE.ShaderMaterial({
       );
       float symbolMask = texture2D(symbolAtlas, atlasUV).a;
       
-      // 8. 노랑 배경 + 검정 심볼 합성
-      vec3 finalColor = mix(bgColor, vec3(0.0), symbolMask);
+      // 8. 배경 + 심볼 합성
+      vec3 symbolCol = vec3(0.447, 0.212, 0.188); // #723630
+      vec3 finalColor = mix(bgColor, symbolCol, symbolMask);
       gl_FragColor = vec4(finalColor, 1.0);
     }
   `,
