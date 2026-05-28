@@ -33,6 +33,9 @@
 <div class="gui" id="gui">
   <h3>Pictogram Halftone</h3>
   <label>Cell Size <input type="range" id="cellSlider" min="6" max="48" value="14" step="1"><span class="val" id="cellVal">14</span></label>
+  <label>X 회전 <input type="range" id="rotX" min="-180" max="180" value="90" step="5"><span class="val" id="rotXVal">90</span></label>
+  <label>Y 회전 <input type="range" id="rotY" min="-180" max="180" value="0" step="5"><span class="val" id="rotYVal">0</span></label>
+  <label>Z 회전 <input type="range" id="rotZ" min="-180" max="180" value="0" step="5"><span class="val" id="rotZVal">0</span></label>
 </div>
 
 <!-- Three.js -->
@@ -270,8 +273,8 @@ loader.load(CONFIG.glbPath, (gltf) => {
 
   scene.add(catModel);
   
-  // 모델이 뒤집혀 있으면 보정
-  catModel.rotation.x = Math.PI / 2; // X축 90도
+  // 초기 회전은 GUI 슬라이더 값으로
+  updateRotation();
   
   modelInfo = fitCameraToObject(camera, catModel, controls);
 }, undefined, (err) => {
@@ -315,6 +318,28 @@ cellSlider.addEventListener('input', (e) => {
   postMaterial.uniforms.cellSize.value = CONFIG.cellSize;
   cellVal.textContent = e.target.value;
 });
+
+// 회전 슬라이더
+const rotXSlider = document.getElementById('rotX');
+const rotYSlider = document.getElementById('rotY');
+const rotZSlider = document.getElementById('rotZ');
+const rotXVal = document.getElementById('rotXVal');
+const rotYVal = document.getElementById('rotYVal');
+const rotZVal = document.getElementById('rotZVal');
+
+function updateRotation() {
+  if (!catModel) return;
+  catModel.rotation.x = Number(rotXSlider.value) * Math.PI / 180;
+  catModel.rotation.y = Number(rotYSlider.value) * Math.PI / 180;
+  catModel.rotation.z = Number(rotZSlider.value) * Math.PI / 180;
+  rotXVal.textContent = rotXSlider.value;
+  rotYVal.textContent = rotYSlider.value;
+  rotZVal.textContent = rotZSlider.value;
+}
+
+rotXSlider.addEventListener('input', updateRotation);
+rotYSlider.addEventListener('input', updateRotation);
+rotZSlider.addEventListener('input', updateRotation);
 
 // ============================================
 // 렌더 루프
