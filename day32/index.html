@@ -279,6 +279,7 @@ loader.load(CONFIG.glbPath, (gltf) => {
 // ============================================
 function updateCellSizeFromZoom() {
   if (!modelInfo) return;
+  if (manualCellSize) return; // 수동 모드면 자동 변경 안 함
 
   const dist = camera.position.distanceTo(controls.target);
   const normalizedDist = dist / modelInfo.dist; // 1.0 = 기본 거리
@@ -301,8 +302,10 @@ function updateCellSizeFromZoom() {
 // ============================================
 const cellSlider = document.getElementById('cellSlider');
 const cellVal = document.getElementById('cellVal');
+let manualCellSize = false; // 수동 모드 플래그
 
 cellSlider.addEventListener('input', (e) => {
+  manualCellSize = true; // 수동 조절 시 자동 모드 끔
   CONFIG.cellSize = Number(e.target.value);
   postMaterial.uniforms.cellSize.value = CONFIG.cellSize;
   cellVal.textContent = e.target.value;
