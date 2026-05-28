@@ -33,7 +33,7 @@
 <div class="gui" id="gui">
   <h3>Pictogram Halftone</h3>
   <label>Cell Size <input type="range" id="cellSlider" min="6" max="48" value="14" step="1"><span class="val" id="cellVal">14</span></label>
-  <label>X 회전 <input type="range" id="rotX" min="-180" max="180" value="90" step="5"><span class="val" id="rotXVal">90</span></label>
+  <label>X 회전 <input type="range" id="rotX" min="-180" max="180" value="0" step="5"><span class="val" id="rotXVal">0</span></label>
   <label>Y 회전 <input type="range" id="rotY" min="-180" max="180" value="0" step="5"><span class="val" id="rotYVal">0</span></label>
   <label>Z 회전 <input type="range" id="rotZ" min="-180" max="180" value="0" step="5"><span class="val" id="rotZVal">0</span></label>
 </div>
@@ -274,13 +274,9 @@ loader.load(CONFIG.glbPath, (gltf) => {
   scene.add(catModel);
   
   // 초기 회전 (꼬깔이 위로 가는 각도)
-  catModel.rotation.x = Math.PI / 2; // 90도
+  catModel.rotation.x = Math.PI / 2; // 실제 90도
   catModel.rotation.y = 0;
   catModel.rotation.z = 0;
-  
-  // 슬라이더 초기값 동기화
-  rotXSlider.value = 90;
-  rotXVal.textContent = '90';
   
   modelInfo = fitCameraToObject(camera, catModel, controls);
 }, undefined, (err) => {
@@ -335,7 +331,8 @@ const rotZVal = document.getElementById('rotZVal');
 
 function updateRotation() {
   if (!catModel) return;
-  catModel.rotation.x = Number(rotXSlider.value) * Math.PI / 180;
+  // 슬라이더 0 = 실제 90도 (기본 자세)
+  catModel.rotation.x = (Number(rotXSlider.value) + 90) * Math.PI / 180;
   catModel.rotation.y = Number(rotYSlider.value) * Math.PI / 180;
   catModel.rotation.z = Number(rotZSlider.value) * Math.PI / 180;
   rotXVal.textContent = rotXSlider.value;
