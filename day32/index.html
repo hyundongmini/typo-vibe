@@ -277,6 +277,8 @@ loader.load(CONFIG.glbPath, (gltf) => {
 // ============================================
 // 줌 레벨에 따른 cellSize 동적 변경
 // ============================================
+let manualCellSize = false; // 수동 모드 플래그
+
 function updateCellSizeFromZoom() {
   if (!modelInfo) return;
   if (manualCellSize) return; // 수동 모드면 자동 변경 안 함
@@ -302,7 +304,6 @@ function updateCellSizeFromZoom() {
 // ============================================
 const cellSlider = document.getElementById('cellSlider');
 const cellVal = document.getElementById('cellVal');
-let manualCellSize = false; // 수동 모드 플래그
 
 cellSlider.addEventListener('input', (e) => {
   manualCellSize = true; // 수동 조절 시 자동 모드 끔
