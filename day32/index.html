@@ -33,7 +33,7 @@
 <div class="gui" id="gui">
   <h3>Pictogram Halftone</h3>
   <label>Cell Size <input type="range" id="cellSlider" min="6" max="48" value="14" step="1"><span class="val" id="cellVal">14</span></label>
-  <label>X 회전 <input type="range" id="rotX" min="-180" max="180" value="0" step="5"><span class="val" id="rotXVal">0</span></label>
+  <label>X 회전 <input type="range" id="rotX" min="-180" max="180" value="-90" step="5"><span class="val" id="rotXVal">-90</span></label>
   <label>Y 회전 <input type="range" id="rotY" min="-180" max="180" value="0" step="5"><span class="val" id="rotYVal">0</span></label>
   <label>Z 회전 <input type="range" id="rotZ" min="-180" max="180" value="0" step="5"><span class="val" id="rotZVal">0</span></label>
 </div>
@@ -273,8 +273,8 @@ loader.load(CONFIG.glbPath, (gltf) => {
 
   scene.add(catModel);
   
-  // 초기 회전 (꼬깔이 위로 가는 각도)
-  catModel.rotation.x = Math.PI / 2; // 실제 90도
+  // 초기 회전
+  catModel.rotation.x = (-90 + 90) * Math.PI / 180; // 슬라이더 -90 → 실제 0도
   catModel.rotation.y = 0;
   catModel.rotation.z = 0;
   
@@ -363,23 +363,24 @@ function animate() {
 
   // 자동 애니메이션
   if (autoRotate && catModel) {
-    animTime += 0.005;
+    animTime += 0.012; // 더 빠르게
     
-    // Y축 천천히 회전
-    catModel.rotation.y += 0.003;
+    // Y축 회전 (더 빠르게)
+    catModel.rotation.y += 0.008;
     
-    // 줌 인/아웃 (sin 파동)
-    const zoomCycle = Math.sin(animTime * 0.5) * 0.3 + 1.0; // 0.7 ~ 1.3
+    // 줌 인/아웃 (더 다채롭게 - 두 개 sin 합성)
+    const zoomCycle = Math.sin(animTime * 1.2) * 0.25 + Math.sin(animTime * 0.5) * 0.15 + 1.0;
     if (modelInfo) {
       const targetDist = modelInfo.dist * zoomCycle;
       const dir = new THREE.Vector3().subVectors(camera.position, controls.target).normalize();
       camera.position.copy(controls.target).addScaledVector(dir, targetDist);
     }
     
-    // cellSize도 줌에 따라 변화 (가까울수록 크게)
+    // cellSize 다채롭게 변화 (빠른 주기 + 느린 주기 합성)
     if (!manualCellSize) {
-      const targetCell = 8 + (1 - zoomCycle + 0.7) * 20;
-      CONFIG.cellSize = THREE.MathUtils.lerp(CONFIG.cellSize, targetCell, 0.05);
+      const cellCycle = Math.sin(animTime * 1.5) * 0.5 + Math.sin(animTime * 0.7) * 0.3 + 0.5;
+      const targetCell = 6 + cellCycle * 30; // 6 ~ 36 범위
+      CONFIG.cellSize = THREE.MathUtils.lerp(CONFIG.cellSize, targetCell, 0.08);
       postMaterial.uniforms.cellSize.value = CONFIG.cellSize;
       cellSlider.value = Math.round(CONFIG.cellSize);
       cellVal.textContent = Math.round(CONFIG.cellSize);
