@@ -112,6 +112,7 @@ function fitCameraToObject(camera, object, controls) {
 
   camera.position.set(center.x, center.y, center.z + dist);
   camera.lookAt(center);
+  controls.up = new THREE.Vector3(0, 1, 0);
 
   if (controls) {
     controls.target.copy(center);
@@ -267,6 +268,10 @@ loader.load(CONFIG.glbPath, (gltf) => {
   });
 
   scene.add(catModel);
+  
+  // 모델이 뒤집혀 있으면 보정
+  catModel.rotation.x = Math.PI; // 180도 회전
+  
   modelInfo = fitCameraToObject(camera, catModel, controls);
 }, undefined, (err) => {
   console.error('GLB 로드 실패:', err);
