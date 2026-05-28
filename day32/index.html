@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Pictogram Halftone Cat</title>
+<title>아스키 변도동</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { overflow: hidden; background: #763934; }
@@ -26,16 +26,24 @@
   .gui input[type=range] { flex: 1; height: 4px; }
   .gui .val { font-variant-numeric: tabular-nums; min-width: 28px; text-align: right; }
   .gui h3 { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; opacity: 0.5; margin-bottom: 6px; }
+  .gui .usage { margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.15); }
+  .gui .usage p { font-size: 10px; opacity: 0.6; line-height: 1.8; }
 </style>
 </head>
 <body>
 
 <div class="gui" id="gui">
-  <h3>Pictogram Halftone</h3>
+  <h3>아스키 변도동</h3>
   <label>Cell Size <input type="range" id="cellSlider" min="6" max="48" value="14" step="1"><span class="val" id="cellVal">14</span></label>
   <label>X 회전 <input type="range" id="rotX" min="-180" max="180" value="-90" step="5"><span class="val" id="rotXVal">-90</span></label>
   <label>Y 회전 <input type="range" id="rotY" min="-180" max="180" value="0" step="5"><span class="val" id="rotYVal">0</span></label>
   <label>Z 회전 <input type="range" id="rotZ" min="-180" max="180" value="0" step="5"><span class="val" id="rotZVal">0</span></label>
+  <div class="usage">
+    <p>🖱 드래그: 회전</p>
+    <p>🖱 휠: 줌 인/아웃</p>
+    <p>슬라이더: XYZ축·셀 크기 조절</p>
+    <p>3초 방치 시 자동 회전 재개</p>
+  </div>
 </div>
 
 <!-- Three.js -->
