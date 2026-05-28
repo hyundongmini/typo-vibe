@@ -192,8 +192,6 @@ const postMaterial = new THREE.ShaderMaterial({
       
       // 2. 셀 중심의 UV (0~1)
       vec2 cellCenter = (cellOrigin + cellSize * 0.5) / resolution;
-      // Y축 뒤집기 (WebGL 좌표계)
-      cellCenter.y = 1.0 - cellCenter.y;
       
       // 3. 셀 중심에서 명암 샘플링 + contrast 부스트
       vec3 sceneColor = texture2D(sceneTexture, cellCenter).rgb;
