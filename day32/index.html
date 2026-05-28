@@ -273,11 +273,14 @@ loader.load(CONFIG.glbPath, (gltf) => {
 
   scene.add(catModel);
   
-  // 초기 회전 (현재 값 기본)
-  catModel.rotation.x = 0;
+  // 초기 회전 (꼬깔이 위로 가는 각도)
+  catModel.rotation.x = Math.PI / 2; // 90도
   catModel.rotation.y = 0;
   catModel.rotation.z = 0;
-  updateRotation();
+  
+  // 슬라이더 초기값 동기화
+  rotXSlider.value = 90;
+  rotXVal.textContent = '90';
   
   modelInfo = fitCameraToObject(camera, catModel, controls);
 }, undefined, (err) => {
