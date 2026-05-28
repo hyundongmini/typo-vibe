@@ -271,7 +271,7 @@ loader.load(CONFIG.glbPath, (gltf) => {
   scene.add(catModel);
   
   // 모델이 뒤집혀 있으면 보정
-  catModel.rotation.x = -Math.PI; // X축 위쪽으로 90도 더 올림
+  catModel.rotation.x = Math.PI / 2; // X축 90도
   
   modelInfo = fitCameraToObject(camera, catModel, controls);
 }, undefined, (err) => {
