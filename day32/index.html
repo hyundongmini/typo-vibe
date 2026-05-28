@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pictogram Halftone Cat</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { overflow: hidden; background: #EEFF00; }
+  canvas { display: block; }
+  
+  /* GUI */
+  .gui {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    background: rgba(0,0,0,0.75);
+    color: #fff;
+    padding: 12px 16px;
+    border-radius: 8px;
+    font: 11px/1.6 ui-sans-serif, system-ui, sans-serif;
+    z-index: 10;
+    min-width: 180px;
+  }
+  .gui label { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .gui input[type=range] { flex: 1; height: 4px; }
+  .gui .val { font-variant-numeric: tabular-nums; min-width: 28px; text-align: right; }
+  .gui h3 { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; opacity: 0.5; margin-bottom: 6px; }
+</style>
+</head>
+<body>
+
+<div class="gui" id="gui">
+  <h3>Pictogram Halftone</h3>
+  <label>Cell Size <input type="range" id="cellSlider" min="6" max="48" value="14" step="1"><span class="val" id="cellVal">14</span></label>
+</div>
+
+<!-- Three.js -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.164.1/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.164.1/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+// ============================================
+// CONFIG
+// ============================================
+const CONFIG = {
+  bgColor: '#EEFF00',       // 배경 노란색
+  symbolColor: '#000000',   // 심볼 검정
+  cellSize: 14,             // 초기 셀 크기 (px)
+  symbolCount: 8,           // 심볼 개수
+  minCell: 6,               // 줌 아웃 시 최소 셀
+  maxCell: 48,              // 줌 인 시 최대 셀
+  glbPath: './Meshy_AI_Birthday_Cat_0518090039_generate.glb',
+};
+
+// ============================================
+// 심볼 아틀라스 생성 (Canvas → Texture)
+// ============================================
+function createSymbolAtlas() {
+  const symbols = ['·', '◇', '✂', '⚠', '✦', '❀', '✺', '⓼'];
+  const cellW = 128;
+  const cellH = 128;
+  const canvas = document.createElement('canvas');
+  canvas.width = cellW * symbols.length;
+  canvas.height = cellH;
+  const ctx = canvas.getContext('2d');
+
+  // 투명 배경
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // 각 심볼 그리기
+  ctx.fillStyle = '#000000';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = `bold 80px "Apple Symbols", "Segoe UI Symbol", "Noto Sans Symbols", Arial, sans-serif`;
+
+  symbols.forEach((sym, i) => {
+    const x = i * cellW + cellW / 2;
+    const y = cellH / 2;
+    ctx.fillText(sym, x, y);
+  });
+
+  // Three.js 텍스처로 변환
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.minFilter = THREE.LinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  texture.needsUpdate = true;
+
+  return texture;
+}
+
+// ============================================
+// 카메라를 모델에 맞추기
+// ============================================
+function fitCameraToObject(camera, object, controls) {
+  const box = new THREE.Box3().setFromObject(object);
+  const center = box.getCenter(new THREE.Vector3());
+  const size = box.getSize(new THREE.Vector3());
+  const maxDim = Math.max(size.x, size.y, size.z);
+  const fov = camera.fov * (Math.PI / 180);
+  const dist = maxDim / (2 * Math.tan(fov / 2)) * 1.5;
+
+  camera.position.set(center.x, center.y, center.z + dist);
+  camera.lookAt(center);
+
+  if (controls) {
+    controls.target.copy(center);
+    controls.update();
+  }
+
+  return { center, dist, maxDim };
+}
+
+// ============================================
+// 메인
+// ============================================
+const renderer = new THREE.WebGLRenderer({ antialias: false });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(1); // 성능 위해 1x
+document.body.appendChild(renderer.domElement);
+
+// Pass 1 씬 (고양이 모델)
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xffffff);
+
+const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+
+// 조명
+const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
+dirLight.position.set(2, 4, 3);
+scene.add(dirLight);
+scene.add(new THREE.AmbientLight(0xffffff, 0.3));
+
+// 오프스크린 렌더 타겟 (Pass 1 결과)
+let renderTarget = new THREE.WebGLRenderTarget(
+  Math.floor(window.innerWidth / 2),
+  Math.floor(window.innerHeight / 2)
+);
+
+// 심볼 아틀라스
+const symbolAtlas = createSymbolAtlas();
+
+// Pass 2: 풀스크린 쿼드 + 셰이더
+const postScene = new THREE.Scene();
+const postCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+
+const postMaterial = new THREE.ShaderMaterial({
+  uniforms: {
+    sceneTexture: { value: renderTarget.texture },
+    symbolAtlas: { value: symbolAtlas },
+    resolution: { value: new THREE.Vector2(window.innerWidth, window.innerHeight) },
+    cellSize: { value: CONFIG.cellSize },
+    symbolCount: { value: CONFIG.symbolCount },
+    bgColor: { value: new THREE.Color(CONFIG.bgColor) },
+  },
+  vertexShader: `
+    varying vec2 vUv;
+    void main() {
+      vUv = uv;
+      gl_Position = vec4(position, 1.0);
+    }
+  `,
+  fragmentShader: `
+    precision highp float;
+    
+    uniform sampler2D sceneTexture;
+    uniform sampler2D symbolAtlas;
+    uniform vec2 resolution;
+    uniform float cellSize;
+    uniform float symbolCount;
+    uniform vec3 bgColor;
+    
+    void main() {
+      vec2 fragCoord = gl_FragCoord.xy;
+      
+      // 1. 현재 픽셀이 속한 셀의 원점
+      vec2 cellOrigin = floor(fragCoord / cellSize) * cellSize;
+      
+      // 2. 셀 중심의 UV (0~1)
+      vec2 cellCenter = (cellOrigin + cellSize * 0.5) / resolution;
+      // Y축 뒤집기 (WebGL 좌표계)
+      cellCenter.y = 1.0 - cellCenter.y;
+      
+      // 3. 셀 중심에서 명암 샘플링
+      vec3 sceneColor = texture2D(sceneTexture, cellCenter).rgb;
+      float brightness = dot(sceneColor, vec3(0.299, 0.587, 0.114));
+      
+      // 4. 배경이면 노란색 출력
+      if (brightness > 0.92) {
+        gl_FragColor = vec4(bgColor, 1.0);
+        return;
+      }
+      
+      // 5. 밝기 → 심볼 인덱스 (어두울수록 큰 인덱스)
+      float idx = floor((1.0 - brightness) * symbolCount);
+      idx = clamp(idx, 0.0, symbolCount - 1.0);
+      
+      // 6. 셀 내부 UV
+      vec2 cellUV = (fragCoord - cellOrigin) / cellSize;
+      
+      // 7. 심볼 아틀라스에서 샘플링
+      vec2 atlasUV = vec2(
+        (idx + cellUV.x) / symbolCount,
+        1.0 - cellUV.y  // Y 뒤집기
+      );
+      float symbolMask = texture2D(symbolAtlas, atlasUV).a;
+      
+      // 8. 노랑 배경 + 검정 심볼 합성
+      vec3 finalColor = mix(bgColor, vec3(0.0), symbolMask);
+      gl_FragColor = vec4(finalColor, 1.0);
+    }
+  `,
+});
+
+const postQuad = new THREE.Mesh(
+  new THREE.PlaneGeometry(2, 2),
+  postMaterial
+);
+postScene.add(postQuad);
+
+// GLB 로드
+let catModel = null;
+let modelInfo = null;
+
+const loader = new GLTFLoader();
+loader.load(CONFIG.glbPath, (gltf) => {
+  catModel = gltf.scene;
+
+  // 머티리얼 강제 교체 (흰색 단색)
+  catModel.traverse((child) => {
+    if (child.isMesh) {
+      child.material = new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        roughness: 0.6,
+        metalness: 0.0,
+      });
+    }
+  });
+
+  scene.add(catModel);
+  modelInfo = fitCameraToObject(camera, catModel, controls);
+}, undefined, (err) => {
+  console.error('GLB 로드 실패:', err);
+});
+
+// ============================================
+// 줌 레벨에 따른 cellSize 동적 변경
+// ============================================
+function updateCellSizeFromZoom() {
+  if (!modelInfo) return;
+
+  const dist = camera.position.distanceTo(controls.target);
+  const normalizedDist = dist / modelInfo.dist; // 1.0 = 기본 거리
+
+  // 가까울수록 cellSize 크게, 멀수록 작게
+  const t = THREE.MathUtils.clamp((normalizedDist - 0.3) / 2.5, 0, 1);
+  const targetCell = THREE.MathUtils.lerp(CONFIG.maxCell, CONFIG.minCell, t);
+
+  // 부드럽게 보간
+  CONFIG.cellSize = THREE.MathUtils.lerp(CONFIG.cellSize, targetCell, 0.1);
+  postMaterial.uniforms.cellSize.value = CONFIG.cellSize;
+
+  // GUI 슬라이더 동기화
+  cellSlider.value = Math.round(CONFIG.cellSize);
+  cellVal.textContent = Math.round(CONFIG.cellSize);
+}
+
+// ============================================
+// GUI
+// ============================================
+const cellSlider = document.getElementById('cellSlider');
+const cellVal = document.getElementById('cellVal');
+
+cellSlider.addEventListener('input', (e) => {
+  CONFIG.cellSize = Number(e.target.value);
+  postMaterial.uniforms.cellSize.value = CONFIG.cellSize;
+  cellVal.textContent = e.target.value;
+});
+
+// ============================================
+// 렌더 루프
+// ============================================
+function animate() {
+  requestAnimationFrame(animate);
+  controls.update();
+
+  // 줌에 따른 cellSize 업데이트
+  updateCellSizeFromZoom();
+
+  // Pass 1: 모델을 오프스크린에 렌더
+  renderer.setRenderTarget(renderTarget);
+  renderer.render(scene, camera);
+
+  // Pass 2: 풀스크린 셰이더로 최종 출력
+  renderer.setRenderTarget(null);
+  renderer.render(postScene, postCamera);
+}
+
+animate();
+
+// ============================================
+// 리사이즈 대응
+// ============================================
+window.addEventListener('resize', () => {
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  renderer.setSize(w, h);
+
+  // 렌더 타겟도 리사이즈
+  renderTarget.setSize(Math.floor(w / 2), Math.floor(h / 2));
+  postMaterial.uniforms.resolution.value.set(w, h);
+});
+</script>
+
+</body>
+</html>
