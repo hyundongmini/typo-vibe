@@ -365,15 +365,15 @@ function switchMode(mode) {
   }
   else if (mode === 'gradient') {
     layers[0].style.display = 'none'; layers[1].style.display = 'none'; layers[2].style.display = 'none';
-    layers[3].setAttribute('stroke-width', '134');
+    layers[3].setAttribute('stroke-width', '35');
     layers[3].setAttribute('stroke', 'url(#brushGradient)');
     layers[3].style.strokeDasharray = 'none';
     layers[3].style.strokeDashoffset = '0';
     displacement.setAttribute('scale', '52'); turbulence.setAttribute('baseFrequency', '0.014');
     fontSizeSlider.value = 250; layers[3].setAttribute('font-size', '250');
-    strokeSlider.value = 134;
+    strokeSlider.value = 35;
     displaceSlider.value = 52; freqSlider.value = 0.014;
-    document.getElementById('strokeVal').textContent = '134';
+    document.getElementById('strokeVal').textContent = '35';
     document.getElementById('displaceVal').textContent = '52';
     document.getElementById('freqVal').textContent = '0.014';
     document.getElementById('sizeVal').textContent = '250';
