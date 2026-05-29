@@ -409,6 +409,19 @@ function switchMode(mode) {
     const bc = document.getElementById('brushCanvas');
     bc.width = window.innerWidth;
     bc.height = window.innerHeight;
+    
+    // 기본값 설정
+    document.getElementById('strokeWidth').value = 7.5;
+    document.getElementById('strokeVal').textContent = '7.5';
+    document.getElementById('chromatic').value = 2.5;
+    document.getElementById('chromVal').textContent = '2.5';
+    document.getElementById('wander').value = 3;
+    document.getElementById('wanderVal').textContent = '3';
+    document.getElementById('inertia').value = 24;
+    document.getElementById('inertiaVal2').textContent = '24';
+    document.getElementById('pull').value = 0.11;
+    document.getElementById('pullVal').textContent = '0.11';
+    
     renderCanvasBrush();
   }
 }
