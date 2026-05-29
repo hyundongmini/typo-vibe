@@ -454,22 +454,20 @@ const outlineModeBtn = document.getElementById('outlineModeBtn');
 let isOutlineMode = false;
 let loadedFont = null;
 
-// 한글 폰트 로드 (Noto Sans KR Bold)
-const FONT_URL = 'https://fonts.gstatic.com/s/notosanskr/v36/PbyxFmXiEBPT4ITbgNA5Cgms3VYcOA-vvnIzzuoyeLTq8H4hGPNuCFQ.otf';
+// 한글 폰트 로드 (Black Han Sans - 확실히 작동하는 ttf)
+const FONT_URL = 'https://cdn.jsdelivr.net/gh/nicholasgasior/gfonts@master/fonts/black-han-sans/BlackHanSans-Regular.ttf';
 
-opentype.load(FONT_URL, (err, font) => {
-  if (err) {
-    console.warn('한글 폰트 로드 실패:', err);
-    // 대체: 영문 폰트
-    opentype.load('https://fonts.gstatic.com/s/inter/v18/UcCO3FwrK3iLTeHuS_nVMrMxCp50SjIw2boKoduKmMEVuLyfAZ9hiA.woff2', (err2, font2) => {
-      if (!err2) loadedFont = font2;
-      else console.error('대체 폰트도 실패:', err2);
-    });
-  } else {
-    loadedFont = font;
+fetch(FONT_URL)
+  .then(res => res.arrayBuffer())
+  .then(buffer => {
+    loadedFont = opentype.parse(buffer);
     console.log('폰트 로드 완료');
-  }
-});
+  })
+  .catch(err => {
+    console.warn('폰트 로드 실패, Canvas 방식으로 대체:', err);
+    // Canvas 기반 윤곽선 추출로 대체
+    loadedFont = 'canvas-fallback';
+  });
 
 outlineModeBtn.addEventListener('click', () => {
   // 다른 모드 끄기
@@ -516,11 +514,6 @@ outlineModeBtn.addEventListener('click', () => {
 });
 
 function renderOutlineBrush(text) {
-  if (!loadedFont) {
-    alert('폰트 로딩 중... 잠시 후 다시 시도해주세요.');
-    return;
-  }
-  
   // 기존 윤곽선 그룹 제거
   const existing = document.getElementById('outline-group');
   if (existing) existing.remove();
@@ -528,10 +521,22 @@ function renderOutlineBrush(text) {
   const svg = document.getElementById('svg');
   const svgNS = 'http://www.w3.org/2000/svg';
   
-  // opentype.js로 글리프 path 추출
-  const fontSize = 250;
-  const path = loadedFont.getPath(text, 150, 500, fontSize);
-  const pathData = path.toPathData(2); // SVG path d 문자열
+  let pathData;
+  
+  if (loadedFont && loadedFont !== 'canvas-fallback') {
+    // opentype.js로 글리프 path 추출
+    const fontSize = 250;
+    const path = loadedFont.getPath(text, 150, 500, fontSize);
+    pathData = path.toPathData(2);
+  } else {
+    // Canvas 기반 대체: 텍스트를 Canvas에 그려서 윤곽선 추출
+    pathData = getCanvasOutlinePath(text);
+  }
+  
+  if (!pathData) {
+    console.error('path 생성 실패');
+    return;
+  }
   
   // 윤곽선 그룹 생성
   const group = document.createElementNS(svgNS, 'g');
@@ -593,6 +598,75 @@ textInput.addEventListener('input', () => {
     renderOutlineBrush(textInput.value || '비정형');
   }
 });
+
+// ============================================
+// Canvas 기반 윤곽선 추출 (폰트 로드 실패 시 대체)
+// ============================================
+function getCanvasOutlinePath(text) {
+  const canvas = document.createElement('canvas');
+  const W = 1200, H = 800;
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#000';
+  ctx.font = 'bold 250px "Arial Black", Impact, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, W/2, H/2);
+  
+  // 픽셀 데이터에서 윤곽선 추출 (간단한 edge detection)
+  const imageData = ctx.getImageData(0, 0, W, H);
+  const data = imageData.data;
+  const step = 4; // 샘플링 간격
+  
+  let pathStr = '';
+  
+  // 수평 스캔라인으로 윤곽선 포인트 수집
+  for (let y = 0; y < H; y += step) {
+    let inShape = false;
+    let entered = -1;
+    
+    for (let x = 0; x < W; x += 2) {
+      const idx = (y * W + x) * 4;
+      const alpha = data[idx + 3];
+      const isPixel = alpha > 128;
+      
+      if (isPixel && !inShape) {
+        // 왼쪽 경계
+        inShape = true;
+        entered = x;
+        pathStr += (pathStr ? ' L' : 'M') + ` ${x} ${y}`;
+      } else if (!isPixel && inShape) {
+        // 오른쪽 경계
+        inShape = false;
+        pathStr += ` L ${x} ${y}`;
+      }
+    }
+  }
+  
+  // 수직 스캔라인도 추가
+  for (let x = 0; x < W; x += step) {
+    let inShape = false;
+    
+    for (let y = 0; y < H; y += 2) {
+      const idx = (y * W + x) * 4;
+      const alpha = data[idx + 3];
+      const isPixel = alpha > 128;
+      
+      if (isPixel && !inShape) {
+        inShape = true;
+        pathStr += ` M ${x} ${y}`;
+      } else if (!isPixel && inShape) {
+        inShape = false;
+        pathStr += ` L ${x} ${y}`;
+      }
+    }
+  }
+  
+  return pathStr || null;
+}
 </script>
 
 </body>
