@@ -267,11 +267,17 @@ textInput.addEventListener('input', () => {
 strokeSlider.addEventListener('input', () => {
   const val = Number(strokeSlider.value);
   document.getElementById('strokeVal').textContent = val;
-  // 레이어별 비율 유지: 1번=val, 2번=val*0.6, 3번=val*0.6, 4번=val*0.25
-  layers[0].setAttribute('stroke-width', val);
-  layers[1].setAttribute('stroke-width', val * 0.6);
-  layers[2].setAttribute('stroke-width', val * 0.6);
-  layers[3].setAttribute('stroke-width', val * 0.25);
+  
+  if (currentMode === 'gradient') {
+    // 그라데이션 모드: layer4에 직접 적용
+    layers[3].setAttribute('stroke-width', val);
+  } else {
+    // 다른 모드: 레이어별 비율
+    layers[0].setAttribute('stroke-width', val);
+    layers[1].setAttribute('stroke-width', val * 0.6);
+    layers[2].setAttribute('stroke-width', val * 0.6);
+    layers[3].setAttribute('stroke-width', val * 0.25);
+  }
 });
 
 // 비정형 강도 (displacement scale)
