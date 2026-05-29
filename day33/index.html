@@ -370,8 +370,38 @@ function switchMode(mode) {
     setTimeout(() => animateWobble(), 4000);
   }
   else if (mode === 'outline') {
-    layers.forEach(l => l.style.display = 'none');
-    renderOutlineBrush(textInput.value || '비정형');
+    // SVG text를 stroke만으로 표시 (fill 없이)
+    // 레이어 1~3을 얇은 stroke + 색수차로
+    layers.forEach(l => { l.style.display = ''; });
+    
+    // fill 제거, stroke만
+    layers[0].setAttribute('stroke', '#0066ff');
+    layers[0].setAttribute('stroke-width', '2');
+    layers[0].setAttribute('fill', 'none');
+    layers[0].setAttribute('transform', 'translate(-3,-2)');
+    
+    layers[1].setAttribute('stroke', '#00cc44');
+    layers[1].setAttribute('stroke-width', '2');
+    layers[1].setAttribute('fill', 'none');
+    layers[1].setAttribute('transform', 'translate(3,2)');
+    
+    layers[2].setAttribute('stroke', 'url(#brushGradient)');
+    layers[2].setAttribute('stroke-width', '1.5');
+    layers[2].setAttribute('fill', 'none');
+    layers[2].setAttribute('transform', '');
+    
+    layers[3].setAttribute('stroke', '#ffffff');
+    layers[3].setAttribute('stroke-width', '0.5');
+    layers[3].setAttribute('fill', 'none');
+    layers[3].setAttribute('transform', '');
+    
+    // 왜곡 적용
+    displacement.setAttribute('scale', '40');
+    turbulence.setAttribute('baseFrequency', '0.012');
+    displaceSlider.value = 40;
+    freqSlider.value = 0.012;
+    document.getElementById('displaceVal').textContent = '40';
+    document.getElementById('freqVal').textContent = '0.012';
   }
   else if (mode === 'canvasBrush') {
     document.getElementById('svg').style.display = 'none';
