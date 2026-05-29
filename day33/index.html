@@ -216,6 +216,12 @@
   
   <label>글자 크기 <input type="range" id="fontSize" min="60" max="400" value="180" step="5"><span class="val" id="sizeVal">180</span></label>
   
+  <label>번짐 <input type="range" id="blur" min="0" max="8" value="0" step="0.5"><span class="val" id="blurVal">0</span></label>
+  <label>이탈강도 <input type="range" id="wander" min="0" max="5" value="1" step="0.1"><span class="val" id="wanderVal">1</span></label>
+  <label>관성 <input type="range" id="inertia" min="1" max="30" value="8" step="1"><span class="val" id="inertiaVal2">8</span></label>
+  <label>복귀력 <input type="range" id="pull" min="0.01" max="1" value="0.3" step="0.01"><span class="val" id="pullVal">0.3</span></label>
+  <label>샘플 간격 <input type="range" id="sampleStep" min="1" max="8" value="3" step="1"><span class="val" id="stepVal">3</span></label>
+  
   <button id="randomBtn">🎲 패턴 바꾸기</button>
   <button id="modeBtn">🖌 유기적 모드</button>
   <button id="gradModeBtn">🌈 그라데이션 브러시</button>
@@ -645,16 +651,26 @@ function renderCanvasBrush() {
   const H = brushCanvas.height;
   const text = textInput.value || '비정형';
   const lw = Number(strokeSlider.value);
-  const noiseStr = Number(displaceSlider.value) * 0.2;
   const chromOffset = Number(chromaticSlider.value);
-  const step = 3;
+  const blurAmount = Number(document.getElementById('blur').value);
+  const wanderStr = Number(document.getElementById('wander').value);
+  const inertiaVal = Number(document.getElementById('inertia').value);
+  const pullStr = Number(document.getElementById('pull').value);
+  const step = Number(document.getElementById('sampleStep').value);
   
-  // 윤곽선 추출
+  // 윤곽선 추출 (가이드 경로)
   const contours = extractBrushContours(text, W, H, step);
   
   // 배경
   bCtx.fillStyle = '#0a0a0a';
   bCtx.fillRect(0, 0, W, H);
+  
+  // 오프스크린 캔버스 (블러용)
+  const offCanvas = document.createElement('canvas');
+  offCanvas.width = W;
+  offCanvas.height = H;
+  const offCtx = offCanvas.getContext('2d');
+  offCtx.clearRect(0, 0, W, H);
   
   // 색수차 레이어
   const layersCfg = [
@@ -664,16 +680,102 @@ function renderCanvasBrush() {
   ];
   
   layersCfg.forEach(layer => {
-    bCtx.save();
-    bCtx.translate(layer.dx, layer.dy);
-    bCtx.globalAlpha = layer.alpha;
+    offCtx.save();
+    offCtx.translate(layer.dx, layer.dy);
+    offCtx.globalAlpha = layer.alpha;
     
     contours.forEach(contour => {
-      drawBrushContour(contour, lw, noiseStr);
+      drawAgentContour(offCtx, contour, lw, wanderStr, inertiaVal, pullStr);
     });
     
-    bCtx.restore();
+    offCtx.restore();
   });
+  
+  // 블러 적용 후 메인 캔버스에 그리기
+  if (blurAmount > 0) {
+    bCtx.filter = `blur(${blurAmount}px)`;
+  } else {
+    bCtx.filter = 'none';
+  }
+  bCtx.drawImage(offCanvas, 0, 0);
+  bCtx.filter = 'none';
+}
+
+// ============================================
+// 에이전트 기반 윤곽선 그리기
+// ============================================
+function drawAgentContour(ctx, contour, baseWidth, wanderStr, inertiaVal, pullStr) {
+  if (contour.length < 3) return;
+  
+  // 전체 패스 길이 계산
+  let totalLength = 0;
+  const lengths = [0];
+  for (let i = 1; i < contour.length; i++) {
+    const dx = contour[i][0] - contour[i-1][0];
+    const dy = contour[i][1] - contour[i-1][1];
+    totalLength += Math.sqrt(dx * dx + dy * dy);
+    lengths.push(totalLength);
+  }
+  if (totalLength === 0) return;
+  
+  // 에이전트 초기화
+  let ax = contour[0][0]; // 에이전트 위치
+  let ay = contour[0][1];
+  let vx = 0; // 에이전트 속도
+  let vy = 0;
+  
+  const trail = [{ x: ax, y: ay }]; // 에이전트 궤적
+  
+  // 에이전트가 가이드 경로를 따라감
+  for (let i = 1; i < contour.length; i++) {
+    const [targetX, targetY] = contour[i];
+    
+    // 복귀력: 목표점으로 당기는 힘
+    const pullX = (targetX - ax) * pullStr;
+    const pullY = (targetY - ay) * pullStr;
+    
+    // 이탈강도: Fractal Noise 기반 랜덤 힘
+    const noiseAngle = brushNoise(i * 0.5, ax * 0.01) * Math.PI * 2;
+    const wanderX = Math.cos(noiseAngle) * wanderStr;
+    const wanderY = Math.sin(noiseAngle) * wanderStr;
+    
+    // 관성 적용: 속도 감쇠 + 새 힘
+    const decay = 1 - 1 / inertiaVal;
+    vx = vx * decay + (pullX + wanderX) / inertiaVal;
+    vy = vy * decay + (pullY + wanderY) / inertiaVal;
+    
+    // 위치 업데이트
+    ax += vx;
+    ay += vy;
+    
+    trail.push({ x: ax, y: ay });
+  }
+  
+  // 궤적을 누적 거리 기반 색상으로 그리기
+  let trailLength = 0;
+  const trailLengths = [0];
+  for (let i = 1; i < trail.length; i++) {
+    const dx = trail[i].x - trail[i-1].x;
+    const dy = trail[i].y - trail[i-1].y;
+    trailLength += Math.sqrt(dx * dx + dy * dy);
+    trailLengths.push(trailLength);
+  }
+  
+  for (let i = 1; i < trail.length; i++) {
+    const t = trailLengths[i] / trailLength;
+    const color = interpolateColor(t);
+    
+    // lineWidth 변동
+    const lw = baseWidth + brushNoise(i * 0.2, 0) * (baseWidth * 0.4);
+    
+    ctx.beginPath();
+    ctx.moveTo(trail[i-1].x, trail[i-1].y);
+    ctx.lineTo(trail[i].x, trail[i].y);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = Math.max(0.5, lw);
+    ctx.lineCap = 'round';
+    ctx.stroke();
+  }
 }
 
 function extractBrushContours(text, W, H, step) {
@@ -837,6 +939,18 @@ randomBtn.addEventListener('click', () => {
   slider.addEventListener('input', () => {
     if (isCanvasBrushMode) renderCanvasBrush();
   });
+});
+
+// 새 슬라이더들도 연동
+['blur', 'wander', 'inertia', 'pull', 'sampleStep'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) {
+    el.addEventListener('input', () => {
+      const valEl = el.nextElementSibling;
+      if (valEl) valEl.textContent = el.value;
+      if (isCanvasBrushMode) renderCanvasBrush();
+    });
+  }
 });
 
 window.addEventListener('resize', () => {
