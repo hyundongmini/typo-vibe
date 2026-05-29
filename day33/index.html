@@ -754,11 +754,23 @@ function brushNoise(x, y) {
 }
 
 function drawBrushContour(contour, baseWidth, noiseStr) {
-  const gradColors = ['#0085ff', '#fceeff', '#39ff4a'];
+  // STEP 2: 전체 패스 길이 계산
+  let totalLength = 0;
+  const lengths = [0];
   
-  for (let i = 0; i < contour.length - 1; i++) {
-    const [x1, y1] = contour[i];
-    const [x2, y2] = contour[i + 1];
+  for (let i = 1; i < contour.length; i++) {
+    const dx = contour[i][0] - contour[i-1][0];
+    const dy = contour[i][1] - contour[i-1][1];
+    totalLength += Math.sqrt(dx * dx + dy * dy);
+    lengths.push(totalLength);
+  }
+  
+  if (totalLength === 0) return;
+  
+  // STEP 3: 누적 거리 비율(t)로 색상 결정하며 선분 그리기
+  for (let i = 1; i < contour.length; i++) {
+    const [x1, y1] = contour[i - 1];
+    const [x2, y2] = contour[i];
     
     const segLen = Math.sqrt((x2-x1)**2 + (y2-y1)**2);
     if (segLen < 0.5) continue;
@@ -769,29 +781,47 @@ function drawBrushContour(contour, baseWidth, noiseStr) {
     const nx2 = x2 + brushNoise(x2*0.1, y2*0.1) * noiseStr;
     const ny2 = y2 + brushNoise(x2*0.1+100, y2*0.1) * noiseStr;
     
-    // 올바른 방식: 진행 방향으로 그라데이션 (선분 시작→끝)
-    const grad = bCtx.createLinearGradient(nx1, ny1, nx2, ny2);
+    // 누적 거리 비율 (0 ~ 1)
+    const t = lengths[i] / totalLength;
     
-    // 윤곽선 진행도에 따라 색상 변화
-    const t = i / contour.length;
-    const colorT = t * 3; // 0~3 범위
-    const ci = Math.floor(colorT) % gradColors.length;
-    const nextCi = (ci + 1) % gradColors.length;
-    
-    grad.addColorStop(0, gradColors[ci]);
-    grad.addColorStop(1, gradColors[nextCi]);
+    // t값으로 파랑→흰→초록 보간
+    const color = interpolateColor(t);
     
     // lineWidth 변동
     const lw = baseWidth + brushNoise(i * 0.3, 0) * (baseWidth * 0.4);
     
+    // 선분 그리기 (blob X, 실제 선으로)
     bCtx.beginPath();
     bCtx.moveTo(nx1, ny1);
     bCtx.lineTo(nx2, ny2);
-    bCtx.strokeStyle = grad;
+    bCtx.strokeStyle = color;
     bCtx.lineWidth = Math.max(0.5, lw);
     bCtx.lineCap = 'round';
     bCtx.stroke();
   }
+}
+
+// 색상 보간: t=0 파랑, t=0.5 흰, t=1 초록
+function interpolateColor(t) {
+  const colors = [
+    { r: 0, g: 133, b: 255 },    // #0085ff (파랑)
+    { r: 252, g: 238, b: 255 },  // #fceeff (흰/핑크)
+    { r: 57, g: 255, b: 74 },    // #39ff4a (초록)
+  ];
+  
+  // t를 0~2 범위로 매핑 (3색 사이 보간)
+  const scaled = t * (colors.length - 1);
+  const idx = Math.min(Math.floor(scaled), colors.length - 2);
+  const frac = scaled - idx;
+  
+  const c1 = colors[idx];
+  const c2 = colors[idx + 1];
+  
+  const r = Math.round(c1.r + (c2.r - c1.r) * frac);
+  const g = Math.round(c1.g + (c2.g - c1.g) * frac);
+  const b = Math.round(c1.b + (c2.b - c1.b) * frac);
+  
+  return `rgb(${r},${g},${b})`;
 }
 
 // 패턴 바꾸기에 Canvas 모드도 연동
