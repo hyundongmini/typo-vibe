@@ -396,12 +396,12 @@ function switchMode(mode) {
     layers[3].setAttribute('transform', '');
     
     // 왜곡 적용
-    displacement.setAttribute('scale', '40');
-    turbulence.setAttribute('baseFrequency', '0.012');
-    displaceSlider.value = 40;
-    freqSlider.value = 0.012;
-    document.getElementById('displaceVal').textContent = '40';
-    document.getElementById('freqVal').textContent = '0.012';
+    displacement.setAttribute('scale', '45');
+    turbulence.setAttribute('baseFrequency', '0.018');
+    displaceSlider.value = 45;
+    freqSlider.value = 0.018;
+    document.getElementById('displaceVal').textContent = '45';
+    document.getElementById('freqVal').textContent = '0.018';
   }
   else if (mode === 'canvasBrush') {
     document.getElementById('svg').style.display = 'none';
