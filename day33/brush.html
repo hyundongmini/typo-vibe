@@ -237,10 +237,7 @@ function drawSingleContour(contour, color1, color2) {
     const [x1, y1] = contour[i];
     const [x2, y2] = contour[i + 1];
     
-    // 진행 방향 계산
-    const angle = Math.atan2(y2 - y1, x2 - x1);
     const segLen = Math.sqrt((x2-x1)**2 + (y2-y1)**2);
-    
     if (segLen < 0.5) continue;
     
     // 노이즈로 좌표 떨림
@@ -250,26 +247,17 @@ function drawSingleContour(contour, color1, color2) {
     const nx2 = x2 + noise2D(x2 * 0.1, y2 * 0.1, CONFIG.noiseSeed) * ns;
     const ny2 = y2 + noise2D(x2 * 0.1 + 100, y2 * 0.1, CONFIG.noiseSeed) * ns;
     
-    // 선분 방향에 맞는 그라데이션 생성
-    const gradLen = 20;
-    const perpX = Math.cos(angle + Math.PI/2) * gradLen;
-    const perpY = Math.sin(angle + Math.PI/2) * gradLen;
-    const midX = (nx1 + nx2) / 2;
-    const midY = (ny1 + ny2) / 2;
+    // 올바른 방식: 진행 방향으로 그라데이션 (선분 시작→끝)
+    const grad = ctx.createLinearGradient(nx1, ny1, nx2, ny2);
     
-    const grad = ctx.createLinearGradient(
-      midX - perpX, midY - perpY,
-      midX + perpX, midY + perpY
-    );
-    
-    // 그라데이션 색상 (진행도에 따라 변화)
+    // 윤곽선 진행도에 따라 색상 변화
     const t = i / contour.length;
-    const ci = Math.floor(t * (gradColors.length - 1));
-    const ct = (t * (gradColors.length - 1)) - ci;
+    const colorT = t * 3;
+    const ci = Math.floor(colorT) % gradColors.length;
+    const nextCi = (ci + 1) % gradColors.length;
     
-    grad.addColorStop(0, gradColors[ci % gradColors.length]);
-    grad.addColorStop(0.5, gradColors[(ci + 1) % gradColors.length]);
-    grad.addColorStop(1, gradColors[(ci + 2) % gradColors.length]);
+    grad.addColorStop(0, gradColors[ci]);
+    grad.addColorStop(1, gradColors[nextCi]);
     
     // lineWidth 노이즈 변동
     const lw = CONFIG.lineWidth + noise2D(i * 0.3, 0, CONFIG.noiseSeed) * (CONFIG.lineWidth * 0.5);
