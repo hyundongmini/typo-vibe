@@ -83,6 +83,8 @@
     font-size: 11px;
   }
   .controls button:hover { background: rgba(255,255,255,0.25); }
+  .controls button.active { background: rgba(255,255,255,0.35); border-color: rgba(255,255,255,0.6); }
+  .controls .modes { display: flex; flex-wrap: wrap; gap: 4px; }
 </style>
 </head>
 <body>
@@ -222,11 +224,14 @@
   <label>복귀력 <input type="range" id="pull" min="0.01" max="1" value="0.3" step="0.01"><span class="val" id="pullVal">0.3</span></label>
   <label>샘플 간격 <input type="range" id="sampleStep" min="1" max="8" value="3" step="1"><span class="val" id="stepVal">3</span></label>
   
+  <div class="modes">
+    <button id="mode-default" class="active">기본</button>
+    <button id="modeBtn">🖌 유기적</button>
+    <button id="gradModeBtn">🌈 그라데이션</button>
+    <button id="outlineModeBtn">✍️ 윤곽선</button>
+    <button id="canvasBrushBtn">🖊 브러시</button>
+  </div>
   <button id="randomBtn">🎲 패턴 바꾸기</button>
-  <button id="modeBtn">🖌 유기적 모드</button>
-  <button id="gradModeBtn">🌈 그라데이션 브러시</button>
-  <button id="outlineModeBtn">✍️ 윤곽선 브러시</button>
-  <button id="canvasBrushBtn">🖊 브러시 윤곽선</button>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/opentype.js@1.3.4/dist/opentype.min.js"></script>
@@ -309,50 +314,75 @@ randomBtn.addEventListener('click', () => {
 });
 
 // ============================================
-// 모드 2: 유기적 브러시 모드
+// 모드 전환 (라디오 방식 - 하나만 활성)
 // ============================================
-const modeBtn = document.getElementById('modeBtn');
-let isOrganicMode = false;
+const modeButtons = document.querySelectorAll('.modes button');
+let currentMode = 'default';
 
-modeBtn.addEventListener('click', () => {
-  isOrganicMode = !isOrganicMode;
-  modeBtn.textContent = isOrganicMode ? '✏️ 기본 모드' : '🖌 유기적 모드';
+function switchMode(mode) {
+  // 이전 모드 정리
+  stopDrawAnimation();
+  brushCanvas.style.display = 'none';
+  document.getElementById('svg').style.display = '';
+  layers.forEach(l => { l.style.display = ''; });
+  const outlineG = document.getElementById('outline-group');
+  if (outlineG) outlineG.remove();
+  layers[3].setAttribute('stroke-width', '2');
+  layers[3].setAttribute('stroke', 'url(#brushGradient)');
   
-  if (isOrganicMode) {
-    // 유기적 모드: 두꺼운 선 + 강한 왜곡 + 큰 물결
-    strokeSlider.value = 35;
-    displaceSlider.value = 70;
-    freqSlider.value = 0.01;
-    chromaticSlider.value = 12;
-    fontSizeSlider.value = 280;
-    
-    // 값 적용
-    strokeSlider.dispatchEvent(new Event('input'));
-    displaceSlider.dispatchEvent(new Event('input'));
-    freqSlider.dispatchEvent(new Event('input'));
-    chromaticSlider.dispatchEvent(new Event('input'));
-    fontSizeSlider.dispatchEvent(new Event('input'));
-    
-    // 선 그리기 애니메이션 시작
-    startDrawAnimation();
-  } else {
-    // 기본 모드 복원
-    strokeSlider.value = 8;
-    displaceSlider.value = 25;
-    freqSlider.value = 0.015;
-    chromaticSlider.value = 6;
-    fontSizeSlider.value = 180;
-    
-    strokeSlider.dispatchEvent(new Event('input'));
-    displaceSlider.dispatchEvent(new Event('input'));
-    freqSlider.dispatchEvent(new Event('input'));
-    chromaticSlider.dispatchEvent(new Event('input'));
-    fontSizeSlider.dispatchEvent(new Event('input'));
-    
-    // 애니메이션 제거
-    stopDrawAnimation();
+  // 버튼 활성 표시
+  modeButtons.forEach(b => b.classList.remove('active'));
+  document.getElementById(mode === 'default' ? 'mode-default' : 
+    mode === 'organic' ? 'modeBtn' :
+    mode === 'gradient' ? 'gradModeBtn' :
+    mode === 'outline' ? 'outlineModeBtn' : 'canvasBrushBtn'
+  ).classList.add('active');
+  
+  currentMode = mode;
+  
+  // 새 모드 적용
+  if (mode === 'default') {
+    strokeSlider.value = 8; displaceSlider.value = 25; freqSlider.value = 0.015; fontSizeSlider.value = 180;
+    strokeSlider.dispatchEvent(new Event('input')); displaceSlider.dispatchEvent(new Event('input'));
+    freqSlider.dispatchEvent(new Event('input')); fontSizeSlider.dispatchEvent(new Event('input'));
   }
-});
+  else if (mode === 'organic') {
+    strokeSlider.value = 35; displaceSlider.value = 70; freqSlider.value = 0.01; chromaticSlider.value = 12; fontSizeSlider.value = 280;
+    strokeSlider.dispatchEvent(new Event('input')); displaceSlider.dispatchEvent(new Event('input'));
+    freqSlider.dispatchEvent(new Event('input')); chromaticSlider.dispatchEvent(new Event('input')); fontSizeSlider.dispatchEvent(new Event('input'));
+    startDrawAnimation();
+  }
+  else if (mode === 'gradient') {
+    layers[0].style.display = 'none'; layers[1].style.display = 'none'; layers[2].style.display = 'none';
+    layers[3].setAttribute('stroke-width', '40');
+    displacement.setAttribute('scale', '60'); turbulence.setAttribute('baseFrequency', '0.008');
+    fontSizeSlider.value = 300; layers[3].setAttribute('font-size', '300');
+    const pathLength = 4000;
+    layers[3].style.strokeDasharray = pathLength;
+    layers[3].style.strokeDashoffset = pathLength;
+    layers[3].style.transition = 'none';
+    setTimeout(() => { layers[3].style.transition = 'stroke-dashoffset 4s cubic-bezier(0.4, 0, 0.2, 1)'; layers[3].style.strokeDashoffset = '0'; }, 100);
+    setTimeout(() => animateWobble(), 4000);
+  }
+  else if (mode === 'outline') {
+    layers.forEach(l => l.style.display = 'none');
+    renderOutlineBrush(textInput.value || '비정형');
+  }
+  else if (mode === 'canvasBrush') {
+    document.getElementById('svg').style.display = 'none';
+    brushCanvas.style.display = 'block';
+    brushCanvas.width = window.innerWidth;
+    brushCanvas.height = window.innerHeight;
+    renderCanvasBrush();
+  }
+}
+
+// 버튼 이벤트
+document.getElementById('mode-default').addEventListener('click', () => switchMode('default'));
+document.getElementById('modeBtn').addEventListener('click', () => switchMode('organic'));
+document.getElementById('gradModeBtn').addEventListener('click', () => switchMode('gradient'));
+document.getElementById('outlineModeBtn').addEventListener('click', () => switchMode('outline'));
+document.getElementById('canvasBrushBtn').addEventListener('click', () => switchMode('canvasBrush'));
 
 // ============================================
 // 선 그리기 애니메이션 (stroke-dashoffset)
@@ -413,54 +443,13 @@ function stopDrawAnimation() {
 }
 
 // ============================================
-// 모드 3: 그라데이션 브러시 모드
+// 모드 3~5는 switchMode()에서 처리됨
 // ============================================
-const gradModeBtn = document.getElementById('gradModeBtn');
-let isGradMode = false;
-
-gradModeBtn.addEventListener('click', () => {
-  if (isOrganicMode) { isOrganicMode = false; modeBtn.textContent = '🖌 유기적 모드'; stopDrawAnimation(); }
-  if (isOutlineMode) { isOutlineMode = false; outlineModeBtn.textContent = '✍️ 윤곽선 브러시'; const g = document.getElementById('outline-group'); if(g) g.remove(); layers.forEach(l => l.style.display = ''); stopDrawAnimation(); }
-  
-  isGradMode = !isGradMode;
-  gradModeBtn.textContent = isGradMode ? '✏️ 기본 모드' : '🌈 그라데이션 브러시';
-  
-  if (isGradMode) {
-    layers[0].style.display = 'none';
-    layers[1].style.display = 'none';
-    layers[2].style.display = 'none';
-    layers[3].style.display = '';
-    layers[3].setAttribute('stroke-width', '40');
-    layers[3].setAttribute('stroke', 'url(#brushGradient)');
-    displacement.setAttribute('scale', '60');
-    turbulence.setAttribute('baseFrequency', '0.008');
-    fontSizeSlider.value = 300;
-    layers[3].setAttribute('font-size', '300');
-    displaceSlider.value = 60; freqSlider.value = 0.008;
-    document.getElementById('displaceVal').textContent = '60';
-    document.getElementById('freqVal').textContent = '0.008';
-    document.getElementById('sizeVal').textContent = '300';
-    const pathLength = 4000;
-    layers[3].style.strokeDasharray = pathLength;
-    layers[3].style.strokeDashoffset = pathLength;
-    layers[3].style.transition = 'none';
-    setTimeout(() => { layers[3].style.transition = 'stroke-dashoffset 4s cubic-bezier(0.4, 0, 0.2, 1)'; layers[3].style.strokeDashoffset = '0'; }, 100);
-    setTimeout(() => animateWobble(), 4000);
-  } else {
-    stopDrawAnimation();
-    layers.forEach(l => l.style.display = '');
-    layers[3].setAttribute('stroke-width', '2');
-    strokeSlider.value = 8; displaceSlider.value = 25; freqSlider.value = 0.015; fontSizeSlider.value = 180;
-    strokeSlider.dispatchEvent(new Event('input')); displaceSlider.dispatchEvent(new Event('input'));
-    freqSlider.dispatchEvent(new Event('input')); fontSizeSlider.dispatchEvent(new Event('input'));
-  }
-});
 
 // ============================================
 // 모드 4: 윤곽선 브러시 모드 (opentype.js로 글리프 path 추출)
 // ============================================
 const outlineModeBtn = document.getElementById('outlineModeBtn');
-let isOutlineMode = false;
 let loadedFont = null;
 
 // 한글 폰트 로드 (Black Han Sans - 확실히 작동하는 ttf)
@@ -477,50 +466,6 @@ fetch(FONT_URL)
     // Canvas 기반 윤곽선 추출로 대체
     loadedFont = 'canvas-fallback';
   });
-
-outlineModeBtn.addEventListener('click', () => {
-  // 다른 모드 끄기
-  if (isOrganicMode) {
-    isOrganicMode = false;
-    modeBtn.textContent = '🖌 유기적 모드';
-    stopDrawAnimation();
-  }
-  if (isGradMode) {
-    isGradMode = false;
-    gradModeBtn.textContent = '🌈 그라데이션 브러시';
-    stopDrawAnimation();
-    layers.forEach(l => l.style.display = '');
-    layers[3].setAttribute('stroke-width', '2');
-  }
-  
-  isOutlineMode = !isOutlineMode;
-  outlineModeBtn.textContent = isOutlineMode ? '✏️ 기본 모드' : '✍️ 윤곽선 브러시';
-  
-  if (isOutlineMode) {
-    // 기존 텍스트 레이어 숨기기
-    layers.forEach(l => l.style.display = 'none');
-    
-    // 윤곽선 path 생성
-    renderOutlineBrush(textInput.value || '비정형');
-  } else {
-    // 기본 모드 복원
-    layers.forEach(l => l.style.display = '');
-    
-    // 윤곽선 path 제거
-    const outlineGroup = document.getElementById('outline-group');
-    if (outlineGroup) outlineGroup.remove();
-    
-    stopDrawAnimation();
-    strokeSlider.value = 8;
-    displaceSlider.value = 25;
-    freqSlider.value = 0.015;
-    fontSizeSlider.value = 180;
-    strokeSlider.dispatchEvent(new Event('input'));
-    displaceSlider.dispatchEvent(new Event('input'));
-    freqSlider.dispatchEvent(new Event('input'));
-    fontSizeSlider.dispatchEvent(new Event('input'));
-  }
-});
 
 function renderOutlineBrush(text) {
   // 기존 윤곽선 그룹 제거
@@ -603,10 +548,10 @@ function renderOutlineBrush(text) {
 
 // 텍스트 변경 시 윤곽선 모드면 다시 그리기
 textInput.addEventListener('input', () => {
-  if (isOutlineMode) {
+  if (currentMode === 'outline') {
     renderOutlineBrush(textInput.value || '비정형');
   }
-  if (isCanvasBrushMode) {
+  if (currentMode === 'canvasBrush') {
     renderCanvasBrush();
   }
 });
@@ -617,34 +562,7 @@ textInput.addEventListener('input', () => {
 const canvasBrushBtn = document.getElementById('canvasBrushBtn');
 const brushCanvas = document.getElementById('brushCanvas');
 const bCtx = brushCanvas.getContext('2d');
-let isCanvasBrushMode = false;
 let brushNoiseSeed = 0;
-
-canvasBrushBtn.addEventListener('click', () => {
-  // 다른 모드 끄기
-  if (isOrganicMode) { isOrganicMode = false; modeBtn.textContent = '🖌 유기적 모드'; stopDrawAnimation(); }
-  if (isGradMode) { isGradMode = false; gradModeBtn.textContent = '🌈 그라데이션 브러시'; stopDrawAnimation(); layers.forEach(l => l.style.display = ''); layers[3].setAttribute('stroke-width', '2'); }
-  if (isOutlineMode) { isOutlineMode = false; outlineModeBtn.textContent = '✍️ 윤곽선 브러시'; const g = document.getElementById('outline-group'); if(g) g.remove(); layers.forEach(l => l.style.display = ''); stopDrawAnimation(); }
-  
-  isCanvasBrushMode = !isCanvasBrushMode;
-  canvasBrushBtn.textContent = isCanvasBrushMode ? '✏️ 기본 모드' : '🖊 브러시 윤곽선';
-  
-  if (isCanvasBrushMode) {
-    document.getElementById('svg').style.display = 'none';
-    brushCanvas.style.display = 'block';
-    brushCanvas.width = window.innerWidth;
-    brushCanvas.height = window.innerHeight;
-    renderCanvasBrush();
-  } else {
-    brushCanvas.style.display = 'none';
-    document.getElementById('svg').style.display = '';
-    // 기본 모드 복원
-    layers.forEach(l => l.style.display = '');
-    strokeSlider.value = 8; displaceSlider.value = 25; freqSlider.value = 0.015; fontSizeSlider.value = 180;
-    strokeSlider.dispatchEvent(new Event('input')); displaceSlider.dispatchEvent(new Event('input'));
-    freqSlider.dispatchEvent(new Event('input')); fontSizeSlider.dispatchEvent(new Event('input'));
-  }
-});
 
 function renderCanvasBrush() {
   const W = brushCanvas.width;
@@ -928,7 +846,7 @@ function interpolateColor(t) {
 
 // 패턴 바꾸기에 Canvas 모드도 연동
 randomBtn.addEventListener('click', () => {
-  if (isCanvasBrushMode) {
+  if (currentMode === 'canvasBrush') {
     brushNoiseSeed = Math.random() * 1000;
     renderCanvasBrush();
   }
@@ -939,12 +857,12 @@ document.querySelectorAll('.controls input[type=range]').forEach(slider => {
   slider.addEventListener('input', () => {
     const valEl = slider.nextElementSibling;
     if (valEl && valEl.classList.contains('val')) valEl.textContent = slider.value;
-    if (isCanvasBrushMode) renderCanvasBrush();
+    if (currentMode === 'canvasBrush') renderCanvasBrush();
   });
 });
 
 window.addEventListener('resize', () => {
-  if (isCanvasBrushMode) {
+  if (currentMode === 'canvasBrush') {
     brushCanvas.width = window.innerWidth;
     brushCanvas.height = window.innerHeight;
     renderCanvasBrush();
