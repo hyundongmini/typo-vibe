@@ -650,8 +650,8 @@ function renderCanvasBrush() {
   const W = brushCanvas.width;
   const H = brushCanvas.height;
   const text = textInput.value || '비정형';
-  const lw = Number(strokeSlider.value);
-  const chromOffset = Number(chromaticSlider.value);
+  const lw = Number(document.getElementById('strokeWidth').value);
+  const chromOffset = Number(document.getElementById('chromatic').value);
   const blurAmount = Number(document.getElementById('blur').value);
   const wanderStr = Number(document.getElementById('wander').value);
   const inertiaVal = Number(document.getElementById('inertia').value);
@@ -935,22 +935,12 @@ randomBtn.addEventListener('click', () => {
 });
 
 // 슬라이더 변경 시 Canvas 모드면 다시 그리기
-[strokeSlider, displaceSlider, chromaticSlider].forEach(slider => {
+document.querySelectorAll('.controls input[type=range]').forEach(slider => {
   slider.addEventListener('input', () => {
+    const valEl = slider.nextElementSibling;
+    if (valEl && valEl.classList.contains('val')) valEl.textContent = slider.value;
     if (isCanvasBrushMode) renderCanvasBrush();
   });
-});
-
-// 새 슬라이더들도 연동
-['blur', 'wander', 'inertia', 'pull', 'sampleStep'].forEach(id => {
-  const el = document.getElementById(id);
-  if (el) {
-    el.addEventListener('input', () => {
-      const valEl = el.nextElementSibling;
-      if (valEl) valEl.textContent = el.value;
-      if (isCanvasBrushMode) renderCanvasBrush();
-    });
-  }
 });
 
 window.addEventListener('resize', () => {
