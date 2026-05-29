@@ -215,6 +215,7 @@
   <label>글자 크기 <input type="range" id="fontSize" min="60" max="400" value="180" step="5"><span class="val" id="sizeVal">180</span></label>
   
   <button id="randomBtn">🎲 패턴 바꾸기</button>
+  <button id="modeBtn">🖌 유기적 모드</button>
 </div>
 
 <script>
@@ -294,6 +295,109 @@ randomBtn.addEventListener('click', () => {
   const newSeed = Math.floor(Math.random() * 1000);
   turbulence.setAttribute('seed', newSeed);
 });
+
+// ============================================
+// 모드 2: 유기적 브러시 모드
+// ============================================
+const modeBtn = document.getElementById('modeBtn');
+let isOrganicMode = false;
+
+modeBtn.addEventListener('click', () => {
+  isOrganicMode = !isOrganicMode;
+  modeBtn.textContent = isOrganicMode ? '✏️ 기본 모드' : '🖌 유기적 모드';
+  
+  if (isOrganicMode) {
+    // 유기적 모드: 두꺼운 선 + 강한 왜곡 + 큰 물결
+    strokeSlider.value = 35;
+    displaceSlider.value = 70;
+    freqSlider.value = 0.01;
+    chromaticSlider.value = 12;
+    fontSizeSlider.value = 280;
+    
+    // 값 적용
+    strokeSlider.dispatchEvent(new Event('input'));
+    displaceSlider.dispatchEvent(new Event('input'));
+    freqSlider.dispatchEvent(new Event('input'));
+    chromaticSlider.dispatchEvent(new Event('input'));
+    fontSizeSlider.dispatchEvent(new Event('input'));
+    
+    // 선 그리기 애니메이션 시작
+    startDrawAnimation();
+  } else {
+    // 기본 모드 복원
+    strokeSlider.value = 8;
+    displaceSlider.value = 25;
+    freqSlider.value = 0.015;
+    chromaticSlider.value = 6;
+    fontSizeSlider.value = 180;
+    
+    strokeSlider.dispatchEvent(new Event('input'));
+    displaceSlider.dispatchEvent(new Event('input'));
+    freqSlider.dispatchEvent(new Event('input'));
+    chromaticSlider.dispatchEvent(new Event('input'));
+    fontSizeSlider.dispatchEvent(new Event('input'));
+    
+    // 애니메이션 제거
+    stopDrawAnimation();
+  }
+});
+
+// ============================================
+// 선 그리기 애니메이션 (stroke-dashoffset)
+// ============================================
+let animFrame = null;
+
+function startDrawAnimation() {
+  // 각 레이어의 총 경로 길이 추정 (텍스트 길이 기반)
+  const pathLength = 3000;
+  
+  layers.forEach((layer, i) => {
+    layer.style.strokeDasharray = pathLength;
+    layer.style.strokeDashoffset = pathLength;
+    layer.style.transition = 'none';
+    
+    // 각 레이어 시차를 두고 그려짐
+    setTimeout(() => {
+      layer.style.transition = `stroke-dashoffset 3s cubic-bezier(0.4, 0, 0.2, 1)`;
+      layer.style.strokeDashoffset = '0';
+    }, i * 400);
+  });
+  
+  // 그려진 후 미세 흔들림 애니메이션
+  setTimeout(() => {
+    animateWobble();
+  }, 3000);
+}
+
+function animateWobble() {
+  let time = 0;
+  
+  function tick() {
+    time += 0.02;
+    // seed를 미세하게 변경해서 흔들림 효과
+    const seed = 42 + Math.sin(time) * 2;
+    turbulence.setAttribute('seed', Math.round(seed));
+    animFrame = requestAnimationFrame(tick);
+  }
+  
+  tick();
+}
+
+function stopDrawAnimation() {
+  if (animFrame) {
+    cancelAnimationFrame(animFrame);
+    animFrame = null;
+  }
+  
+  layers.forEach(layer => {
+    layer.style.strokeDasharray = 'none';
+    layer.style.strokeDashoffset = '0';
+    layer.style.transition = 'none';
+  });
+  
+  // seed 복원
+  turbulence.setAttribute('seed', '42');
+}
 </script>
 
 </body>
