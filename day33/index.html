@@ -367,6 +367,8 @@ function switchMode(mode) {
     layers[0].style.display = 'none'; layers[1].style.display = 'none'; layers[2].style.display = 'none';
     layers[3].setAttribute('stroke-width', '134');
     layers[3].setAttribute('stroke', 'url(#brushGradient)');
+    layers[3].style.strokeDasharray = 'none';
+    layers[3].style.strokeDashoffset = '0';
     displacement.setAttribute('scale', '52'); turbulence.setAttribute('baseFrequency', '0.014');
     fontSizeSlider.value = 250; layers[3].setAttribute('font-size', '250');
     strokeSlider.value = 134;
@@ -375,12 +377,6 @@ function switchMode(mode) {
     document.getElementById('displaceVal').textContent = '52';
     document.getElementById('freqVal').textContent = '0.014';
     document.getElementById('sizeVal').textContent = '250';
-    const pathLength = 4000;
-    layers[3].style.strokeDasharray = pathLength;
-    layers[3].style.strokeDashoffset = pathLength;
-    layers[3].style.transition = 'none';
-    setTimeout(() => { layers[3].style.transition = 'stroke-dashoffset 4s cubic-bezier(0.4, 0, 0.2, 1)'; layers[3].style.strokeDashoffset = '0'; }, 100);
-    setTimeout(() => animateWobble(), 4000);
   }
   else if (mode === 'outline') {
     // SVG text를 stroke만으로 표시 (fill 없이)
