@@ -231,7 +231,6 @@
   <button id="randomBtn">🎲 패턴 바꾸기</button>
   <div style="display:flex;gap:4px;margin-top:4px;">
     <button id="dlPng">📥 PNG</button>
-    <button id="dlSvg">📥 SVG</button>
   </div>
 </div>
 
@@ -1103,21 +1102,6 @@ document.getElementById('dlPng').addEventListener('click', () => {
       URL.revokeObjectURL(url);
     };
     img.src = url;
-  }
-});
-
-document.getElementById('dlSvg').addEventListener('click', () => {
-  if (currentMode === 'canvasBrush') {
-    alert('브러시 모드는 Canvas 기반이라 SVG 내보내기가 불가합니다. PNG를 사용해주세요.');
-  } else {
-    // SVG 모드: SVG 직접 다운로드 (배경 없이)
-    const svgEl = document.getElementById('svg');
-    const svgData = new XMLSerializer().serializeToString(svgEl);
-    const blob = new Blob([svgData], { type: 'image/svg+xml' });
-    const link = document.createElement('a');
-    link.download = `brush-typo-${Date.now()}.svg`;
-    link.href = URL.createObjectURL(blob);
-    link.click();
   }
 });
 
