@@ -208,21 +208,21 @@
   <label>텍스트</label>
   <input type="text" id="textInput" value="비정형" placeholder="텍스트 입력">
   
-  <label>선 굵기 <input type="range" id="strokeWidth" min="1" max="20" value="8" step="0.5"><span class="val" id="strokeVal">8</span></label>
+  <label data-modes="organic,gradient,canvasBrush">선 굵기 <input type="range" id="strokeWidth" min="1" max="20" value="8" step="0.5"><span class="val" id="strokeVal">8</span></label>
   
-  <label>비정형 강도 <input type="range" id="displace" min="0" max="80" value="25" step="1"><span class="val" id="displaceVal">25</span></label>
+  <label data-modes="organic,gradient,outline">비정형 강도 <input type="range" id="displace" min="0" max="80" value="25" step="1"><span class="val" id="displaceVal">25</span></label>
   
-  <label>노이즈 촘촘함 <input type="range" id="frequency" min="0.005" max="0.08" value="0.015" step="0.001"><span class="val" id="freqVal">0.015</span></label>
+  <label data-modes="organic,gradient,outline">노이즈 촘촘함 <input type="range" id="frequency" min="0.005" max="0.08" value="0.015" step="0.001"><span class="val" id="freqVal">0.015</span></label>
   
-  <label>색수차 간격 <input type="range" id="chromatic" min="0" max="20" value="6" step="0.5"><span class="val" id="chromVal">6</span></label>
+  <label data-modes="organic,canvasBrush">색수차 간격 <input type="range" id="chromatic" min="0" max="20" value="6" step="0.5"><span class="val" id="chromVal">6</span></label>
   
-  <label>글자 크기 <input type="range" id="fontSize" min="60" max="400" value="180" step="5"><span class="val" id="sizeVal">180</span></label>
+  <label data-modes="organic,gradient">글자 크기 <input type="range" id="fontSize" min="60" max="400" value="180" step="5"><span class="val" id="sizeVal">180</span></label>
   
-  <label>번짐 <input type="range" id="blur" min="0" max="8" value="0" step="0.5"><span class="val" id="blurVal">0</span></label>
-  <label>이탈강도 <input type="range" id="wander" min="0" max="5" value="1" step="0.1"><span class="val" id="wanderVal">1</span></label>
-  <label>관성 <input type="range" id="inertia" min="1" max="30" value="8" step="1"><span class="val" id="inertiaVal2">8</span></label>
-  <label>복귀력 <input type="range" id="pull" min="0.01" max="1" value="0.3" step="0.01"><span class="val" id="pullVal">0.3</span></label>
-  <label>샘플 간격 <input type="range" id="sampleStep" min="1" max="8" value="3" step="1"><span class="val" id="stepVal">3</span></label>
+  <label data-modes="canvasBrush">번짐 <input type="range" id="blur" min="0" max="8" value="0" step="0.5"><span class="val" id="blurVal">0</span></label>
+  <label data-modes="canvasBrush">이탈강도 <input type="range" id="wander" min="0" max="5" value="1" step="0.1"><span class="val" id="wanderVal">1</span></label>
+  <label data-modes="canvasBrush">관성 <input type="range" id="inertia" min="1" max="30" value="8" step="1"><span class="val" id="inertiaVal2">8</span></label>
+  <label data-modes="canvasBrush">복귀력 <input type="range" id="pull" min="0.01" max="1" value="0.3" step="0.01"><span class="val" id="pullVal">0.3</span></label>
+  <label data-modes="canvasBrush">샘플 간격 <input type="range" id="sampleStep" min="1" max="8" value="3" step="1"><span class="val" id="stepVal">3</span></label>
   
   <div class="modes">
     <button id="modeBtn" class="active">🖌 유기적</button>
@@ -339,6 +339,12 @@ function switchMode(mode) {
   
   currentMode = mode;
   
+  // 슬라이더 표시/숨김
+  document.querySelectorAll('.controls label[data-modes]').forEach(label => {
+    const modes = label.dataset.modes.split(',');
+    label.style.display = modes.includes(mode) ? '' : 'none';
+  });
+  
   // 새 모드 적용
   if (mode === 'default') {
     strokeSlider.value = 8; displaceSlider.value = 25; freqSlider.value = 0.015; fontSizeSlider.value = 180;
@@ -381,6 +387,9 @@ document.getElementById('modeBtn').addEventListener('click', () => switchMode('o
 document.getElementById('gradModeBtn').addEventListener('click', () => switchMode('gradient'));
 document.getElementById('outlineModeBtn').addEventListener('click', () => switchMode('outline'));
 document.getElementById('canvasBrushBtn').addEventListener('click', () => switchMode('canvasBrush'));
+
+// 초기 모드 적용
+switchMode('organic');
 
 // ============================================
 // 선 그리기 애니메이션 (stroke-dashoffset)
