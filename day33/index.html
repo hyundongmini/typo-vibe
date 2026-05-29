@@ -208,7 +208,7 @@
   <label>텍스트</label>
   <input type="text" id="textInput" value="비정형" placeholder="텍스트 입력">
   
-  <label data-modes="organic,gradient,canvasBrush">선 굵기 <input type="range" id="strokeWidth" min="1" max="50" value="8" step="0.5"><span class="val" id="strokeVal">8</span></label>
+  <label data-modes="organic,gradient,canvasBrush">선 굵기 <input type="range" id="strokeWidth" min="1" max="150" value="8" step="1"><span class="val" id="strokeVal">8</span></label>
   
   <label data-modes="organic,gradient,outline">비정형 강도 <input type="range" id="displace" min="0" max="80" value="25" step="1"><span class="val" id="displaceVal">25</span></label>
   
@@ -359,13 +359,13 @@ function switchMode(mode) {
   }
   else if (mode === 'gradient') {
     layers[0].style.display = 'none'; layers[1].style.display = 'none'; layers[2].style.display = 'none';
-    layers[3].setAttribute('stroke-width', '40');
+    layers[3].setAttribute('stroke-width', '100');
     layers[3].setAttribute('stroke', 'url(#brushGradient)');
     displacement.setAttribute('scale', '70'); turbulence.setAttribute('baseFrequency', '0.01');
     fontSizeSlider.value = 280; layers[3].setAttribute('font-size', '280');
-    strokeSlider.value = 20;
+    strokeSlider.value = 100;
     displaceSlider.value = 70; freqSlider.value = 0.01;
-    document.getElementById('strokeVal').textContent = '20';
+    document.getElementById('strokeVal').textContent = '100';
     document.getElementById('displaceVal').textContent = '70';
     document.getElementById('freqVal').textContent = '0.01';
     document.getElementById('sizeVal').textContent = '280';
