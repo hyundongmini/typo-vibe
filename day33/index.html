@@ -225,8 +225,7 @@
   <label>샘플 간격 <input type="range" id="sampleStep" min="1" max="8" value="3" step="1"><span class="val" id="stepVal">3</span></label>
   
   <div class="modes">
-    <button id="mode-default" class="active">기본</button>
-    <button id="modeBtn">🖌 유기적</button>
+    <button id="modeBtn" class="active">🖌 유기적</button>
     <button id="gradModeBtn">🌈 그라데이션</button>
     <button id="outlineModeBtn">✍️ 윤곽선</button>
     <button id="canvasBrushBtn">🖊 브러시</button>
@@ -317,7 +316,7 @@ randomBtn.addEventListener('click', () => {
 // 모드 전환 (라디오 방식 - 하나만 활성)
 // ============================================
 const modeButtons = document.querySelectorAll('.modes button');
-let currentMode = 'default';
+let currentMode = 'organic';
 
 function switchMode(mode) {
   // 이전 모드 정리
@@ -332,7 +331,7 @@ function switchMode(mode) {
   
   // 버튼 활성 표시
   modeButtons.forEach(b => b.classList.remove('active'));
-  document.getElementById(mode === 'default' ? 'mode-default' : 
+  document.getElementById(
     mode === 'organic' ? 'modeBtn' :
     mode === 'gradient' ? 'gradModeBtn' :
     mode === 'outline' ? 'outlineModeBtn' : 'canvasBrushBtn'
@@ -377,8 +376,7 @@ function switchMode(mode) {
   }
 }
 
-// 버튼 이벤트
-document.getElementById('mode-default').addEventListener('click', () => switchMode('default'));
+// 버튼 이벤트 (기본 모드 버튼 없음 - 첫 모드가 기본)
 document.getElementById('modeBtn').addEventListener('click', () => switchMode('organic'));
 document.getElementById('gradModeBtn').addEventListener('click', () => switchMode('gradient'));
 document.getElementById('outlineModeBtn').addEventListener('click', () => switchMode('outline'));
