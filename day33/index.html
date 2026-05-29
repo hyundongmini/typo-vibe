@@ -229,6 +229,10 @@
     <button id="canvasBrushBtn">🖊 브러시</button>
   </div>
   <button id="randomBtn">🎲 패턴 바꾸기</button>
+  <div style="display:flex;gap:4px;margin-top:4px;">
+    <button id="dlPng">📥 PNG</button>
+    <button id="dlSvg">📥 SVG</button>
+  </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/opentype.js@1.3.4/dist/opentype.min.js"></script>
@@ -441,7 +445,8 @@ function switchMode(mode) {
     document.getElementById('pull').value = 0.11;
     document.getElementById('pullVal').textContent = '0.11';
     
-    renderCanvasBrush();
+    // 그리기 모션: 점진적으로 윤곽선 그리기
+    renderCanvasBrushAnimated();
   }
 }
 
@@ -950,9 +955,80 @@ function interpolateColor(t) {
 randomBtn.addEventListener('click', () => {
   if (currentMode === 'canvasBrush') {
     brushNoiseSeed = Math.random() * 1000;
-    renderCanvasBrush();
+    renderCanvasBrushAnimated();
   }
 });
+
+// ============================================
+// 브러시 모드 그리기 모션 (점진적으로 그려짐)
+// ============================================
+let brushAnimFrame = null;
+
+function renderCanvasBrushAnimated() {
+  if (brushAnimFrame) cancelAnimationFrame(brushAnimFrame);
+  
+  const bc = document.getElementById('brushCanvas');
+  const W = bc.width;
+  const H = bc.height;
+  const text = document.getElementById('textInput').value || '비정형';
+  const lw = Number(document.getElementById('strokeWidth').value);
+  const chromOffset = Number(document.getElementById('chromatic').value);
+  const wanderStr = Number(document.getElementById('wander').value);
+  const inertiaVal = Number(document.getElementById('inertia').value);
+  const pullStr = Number(document.getElementById('pull').value);
+  
+  const contours = extractBrushContours(text, W, H, 1);
+  
+  // 전체 포인트 수 계산
+  let totalPoints = 0;
+  contours.forEach(c => totalPoints += c.length);
+  
+  let drawnPoints = 0;
+  const speed = Math.max(20, Math.floor(totalPoints / 60)); // ~60프레임에 완성
+  
+  const bCtx2 = bc.getContext('2d');
+  bCtx2.fillStyle = '#0a0a0a';
+  bCtx2.fillRect(0, 0, W, H);
+  
+  const layersCfg = [
+    { dx: -chromOffset, dy: -chromOffset * 0.8, alpha: 0.7 },
+    { dx: chromOffset, dy: chromOffset * 0.8, alpha: 0.7 },
+    { dx: 0, dy: 0, alpha: 0.9 },
+  ];
+  
+  function drawFrame() {
+    drawnPoints += speed;
+    
+    bCtx2.fillStyle = '#0a0a0a';
+    bCtx2.fillRect(0, 0, W, H);
+    
+    let pointsLeft = drawnPoints;
+    
+    layersCfg.forEach(layer => {
+      bCtx2.save();
+      bCtx2.translate(layer.dx, layer.dy);
+      bCtx2.globalAlpha = layer.alpha;
+      
+      let remaining = drawnPoints;
+      contours.forEach(contour => {
+        const drawCount = Math.min(contour.length, remaining);
+        if (drawCount > 1) {
+          drawAgentContour(bCtx2, contour.slice(0, drawCount), lw, wanderStr, inertiaVal, pullStr);
+        }
+        remaining -= contour.length;
+        if (remaining <= 0) return;
+      });
+      
+      bCtx2.restore();
+    });
+    
+    if (drawnPoints < totalPoints) {
+      brushAnimFrame = requestAnimationFrame(drawFrame);
+    }
+  }
+  
+  drawFrame();
+}
 
 // 슬라이더 변경 시 Canvas 모드면 다시 그리기
 document.querySelectorAll('.controls input[type=range]').forEach(slider => {
@@ -961,6 +1037,77 @@ document.querySelectorAll('.controls input[type=range]').forEach(slider => {
     if (valEl && valEl.classList.contains('val')) valEl.textContent = slider.value;
     if (currentMode === 'canvasBrush') renderCanvasBrush();
   });
+});
+
+// ============================================
+// 다운로드 기능
+// ============================================
+document.getElementById('dlPng').addEventListener('click', () => {
+  if (currentMode === 'canvasBrush') {
+    // Canvas 모드: 직접 다운로드
+    const bc = document.getElementById('brushCanvas');
+    const link = document.createElement('a');
+    link.download = `brush-typo-${Date.now()}.png`;
+    link.href = bc.toDataURL('image/png');
+    link.click();
+  } else {
+    // SVG 모드: SVG를 Canvas에 그려서 PNG로
+    const svgEl = document.getElementById('svg');
+    const svgData = new XMLSerializer().serializeToString(svgEl);
+    const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(svgBlob);
+    
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 2400;
+      canvas.height = 1600;
+      const ctx2 = canvas.getContext('2d');
+      ctx2.fillStyle = '#0a0a0a';
+      ctx2.fillRect(0, 0, 2400, 1600);
+      ctx2.drawImage(img, 0, 0, 2400, 1600);
+      
+      const link = document.createElement('a');
+      link.download = `brush-typo-${Date.now()}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+      URL.revokeObjectURL(url);
+    };
+    img.src = url;
+  }
+});
+
+document.getElementById('dlSvg').addEventListener('click', () => {
+  if (currentMode === 'canvasBrush') {
+    // Canvas 모드: Canvas를 SVG image로 감싸서 다운로드
+    const bc = document.getElementById('brushCanvas');
+    const dataUrl = bc.toDataURL('image/png');
+    const svgStr = `<svg xmlns="http://www.w3.org/2000/svg" width="${bc.width}" height="${bc.height}">
+      <image href="${dataUrl}" width="${bc.width}" height="${bc.height}"/>
+    </svg>`;
+    const blob = new Blob([svgStr], { type: 'image/svg+xml' });
+    const link = document.createElement('a');
+    link.download = `brush-typo-${Date.now()}.svg`;
+    link.href = URL.createObjectURL(blob);
+    link.click();
+  } else {
+    // SVG 모드: SVG 직접 다운로드
+    const svgEl = document.getElementById('svg');
+    const clone = svgEl.cloneNode(true);
+    // 배경 추가
+    const bg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    bg.setAttribute('width', '1200');
+    bg.setAttribute('height', '800');
+    bg.setAttribute('fill', '#0a0a0a');
+    clone.insertBefore(bg, clone.firstChild);
+    
+    const svgData = new XMLSerializer().serializeToString(clone);
+    const blob = new Blob([svgData], { type: 'image/svg+xml' });
+    const link = document.createElement('a');
+    link.download = `brush-typo-${Date.now()}.svg`;
+    link.href = URL.createObjectURL(blob);
+    link.click();
+  }
 });
 
 window.addEventListener('resize', () => {
