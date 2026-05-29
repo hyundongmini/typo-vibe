@@ -789,7 +789,23 @@ function extractBrushContours(text, W, H, step) {
     
     // 짧은 윤곽선 필터 + 직선 필터
     if (contour.length > 15) {
-      contours.push(contour);
+      // 직선 비율 체크: 시작점~끝점 직선거리 vs 실제 경로 길이
+      const startEnd = Math.sqrt(
+        (contour[0][0] - contour[contour.length-1][0])**2 + 
+        (contour[0][1] - contour[contour.length-1][1])**2
+      );
+      let pathLen = 0;
+      for (let i = 1; i < contour.length; i++) {
+        pathLen += Math.sqrt(
+          (contour[i][0] - contour[i-1][0])**2 + 
+          (contour[i][1] - contour[i-1][1])**2
+        );
+      }
+      // 직선 비율이 0.85 이상이면 (거의 직선) 스킵
+      const straightRatio = startEnd / Math.max(pathLen, 1);
+      if (straightRatio < 0.85) {
+        contours.push(contour);
+      }
     }
   }
   
