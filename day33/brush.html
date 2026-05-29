@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>브러시 윤곽선 타이포</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    min-height: 100vh;
+    background: #0a0a0a;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: system-ui, sans-serif;
+    overflow: hidden;
+  }
+  #mainCanvas {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+  }
+  .controls {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    background: rgba(0,0,0,0.8);
+    color: #fff;
+    padding: 14px 18px;
+    border-radius: 10px;
+    font-size: 11px;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 200px;
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255,255,255,0.1);
+  }
+  .controls h3 { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; opacity: 0.5; margin-bottom: 4px; }
+  .controls label { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .controls input[type=range] { flex: 1; height: 4px; }
+  .controls input[type=text] { width: 100%; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #fff; padding: 6px 8px; border-radius: 4px; font-size: 12px; outline: none; }
+  .controls .val { font-variant-numeric: tabular-nums; min-width: 28px; text-align: right; opacity: 0.6; }
+  .controls button { padding: 6px 12px; background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.2); color: #fff; border-radius: 4px; cursor: pointer; font-size: 11px; }
+  .controls button:hover { background: rgba(255,255,255,0.25); }
+</style>
+</head>
+<body>
+
+<canvas id="mainCanvas"></canvas>
+
+<div class="controls">
+  <h3>브러시 윤곽선 타이포</h3>
+  <label>텍스트</label>
+  <input type="text" id="textInput" value="비정형" placeholder="텍스트 입력">
+  <label>선 굵기 <input type="range" id="lineWidth" min="1" max="12" value="4" step="0.5"><span class="val" id="lwVal">4</span></label>
+  <label>노이즈 강도 <input type="range" id="noise" min="0" max="15" value="4" step="0.5"><span class="val" id="noiseVal">4</span></label>
+  <label>색수차 간격 <input type="range" id="chromatic" min="0" max="20" value="5" step="1"><span class="val" id="chromVal">5</span></label>
+  <label>샘플 간격 <input type="range" id="sampleStep" min="1" max="8" value="3" step="1"><span class="val" id="stepVal">3</span></label>
+  <button id="randomBtn">🎲 패턴 바꾸기</button>
+  <button id="bgBtn">⬜ 배경 토글</button>
+</div>
+
+<script>
+// ============================================
+// CONFIG
+// ============================================
+let CONFIG = {
+  text: '비정형',
+  lineWidth: 4,
+  noiseStrength: 4,
+  chromaticOffset: 5,
+  sampleStep: 3,
+  bgDark: true,
+  noiseSeed: 0,
+};
+
+const mainCanvas = document.getElementById('mainCanvas');
+const ctx = mainCanvas.getContext('2d');
+
+// 화면 크기 설정
+function resize() {
+  mainCanvas.width = window.innerWidth;
+  mainCanvas.height = window.innerHeight;
+  render();
+}
+window.addEventListener('resize', resize);
+
+// ============================================
+// STEP 1: Contour Tracing - 글자 윤곽선 좌표를 순서대로 추출
+// ============================================
+function extractContours(text) {
+  // 임시 캔버스에 글자 그리기
+  const tmpCanvas = document.createElement('canvas');
+  const W = mainCanvas.width;
+  const H = mainCanvas.height;
+  tmpCanvas.width = W;
+  tmpCanvas.height = H;
+  const tmpCtx = tmpCanvas.getContext('2d');
+  
+  tmpCtx.clearRect(0, 0, W, H);
+  tmpCtx.fillStyle = '#000';
+  tmpCtx.font = `900 ${Math.min(W * 0.25, 300)}px "Arial Black", Impact, sans-serif`;
+  tmpCtx.textAlign = 'center';
+  tmpCtx.textBaseline = 'middle';
+  tmpCtx.fillText(text, W / 2, H / 2);
+  
+  const imageData = tmpCtx.getImageData(0, 0, W, H);
+  const data = imageData.data;
+  const step = CONFIG.sampleStep;
+  
+  // 픽셀이 글자 영역인지 확인
+  function isInside(x, y) {
+    if (x < 0 || x >= W || y < 0 || y >= H) return false;
+    return data[(y * W + x) * 4 + 3] > 128;
+  }
+  
+  // 경계 픽셀인지 확인 (안쪽이면서 이웃 중 바깥이 있음)
+  function isBorder(x, y) {
+    if (!isInside(x, y)) return false;
+    return !isInside(x-step, y) || !isInside(x+step, y) || 
+           !isInside(x, y-step) || !isInside(x, y+step);
+  }
+  
+  // 모든 경계 픽셀 수집
+  const borderPixels = new Set();
+  const borderList = [];
+  
+  for (let y = 0; y < H; y += step) {
+    for (let x = 0; x < W; x += step) {
+      if (isBorder(x, y)) {
+        const key = `${x},${y}`;
+        borderPixels.add(key);
+        borderList.push([x, y]);
+      }
+    }
+  }
+  
+  // Contour Tracing: 이웃 픽셀을 따라가며 순서대로 정렬
+  const contours = [];
+  const visited = new Set();
+  
+  // 8방향 이웃
+  const dirs = [
+    [step, 0], [step, step], [0, step], [-step, step],
+    [-step, 0], [-step, -step], [0, -step], [step, -step]
+  ];
+  
+  for (const [sx, sy] of borderList) {
+    const startKey = `${sx},${sy}`;
+    if (visited.has(startKey)) continue;
+    
+    // 새 윤곽선 시작
+    const contour = [];
+    let cx = sx, cy = sy;
+    
+    for (let i = 0; i < 10000; i++) { // 무한루프 방지
+      const key = `${cx},${cy}`;
+      if (visited.has(key) && contour.length > 2) break;
+      
+      visited.add(key);
+      contour.push([cx, cy]);
+      
+      // 다음 이웃 찾기
+      let found = false;
+      for (const [dx, dy] of dirs) {
+        const nx = cx + dx;
+        const ny = cy + dy;
+        const nKey = `${nx},${ny}`;
+        if (borderPixels.has(nKey) && !visited.has(nKey)) {
+          cx = nx;
+          cy = ny;
+          found = true;
+          break;
+        }
+      }
+      
+      if (!found) break;
+    }
+    
+    // 최소 길이 필터
+    if (contour.length > 10) {
+      contours.push(contour);
+    }
+  }
+  
+  return contours;
+}
+
+// ============================================
+// 간단한 Perlin-like 노이즈
+// ============================================
+function noise2D(x, y, seed) {
+  const n = Math.sin(x * 12.9898 + y * 78.233 + seed * 43.12) * 43758.5453;
+  return (n - Math.floor(n)) * 2 - 1; // -1 ~ 1
+}
+
+// ============================================
+// STEP 2~5: 윤곽선을 브러시로 그리기
+// ============================================
+function drawBrushContours(contours) {
+  const W = mainCanvas.width;
+  const H = mainCanvas.height;
+  
+  // 배경
+  ctx.fillStyle = CONFIG.bgDark ? '#0a0a0a' : '#ffffff';
+  ctx.fillRect(0, 0, W, H);
+  
+  // 색수차 레이어 설정
+  const layers = [
+    { dx: -CONFIG.chromaticOffset, dy: -CONFIG.chromaticOffset * 0.8, color1: '#0066ff', color2: '#0044aa', alpha: 0.7 },
+    { dx: CONFIG.chromaticOffset, dy: CONFIG.chromaticOffset * 0.8, color1: '#00cc44', color2: '#009933', alpha: 0.7 },
+    { dx: 0, dy: 0, color1: '#ff88cc', color2: '#fceeff', alpha: 0.9 },
+  ];
+  
+  // 각 레이어별로 그리기
+  layers.forEach(layer => {
+    ctx.save();
+    ctx.translate(layer.dx, layer.dy);
+    ctx.globalAlpha = layer.alpha;
+    
+    contours.forEach(contour => {
+      drawSingleContour(contour, layer.color1, layer.color2);
+    });
+    
+    ctx.restore();
+  });
+}
+
+function drawSingleContour(contour, color1, color2) {
+  const gradColors = ['#0085ff', '#fceeff', '#39ff4a'];
+  
+  for (let i = 0; i < contour.length - 1; i++) {
+    const [x1, y1] = contour[i];
+    const [x2, y2] = contour[i + 1];
+    
+    // 진행 방향 계산
+    const angle = Math.atan2(y2 - y1, x2 - x1);
+    const segLen = Math.sqrt((x2-x1)**2 + (y2-y1)**2);
+    
+    if (segLen < 0.5) continue;
+    
+    // 노이즈로 좌표 떨림
+    const ns = CONFIG.noiseStrength;
+    const nx1 = x1 + noise2D(x1 * 0.1, y1 * 0.1, CONFIG.noiseSeed) * ns;
+    const ny1 = y1 + noise2D(x1 * 0.1 + 100, y1 * 0.1, CONFIG.noiseSeed) * ns;
+    const nx2 = x2 + noise2D(x2 * 0.1, y2 * 0.1, CONFIG.noiseSeed) * ns;
+    const ny2 = y2 + noise2D(x2 * 0.1 + 100, y2 * 0.1, CONFIG.noiseSeed) * ns;
+    
+    // 선분 방향에 맞는 그라데이션 생성
+    const gradLen = 20;
+    const perpX = Math.cos(angle + Math.PI/2) * gradLen;
+    const perpY = Math.sin(angle + Math.PI/2) * gradLen;
+    const midX = (nx1 + nx2) / 2;
+    const midY = (ny1 + ny2) / 2;
+    
+    const grad = ctx.createLinearGradient(
+      midX - perpX, midY - perpY,
+      midX + perpX, midY + perpY
+    );
+    
+    // 그라데이션 색상 (진행도에 따라 변화)
+    const t = i / contour.length;
+    const ci = Math.floor(t * (gradColors.length - 1));
+    const ct = (t * (gradColors.length - 1)) - ci;
+    
+    grad.addColorStop(0, gradColors[ci % gradColors.length]);
+    grad.addColorStop(0.5, gradColors[(ci + 1) % gradColors.length]);
+    grad.addColorStop(1, gradColors[(ci + 2) % gradColors.length]);
+    
+    // lineWidth 노이즈 변동
+    const lw = CONFIG.lineWidth + noise2D(i * 0.3, 0, CONFIG.noiseSeed) * (CONFIG.lineWidth * 0.5);
+    
+    // 선분 그리기
+    ctx.beginPath();
+    ctx.moveTo(nx1, ny1);
+    ctx.lineTo(nx2, ny2);
+    ctx.strokeStyle = grad;
+    ctx.lineWidth = Math.max(0.5, lw);
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.stroke();
+  }
+}
+
+// ============================================
+// 렌더
+// ============================================
+function render() {
+  const contours = extractContours(CONFIG.text);
+  drawBrushContours(contours);
+}
+
+// ============================================
+// 컨트롤
+// ============================================
+document.getElementById('textInput').addEventListener('input', (e) => {
+  CONFIG.text = e.target.value || '비정형';
+  render();
+});
+
+document.getElementById('lineWidth').addEventListener('input', (e) => {
+  CONFIG.lineWidth = Number(e.target.value);
+  document.getElementById('lwVal').textContent = e.target.value;
+  render();
+});
+
+document.getElementById('noise').addEventListener('input', (e) => {
+  CONFIG.noiseStrength = Number(e.target.value);
+  document.getElementById('noiseVal').textContent = e.target.value;
+  render();
+});
+
+document.getElementById('chromatic').addEventListener('input', (e) => {
+  CONFIG.chromaticOffset = Number(e.target.value);
+  document.getElementById('chromVal').textContent = e.target.value;
+  render();
+});
+
+document.getElementById('sampleStep').addEventListener('input', (e) => {
+  CONFIG.sampleStep = Number(e.target.value);
+  document.getElementById('stepVal').textContent = e.target.value;
+  render();
+});
+
+document.getElementById('randomBtn').addEventListener('click', () => {
+  CONFIG.noiseSeed = Math.random() * 1000;
+  render();
+});
+
+document.getElementById('bgBtn').addEventListener('click', () => {
+  CONFIG.bgDark = !CONFIG.bgDark;
+  document.getElementById('bgBtn').textContent = CONFIG.bgDark ? '⬜ 배경 토글' : '⬛ 배경 토글';
+  render();
+});
+
+// 초기 렌더
+resize();
+</script>
+
+</body>
+</html>
