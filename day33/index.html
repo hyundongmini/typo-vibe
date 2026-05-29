@@ -929,7 +929,7 @@ function getCanvasOutlinePath(text) {
   // Contour Tracing으로 윤곽선 추출
   const imageData = ctx.getImageData(0, 0, W, H);
   const data = imageData.data;
-  const step = 3;
+  const step = 2;
   
   function isInside(x, y) {
     if (x < 0 || x >= W || y < 0 || y >= H) return false;
@@ -965,7 +965,7 @@ function getCanvasOutlinePath(text) {
     let cx = sx, cy = sy;
     let prevDir = 0;
     
-    for (let iter = 0; iter < 20000; iter++) {
+    for (let iter = 0; iter < 30000; iter++) {
       const key = `${cx},${cy}`;
       if (visited.has(key) && contour.length > 4) break;
       visited.add(key);
@@ -986,10 +986,10 @@ function getCanvasOutlinePath(text) {
       if (!found) break;
     }
     
-    // 최소 길이 필터
-    if (contour.length > 20) {
+    // 최소 길이만 필터 (직선 필터 없음)
+    if (contour.length > 8) {
       pathStr += ' M ' + contour.map(p => `${p[0]} ${p[1]}`).join(' L ');
-      pathStr += ' Z'; // 닫기
+      pathStr += ' Z';
     }
   }
   
