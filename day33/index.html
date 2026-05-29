@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>비정형 브러시 타이포</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    min-height: 100vh;
+    background: #0a0a0a;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-family: system-ui, sans-serif;
+    overflow: hidden;
+  }
+
+  svg {
+    width: 100vw;
+    height: 100vh;
+    position: fixed;
+    top: 0;
+    left: 0;
+  }
+
+  /* 컨트롤 패널 */
+  .controls {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    background: rgba(0,0,0,0.8);
+    color: #fff;
+    padding: 14px 18px;
+    border-radius: 10px;
+    font-size: 11px;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 200px;
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255,255,255,0.1);
+  }
+  .controls h3 {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    opacity: 0.5;
+    margin-bottom: 4px;
+  }
+  .controls label {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+  }
+  .controls input[type=range] { flex: 1; height: 4px; }
+  .controls input[type=text] {
+    width: 100%;
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.2);
+    color: #fff;
+    padding: 6px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    outline: none;
+  }
+  .controls .val {
+    font-variant-numeric: tabular-nums;
+    min-width: 28px;
+    text-align: right;
+    opacity: 0.6;
+  }
+  .controls button {
+    padding: 6px 12px;
+    background: rgba(255,255,255,0.15);
+    border: 1px solid rgba(255,255,255,0.2);
+    color: #fff;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 11px;
+  }
+  .controls button:hover { background: rgba(255,255,255,0.25); }
+</style>
+</head>
+<body>
+
+<!-- ============================================
+  SVG 구조:
+  1. <defs>에 feTurbulence + feDisplacementMap 필터 정의
+  2. 4개 텍스트 레이어를 각각 다른 색/오프셋으로 겹침
+  3. 결과: 색수차 + 비정형 브러시 효과
+============================================ -->
+<svg id="svg" viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid meet">
+  <defs>
+    <!-- 
+      feTurbulence: Perlin noise 생성
+      - type="turbulence": 더 거친 패턴 (fractalNoise보다 날카로움)
+      - baseFrequency: 노이즈 촘촘함 (작을수록 큰 물결, 클수록 잔잔)
+      - numOctaves: 디테일 레이어 수
+      - seed: 패턴 시드 (바꾸면 완전히 다른 모양)
+      
+      feDisplacementMap: 노이즈를 이용해 이미지 왜곡
+      - in: 왜곡할 대상 (SourceGraphic = 텍스트)
+      - in2: 왜곡 맵 (위에서 만든 noise)
+      - scale: 왜곡 강도 (클수록 더 구불구불)
+      - xChannelSelector/yChannelSelector: R/G 채널로 X/Y축 왜곡
+    -->
+    <filter id="brush-filter" x="-20%" y="-20%" width="140%" height="140%">
+      <feTurbulence 
+        id="turbulence"
+        type="turbulence" 
+        baseFrequency="0.015" 
+        numOctaves="3" 
+        seed="42" 
+        result="noise"/>
+      <feDisplacementMap 
+        id="displacement"
+        in="SourceGraphic" 
+        in2="noise" 
+        scale="25" 
+        xChannelSelector="R" 
+        yChannelSelector="G"/>
+    </filter>
+
+    <!-- 그라데이션: 파랑 → 흰 → 초록 (세로 방향) -->
+    <linearGradient id="brushGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#0085ff"/>
+      <stop offset="50%" stop-color="#fceeff"/>
+      <stop offset="100%" stop-color="#39ff4a"/>
+    </linearGradient>
+  </defs>
+
+  <!-- 
+    레이어 구성 (뒤에서 앞으로):
+    1. 파랑 레이어: 왼쪽 위로 offset → 색수차의 "파랑 채널"
+    2. 초록 레이어: 오른쪽 아래로 offset → 색수차의 "초록 채널"
+    3. 핑크/메인 레이어: 중앙 → 주 색상
+    4. 그라데이션 레이어: 중앙, 얇은 선 → 디테일/하이라이트
+  -->
+  <g filter="url(#brush-filter)">
+    <!-- 레이어 1: 파랑 (뒤쪽, 두꺼운 선, 왼쪽위 offset) -->
+    <text id="layer1" 
+          x="600" y="420" 
+          text-anchor="middle" 
+          font-family="'Arial Black', 'Impact', sans-serif"
+          font-size="180" 
+          font-weight="900"
+          fill="none" 
+          stroke="#0066ff" 
+          stroke-width="8"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          transform="translate(-6,-5)">비정형</text>
+
+    <!-- 레이어 2: 초록 (중간, 중간 선, 오른쪽아래 offset) -->
+    <text id="layer2" 
+          x="600" y="420" 
+          text-anchor="middle" 
+          font-family="'Arial Black', 'Impact', sans-serif"
+          font-size="180" 
+          font-weight="900"
+          fill="none" 
+          stroke="#00cc44" 
+          stroke-width="5"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          transform="translate(6,5)">비정형</text>
+
+    <!-- 레이어 3: 핑크/메인 (앞쪽, 중간 선, 중앙) -->
+    <text id="layer3" 
+          x="600" y="420" 
+          text-anchor="middle" 
+          font-family="'Arial Black', 'Impact', sans-serif"
+          font-size="180" 
+          font-weight="900"
+          fill="none" 
+          stroke="#ff3388" 
+          stroke-width="5"
+          stroke-linecap="round"
+          stroke-linejoin="round">비정형</text>
+
+    <!-- 레이어 4: 그라데이션 (최상단, 얇은 선, 디테일) -->
+    <text id="layer4" 
+          x="600" y="420" 
+          text-anchor="middle" 
+          font-family="'Arial Black', 'Impact', sans-serif"
+          font-size="180" 
+          font-weight="900"
+          fill="none" 
+          stroke="url(#brushGradient)" 
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round">비정형</text>
+  </g>
+</svg>
+
+<!-- 컨트롤 패널 -->
+<div class="controls">
+  <h3>비정형 브러시 타이포</h3>
+  
+  <label>텍스트</label>
+  <input type="text" id="textInput" value="비정형" placeholder="텍스트 입력">
+  
+  <label>선 굵기 <input type="range" id="strokeWidth" min="1" max="20" value="8" step="0.5"><span class="val" id="strokeVal">8</span></label>
+  
+  <label>비정형 강도 <input type="range" id="displace" min="0" max="80" value="25" step="1"><span class="val" id="displaceVal">25</span></label>
+  
+  <label>노이즈 촘촘함 <input type="range" id="frequency" min="0.005" max="0.08" value="0.015" step="0.001"><span class="val" id="freqVal">0.015</span></label>
+  
+  <label>색수차 간격 <input type="range" id="chromatic" min="0" max="20" value="6" step="0.5"><span class="val" id="chromVal">6</span></label>
+  
+  <label>글자 크기 <input type="range" id="fontSize" min="60" max="400" value="180" step="5"><span class="val" id="sizeVal">180</span></label>
+  
+  <button id="randomBtn">🎲 패턴 바꾸기</button>
+</div>
+
+<script>
+// ============================================
+// DOM 요소 참조
+// ============================================
+const turbulence = document.getElementById('turbulence');
+const displacement = document.getElementById('displacement');
+const layers = [
+  document.getElementById('layer1'),
+  document.getElementById('layer2'),
+  document.getElementById('layer3'),
+  document.getElementById('layer4'),
+];
+
+const textInput = document.getElementById('textInput');
+const strokeSlider = document.getElementById('strokeWidth');
+const displaceSlider = document.getElementById('displace');
+const freqSlider = document.getElementById('frequency');
+const chromaticSlider = document.getElementById('chromatic');
+const fontSizeSlider = document.getElementById('fontSize');
+const randomBtn = document.getElementById('randomBtn');
+
+// ============================================
+// 업데이트 함수들
+// ============================================
+
+// 텍스트 변경
+textInput.addEventListener('input', () => {
+  const text = textInput.value || '비정형';
+  layers.forEach(l => l.textContent = text);
+});
+
+// 선 굵기 변경
+strokeSlider.addEventListener('input', () => {
+  const val = Number(strokeSlider.value);
+  document.getElementById('strokeVal').textContent = val;
+  // 레이어별 비율 유지: 1번=val, 2번=val*0.6, 3번=val*0.6, 4번=val*0.25
+  layers[0].setAttribute('stroke-width', val);
+  layers[1].setAttribute('stroke-width', val * 0.6);
+  layers[2].setAttribute('stroke-width', val * 0.6);
+  layers[3].setAttribute('stroke-width', val * 0.25);
+});
+
+// 비정형 강도 (displacement scale)
+displaceSlider.addEventListener('input', () => {
+  const val = displaceSlider.value;
+  document.getElementById('displaceVal').textContent = val;
+  displacement.setAttribute('scale', val);
+});
+
+// 노이즈 촘촘함 (baseFrequency)
+freqSlider.addEventListener('input', () => {
+  const val = freqSlider.value;
+  document.getElementById('freqVal').textContent = val;
+  turbulence.setAttribute('baseFrequency', val);
+});
+
+// 색수차 간격 (레이어 offset)
+chromaticSlider.addEventListener('input', () => {
+  const val = Number(chromaticSlider.value);
+  document.getElementById('chromVal').textContent = val;
+  // 레이어 1: 왼쪽 위, 레이어 2: 오른쪽 아래
+  layers[0].setAttribute('transform', `translate(${-val},${-val * 0.8})`);
+  layers[1].setAttribute('transform', `translate(${val},${val * 0.8})`);
+});
+
+// 글자 크기
+fontSizeSlider.addEventListener('input', () => {
+  const val = fontSizeSlider.value;
+  document.getElementById('sizeVal').textContent = val;
+  layers.forEach(l => l.setAttribute('font-size', val));
+});
+
+// 패턴 바꾸기 (seed 랜덤)
+randomBtn.addEventListener('click', () => {
+  const newSeed = Math.floor(Math.random() * 1000);
+  turbulence.setAttribute('seed', newSeed);
+});
+</script>
+
+</body>
+</html>
