@@ -87,6 +87,8 @@
 </head>
 <body>
 
+<canvas id="brushCanvas" style="position:fixed;top:0;left:0;width:100vw;height:100vh;display:none;z-index:5;"></canvas>
+
 <!-- ============================================
   SVG 구조:
   1. <defs>에 feTurbulence + feDisplacementMap 필터 정의
@@ -218,6 +220,7 @@
   <button id="modeBtn">🖌 유기적 모드</button>
   <button id="gradModeBtn">🌈 그라데이션 브러시</button>
   <button id="outlineModeBtn">✍️ 윤곽선 브러시</button>
+  <button id="canvasBrushBtn">🖊 브러시 윤곽선</button>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/opentype.js@1.3.4/dist/opentype.min.js"></script>
@@ -596,6 +599,223 @@ function renderOutlineBrush(text) {
 textInput.addEventListener('input', () => {
   if (isOutlineMode) {
     renderOutlineBrush(textInput.value || '비정형');
+  }
+  if (isCanvasBrushMode) {
+    renderCanvasBrush();
+  }
+});
+
+// ============================================
+// 모드 5: 브러시 윤곽선 (Canvas 2D contour tracing)
+// ============================================
+const canvasBrushBtn = document.getElementById('canvasBrushBtn');
+const brushCanvas = document.getElementById('brushCanvas');
+const bCtx = brushCanvas.getContext('2d');
+let isCanvasBrushMode = false;
+let brushNoiseSeed = 0;
+
+canvasBrushBtn.addEventListener('click', () => {
+  // 다른 모드 끄기
+  if (isOrganicMode) { isOrganicMode = false; modeBtn.textContent = '🖌 유기적 모드'; stopDrawAnimation(); }
+  if (isGradMode) { isGradMode = false; gradModeBtn.textContent = '🌈 그라데이션 브러시'; stopDrawAnimation(); layers.forEach(l => l.style.display = ''); layers[3].setAttribute('stroke-width', '2'); }
+  if (isOutlineMode) { isOutlineMode = false; outlineModeBtn.textContent = '✍️ 윤곽선 브러시'; const g = document.getElementById('outline-group'); if(g) g.remove(); layers.forEach(l => l.style.display = ''); stopDrawAnimation(); }
+  
+  isCanvasBrushMode = !isCanvasBrushMode;
+  canvasBrushBtn.textContent = isCanvasBrushMode ? '✏️ 기본 모드' : '🖊 브러시 윤곽선';
+  
+  if (isCanvasBrushMode) {
+    document.getElementById('svg').style.display = 'none';
+    brushCanvas.style.display = 'block';
+    brushCanvas.width = window.innerWidth;
+    brushCanvas.height = window.innerHeight;
+    renderCanvasBrush();
+  } else {
+    brushCanvas.style.display = 'none';
+    document.getElementById('svg').style.display = '';
+    // 기본 모드 복원
+    layers.forEach(l => l.style.display = '');
+    strokeSlider.value = 8; displaceSlider.value = 25; freqSlider.value = 0.015; fontSizeSlider.value = 180;
+    strokeSlider.dispatchEvent(new Event('input')); displaceSlider.dispatchEvent(new Event('input'));
+    freqSlider.dispatchEvent(new Event('input')); fontSizeSlider.dispatchEvent(new Event('input'));
+  }
+});
+
+function renderCanvasBrush() {
+  const W = brushCanvas.width;
+  const H = brushCanvas.height;
+  const text = textInput.value || '비정형';
+  const lw = Number(strokeSlider.value);
+  const noiseStr = Number(displaceSlider.value) * 0.2;
+  const chromOffset = Number(chromaticSlider.value);
+  const step = 3;
+  
+  // 윤곽선 추출
+  const contours = extractBrushContours(text, W, H, step);
+  
+  // 배경
+  bCtx.fillStyle = '#0a0a0a';
+  bCtx.fillRect(0, 0, W, H);
+  
+  // 색수차 레이어
+  const layersCfg = [
+    { dx: -chromOffset, dy: -chromOffset * 0.8, alpha: 0.7 },
+    { dx: chromOffset, dy: chromOffset * 0.8, alpha: 0.7 },
+    { dx: 0, dy: 0, alpha: 0.9 },
+  ];
+  
+  layersCfg.forEach(layer => {
+    bCtx.save();
+    bCtx.translate(layer.dx, layer.dy);
+    bCtx.globalAlpha = layer.alpha;
+    
+    contours.forEach(contour => {
+      drawBrushContour(contour, lw, noiseStr);
+    });
+    
+    bCtx.restore();
+  });
+}
+
+function extractBrushContours(text, W, H, step) {
+  const tmpCanvas = document.createElement('canvas');
+  tmpCanvas.width = W;
+  tmpCanvas.height = H;
+  const tmpCtx = tmpCanvas.getContext('2d');
+  
+  tmpCtx.clearRect(0, 0, W, H);
+  tmpCtx.fillStyle = '#000';
+  tmpCtx.font = `900 ${Math.min(W * 0.22, 280)}px "Arial Black", Impact, sans-serif`;
+  tmpCtx.textAlign = 'center';
+  tmpCtx.textBaseline = 'middle';
+  tmpCtx.fillText(text, W / 2, H / 2);
+  
+  const imageData = tmpCtx.getImageData(0, 0, W, H);
+  const data = imageData.data;
+  
+  function isInside(x, y) {
+    if (x < 0 || x >= W || y < 0 || y >= H) return false;
+    return data[(y * W + x) * 4 + 3] > 128;
+  }
+  
+  function isBorder(x, y) {
+    if (!isInside(x, y)) return false;
+    return !isInside(x-step, y) || !isInside(x+step, y) || !isInside(x, y-step) || !isInside(x, y+step);
+  }
+  
+  const borderPixels = new Set();
+  const borderList = [];
+  
+  for (let y = 0; y < H; y += step) {
+    for (let x = 0; x < W; x += step) {
+      if (isBorder(x, y)) {
+        borderPixels.add(`${x},${y}`);
+        borderList.push([x, y]);
+      }
+    }
+  }
+  
+  // Contour tracing
+  const contours = [];
+  const visited = new Set();
+  const dirs = [[step,0],[step,step],[0,step],[-step,step],[-step,0],[-step,-step],[0,-step],[step,-step]];
+  
+  for (const [sx, sy] of borderList) {
+    if (visited.has(`${sx},${sy}`)) continue;
+    const contour = [];
+    let cx = sx, cy = sy;
+    
+    for (let i = 0; i < 10000; i++) {
+      const key = `${cx},${cy}`;
+      if (visited.has(key) && contour.length > 2) break;
+      visited.add(key);
+      contour.push([cx, cy]);
+      
+      let found = false;
+      for (const [dx, dy] of dirs) {
+        const nKey = `${cx+dx},${cy+dy}`;
+        if (borderPixels.has(nKey) && !visited.has(nKey)) {
+          cx += dx; cy += dy;
+          found = true;
+          break;
+        }
+      }
+      if (!found) break;
+    }
+    
+    if (contour.length > 10) contours.push(contour);
+  }
+  
+  return contours;
+}
+
+function brushNoise(x, y) {
+  const n = Math.sin(x * 12.9898 + y * 78.233 + brushNoiseSeed * 43.12) * 43758.5453;
+  return (n - Math.floor(n)) * 2 - 1;
+}
+
+function drawBrushContour(contour, baseWidth, noiseStr) {
+  const gradColors = ['#0085ff', '#fceeff', '#39ff4a'];
+  
+  for (let i = 0; i < contour.length - 1; i++) {
+    const [x1, y1] = contour[i];
+    const [x2, y2] = contour[i + 1];
+    
+    const angle = Math.atan2(y2 - y1, x2 - x1);
+    const segLen = Math.sqrt((x2-x1)**2 + (y2-y1)**2);
+    if (segLen < 0.5) continue;
+    
+    // 노이즈 떨림
+    const nx1 = x1 + brushNoise(x1*0.1, y1*0.1) * noiseStr;
+    const ny1 = y1 + brushNoise(x1*0.1+100, y1*0.1) * noiseStr;
+    const nx2 = x2 + brushNoise(x2*0.1, y2*0.1) * noiseStr;
+    const ny2 = y2 + brushNoise(x2*0.1+100, y2*0.1) * noiseStr;
+    
+    // 선분 방향 그라데이션
+    const perpX = Math.cos(angle + Math.PI/2) * 15;
+    const perpY = Math.sin(angle + Math.PI/2) * 15;
+    const midX = (nx1 + nx2) / 2;
+    const midY = (ny1 + ny2) / 2;
+    
+    const grad = bCtx.createLinearGradient(midX - perpX, midY - perpY, midX + perpX, midY + perpY);
+    const t = i / contour.length;
+    const ci = Math.floor(t * (gradColors.length - 1));
+    grad.addColorStop(0, gradColors[ci % gradColors.length]);
+    grad.addColorStop(0.5, gradColors[(ci + 1) % gradColors.length]);
+    grad.addColorStop(1, gradColors[(ci + 2) % gradColors.length]);
+    
+    // lineWidth 변동
+    const lw = baseWidth + brushNoise(i * 0.3, 0) * (baseWidth * 0.4);
+    
+    bCtx.beginPath();
+    bCtx.moveTo(nx1, ny1);
+    bCtx.lineTo(nx2, ny2);
+    bCtx.strokeStyle = grad;
+    bCtx.lineWidth = Math.max(0.5, lw);
+    bCtx.lineCap = 'round';
+    bCtx.stroke();
+  }
+}
+
+// 패턴 바꾸기에 Canvas 모드도 연동
+randomBtn.addEventListener('click', () => {
+  if (isCanvasBrushMode) {
+    brushNoiseSeed = Math.random() * 1000;
+    renderCanvasBrush();
+  }
+});
+
+// 슬라이더 변경 시 Canvas 모드면 다시 그리기
+[strokeSlider, displaceSlider, chromaticSlider].forEach(slider => {
+  slider.addEventListener('input', () => {
+    if (isCanvasBrushMode) renderCanvasBrush();
+  });
+});
+
+window.addEventListener('resize', () => {
+  if (isCanvasBrushMode) {
+    brushCanvas.width = window.innerWidth;
+    brushCanvas.height = window.innerHeight;
+    renderCanvasBrush();
   }
 });
 
