@@ -928,52 +928,70 @@ function getCanvasOutlinePath(text) {
   ctx.textBaseline = 'middle';
   ctx.fillText(text, W/2, H/2);
   
-  // 픽셀 데이터에서 윤곽선 추출 (간단한 edge detection)
+  // Contour Tracing으로 윤곽선 추출
   const imageData = ctx.getImageData(0, 0, W, H);
   const data = imageData.data;
-  const step = 4; // 샘플링 간격
+  const step = 3;
   
-  let pathStr = '';
+  function isInside(x, y) {
+    if (x < 0 || x >= W || y < 0 || y >= H) return false;
+    return data[(y * W + x) * 4 + 3] > 128;
+  }
   
-  // 수평 스캔라인으로 윤곽선 포인트 수집
+  function isBorder(x, y) {
+    if (!isInside(x, y)) return false;
+    return !isInside(x-1, y) || !isInside(x+1, y) || !isInside(x, y-1) || !isInside(x, y+1);
+  }
+  
+  // 경계 픽셀 수집
+  const borderSet = new Set();
+  const borderList = [];
   for (let y = 0; y < H; y += step) {
-    let inShape = false;
-    let entered = -1;
-    
-    for (let x = 0; x < W; x += 2) {
-      const idx = (y * W + x) * 4;
-      const alpha = data[idx + 3];
-      const isPixel = alpha > 128;
-      
-      if (isPixel && !inShape) {
-        // 왼쪽 경계
-        inShape = true;
-        entered = x;
-        pathStr += (pathStr ? ' L' : 'M') + ` ${x} ${y}`;
-      } else if (!isPixel && inShape) {
-        // 오른쪽 경계
-        inShape = false;
-        pathStr += ` L ${x} ${y}`;
+    for (let x = 0; x < W; x += step) {
+      if (isBorder(x, y)) {
+        borderSet.add(`${x},${y}`);
+        borderList.push([x, y]);
       }
     }
   }
   
-  // 수직 스캔라인도 추가
-  for (let x = 0; x < W; x += step) {
-    let inShape = false;
+  // 8방향 이웃 추적
+  const visited = new Set();
+  const dirs = [[step,0],[step,step],[0,step],[-step,step],[-step,0],[-step,-step],[0,-step],[step,-step]];
+  let pathStr = '';
+  
+  for (const [sx, sy] of borderList) {
+    if (visited.has(`${sx},${sy}`)) continue;
     
-    for (let y = 0; y < H; y += 2) {
-      const idx = (y * W + x) * 4;
-      const alpha = data[idx + 3];
-      const isPixel = alpha > 128;
+    const contour = [];
+    let cx = sx, cy = sy;
+    let prevDir = 0;
+    
+    for (let iter = 0; iter < 20000; iter++) {
+      const key = `${cx},${cy}`;
+      if (visited.has(key) && contour.length > 4) break;
+      visited.add(key);
+      contour.push([cx, cy]);
       
-      if (isPixel && !inShape) {
-        inShape = true;
-        pathStr += ` M ${x} ${y}`;
-      } else if (!isPixel && inShape) {
-        inShape = false;
-        pathStr += ` L ${x} ${y}`;
+      let found = false;
+      for (let d = 0; d < 8; d++) {
+        const di = (prevDir + d) % 8;
+        const [dx, dy] = dirs[di];
+        const nKey = `${cx+dx},${cy+dy}`;
+        if (borderSet.has(nKey) && !visited.has(nKey)) {
+          cx += dx; cy += dy;
+          prevDir = (di + 6) % 8;
+          found = true;
+          break;
+        }
       }
+      if (!found) break;
+    }
+    
+    // 최소 길이 필터
+    if (contour.length > 20) {
+      pathStr += ' M ' + contour.map(p => `${p[0]} ${p[1]}`).join(' L ');
+      pathStr += ' Z'; // 닫기
     }
   }
   
