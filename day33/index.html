@@ -505,12 +505,10 @@ function renderOutlineBrush(text) {
   group.id = 'outline-group';
   group.setAttribute('filter', 'url(#brush-filter)');
   
-  // 색상 레이어 3개 (색수차) + 그라데이션 1개
+  // 색상 레이어 2개 (색수차 줄임)
   const layerConfigs = [
-    { stroke: '#0066ff', width: 5, dx: -5, dy: -4 },
-    { stroke: '#00cc44', width: 3.5, dx: 5, dy: 4 },
-    { stroke: '#ff88cc', width: 3, dx: 0, dy: 0 },
-    { stroke: 'url(#brushGradient)', width: 1.5, dx: 0, dy: 0 },
+    { stroke: '#0066ff', width: 4, dx: -3, dy: -2 },
+    { stroke: 'url(#brushGradient)', width: 2.5, dx: 0, dy: 0 },
   ];
   
   layerConfigs.forEach((cfg, i) => {
@@ -801,9 +799,9 @@ function extractBrushContours(text, W, H, step) {
           (contour[i][1] - contour[i-1][1])**2
         );
       }
-      // 직선 비율이 0.85 이상이면 (거의 직선) 스킵
+      // 직선 비율이 0.95 이상이면 (거의 완전 직선) 스킵
       const straightRatio = startEnd / Math.max(pathLen, 1);
-      if (straightRatio < 0.85) {
+      if (straightRatio < 0.95) {
         contours.push(contour);
       }
     }
