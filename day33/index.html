@@ -1044,14 +1044,44 @@ document.querySelectorAll('.controls input[type=range]').forEach(slider => {
 // ============================================
 document.getElementById('dlPng').addEventListener('click', () => {
   if (currentMode === 'canvasBrush') {
-    // Canvas 모드: 직접 다운로드
+    // Canvas 모드: 배경 투명하게 다시 그려서 다운로드
     const bc = document.getElementById('brushCanvas');
+    const W = bc.width, H = bc.height;
+    const exportCanvas = document.createElement('canvas');
+    exportCanvas.width = W;
+    exportCanvas.height = H;
+    const exportCtx = exportCanvas.getContext('2d');
+    // 배경 투명 (fillRect 안 함)
+    // 브러시 다시 그리기
+    const text = document.getElementById('textInput').value || '비정형';
+    const lw = Number(document.getElementById('strokeWidth').value);
+    const chromOffset = Number(document.getElementById('chromatic').value);
+    const wanderStr = Number(document.getElementById('wander').value);
+    const inertiaVal = Number(document.getElementById('inertia').value);
+    const pullStr = Number(document.getElementById('pull').value);
+    const contours = extractBrushContours(text, W, H, 1);
+    
+    const layersCfg = [
+      { dx: -chromOffset, dy: -chromOffset * 0.8, alpha: 0.7 },
+      { dx: chromOffset, dy: chromOffset * 0.8, alpha: 0.7 },
+      { dx: 0, dy: 0, alpha: 0.9 },
+    ];
+    layersCfg.forEach(layer => {
+      exportCtx.save();
+      exportCtx.translate(layer.dx, layer.dy);
+      exportCtx.globalAlpha = layer.alpha;
+      contours.forEach(contour => {
+        drawAgentContour(exportCtx, contour, lw, wanderStr, inertiaVal, pullStr);
+      });
+      exportCtx.restore();
+    });
+    
     const link = document.createElement('a');
     link.download = `brush-typo-${Date.now()}.png`;
-    link.href = bc.toDataURL('image/png');
+    link.href = exportCanvas.toDataURL('image/png');
     link.click();
   } else {
-    // SVG 모드: SVG를 Canvas에 그려서 PNG로
+    // SVG 모드: SVG를 Canvas에 그려서 PNG로 (배경 투명)
     const svgEl = document.getElementById('svg');
     const svgData = new XMLSerializer().serializeToString(svgEl);
     const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
@@ -1063,8 +1093,7 @@ document.getElementById('dlPng').addEventListener('click', () => {
       canvas.width = 2400;
       canvas.height = 1600;
       const ctx2 = canvas.getContext('2d');
-      ctx2.fillStyle = '#0a0a0a';
-      ctx2.fillRect(0, 0, 2400, 1600);
+      // 배경 투명 (fillRect 안 함)
       ctx2.drawImage(img, 0, 0, 2400, 1600);
       
       const link = document.createElement('a');
@@ -1079,29 +1108,11 @@ document.getElementById('dlPng').addEventListener('click', () => {
 
 document.getElementById('dlSvg').addEventListener('click', () => {
   if (currentMode === 'canvasBrush') {
-    // Canvas 모드: Canvas를 SVG image로 감싸서 다운로드
-    const bc = document.getElementById('brushCanvas');
-    const dataUrl = bc.toDataURL('image/png');
-    const svgStr = `<svg xmlns="http://www.w3.org/2000/svg" width="${bc.width}" height="${bc.height}">
-      <image href="${dataUrl}" width="${bc.width}" height="${bc.height}"/>
-    </svg>`;
-    const blob = new Blob([svgStr], { type: 'image/svg+xml' });
-    const link = document.createElement('a');
-    link.download = `brush-typo-${Date.now()}.svg`;
-    link.href = URL.createObjectURL(blob);
-    link.click();
+    alert('브러시 모드는 Canvas 기반이라 SVG 내보내기가 불가합니다. PNG를 사용해주세요.');
   } else {
-    // SVG 모드: SVG 직접 다운로드
+    // SVG 모드: SVG 직접 다운로드 (배경 없이)
     const svgEl = document.getElementById('svg');
-    const clone = svgEl.cloneNode(true);
-    // 배경 추가
-    const bg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-    bg.setAttribute('width', '1200');
-    bg.setAttribute('height', '800');
-    bg.setAttribute('fill', '#0a0a0a');
-    clone.insertBefore(bg, clone.firstChild);
-    
-    const svgData = new XMLSerializer().serializeToString(clone);
+    const svgData = new XMLSerializer().serializeToString(svgEl);
     const blob = new Blob([svgData], { type: 'image/svg+xml' });
     const link = document.createElement('a');
     link.download = `brush-typo-${Date.now()}.svg`;
