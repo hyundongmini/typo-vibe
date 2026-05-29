@@ -317,11 +317,13 @@ randomBtn.addEventListener('click', () => {
 // ============================================
 const modeButtons = document.querySelectorAll('.modes button');
 let currentMode = 'organic';
+let animFrame = null; // 여기서 선언해야 switchMode에서 접근 가능
 
 function switchMode(mode) {
   // 이전 모드 정리
   stopDrawAnimation();
-  brushCanvas.style.display = 'none';
+  const _brushCanvas = document.getElementById('brushCanvas');
+  _brushCanvas.style.display = 'none';
   document.getElementById('svg').style.display = '';
   layers.forEach(l => { l.style.display = ''; });
   const outlineG = document.getElementById('outline-group');
@@ -375,9 +377,10 @@ function switchMode(mode) {
   }
   else if (mode === 'canvasBrush') {
     document.getElementById('svg').style.display = 'none';
-    brushCanvas.style.display = 'block';
-    brushCanvas.width = window.innerWidth;
-    brushCanvas.height = window.innerHeight;
+    document.getElementById('brushCanvas').style.display = 'block';
+    const bc = document.getElementById('brushCanvas');
+    bc.width = window.innerWidth;
+    bc.height = window.innerHeight;
     renderCanvasBrush();
   }
 }
@@ -394,8 +397,6 @@ switchMode('organic');
 // ============================================
 // 선 그리기 애니메이션 (stroke-dashoffset)
 // ============================================
-let animFrame = null;
-
 function startDrawAnimation() {
   // 각 레이어의 총 경로 길이 추정 (텍스트 길이 기반)
   const pathLength = 3000;
