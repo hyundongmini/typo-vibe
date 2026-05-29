@@ -217,8 +217,10 @@
   <button id="randomBtn">🎲 패턴 바꾸기</button>
   <button id="modeBtn">🖌 유기적 모드</button>
   <button id="gradModeBtn">🌈 그라데이션 브러시</button>
+  <button id="outlineModeBtn">✍️ 윤곽선 브러시</button>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/opentype.js@1.3.4/dist/opentype.min.js"></script>
 <script>
 // ============================================
 // DOM 요소 참조
@@ -408,73 +410,183 @@ const gradModeBtn = document.getElementById('gradModeBtn');
 let isGradMode = false;
 
 gradModeBtn.addEventListener('click', () => {
+  if (isOrganicMode) { isOrganicMode = false; modeBtn.textContent = '🖌 유기적 모드'; stopDrawAnimation(); }
+  if (isOutlineMode) { isOutlineMode = false; outlineModeBtn.textContent = '✍️ 윤곽선 브러시'; const g = document.getElementById('outline-group'); if(g) g.remove(); layers.forEach(l => l.style.display = ''); stopDrawAnimation(); }
+  
+  isGradMode = !isGradMode;
+  gradModeBtn.textContent = isGradMode ? '✏️ 기본 모드' : '🌈 그라데이션 브러시';
+  
+  if (isGradMode) {
+    layers[0].style.display = 'none';
+    layers[1].style.display = 'none';
+    layers[2].style.display = 'none';
+    layers[3].style.display = '';
+    layers[3].setAttribute('stroke-width', '40');
+    layers[3].setAttribute('stroke', 'url(#brushGradient)');
+    displacement.setAttribute('scale', '60');
+    turbulence.setAttribute('baseFrequency', '0.008');
+    fontSizeSlider.value = 300;
+    layers[3].setAttribute('font-size', '300');
+    displaceSlider.value = 60; freqSlider.value = 0.008;
+    document.getElementById('displaceVal').textContent = '60';
+    document.getElementById('freqVal').textContent = '0.008';
+    document.getElementById('sizeVal').textContent = '300';
+    const pathLength = 4000;
+    layers[3].style.strokeDasharray = pathLength;
+    layers[3].style.strokeDashoffset = pathLength;
+    layers[3].style.transition = 'none';
+    setTimeout(() => { layers[3].style.transition = 'stroke-dashoffset 4s cubic-bezier(0.4, 0, 0.2, 1)'; layers[3].style.strokeDashoffset = '0'; }, 100);
+    setTimeout(() => animateWobble(), 4000);
+  } else {
+    stopDrawAnimation();
+    layers.forEach(l => l.style.display = '');
+    layers[3].setAttribute('stroke-width', '2');
+    strokeSlider.value = 8; displaceSlider.value = 25; freqSlider.value = 0.015; fontSizeSlider.value = 180;
+    strokeSlider.dispatchEvent(new Event('input')); displaceSlider.dispatchEvent(new Event('input'));
+    freqSlider.dispatchEvent(new Event('input')); fontSizeSlider.dispatchEvent(new Event('input'));
+  }
+});
+
+// ============================================
+// 모드 4: 윤곽선 브러시 모드 (opentype.js로 글리프 path 추출)
+// ============================================
+const outlineModeBtn = document.getElementById('outlineModeBtn');
+let isOutlineMode = false;
+let loadedFont = null;
+
+// 한글 폰트 로드 (Noto Sans KR Bold)
+opentype.load('https://cdn.jsdelivr.net/gh/nicholasgasior/gfonts-subset@master/fonts/noto-sans-kr/NotoSansKR-Bold.otf', (err, font) => {
+  if (err) {
+    console.warn('폰트 로드 실패, 대체 폰트 시도:', err);
+    // 대체: 영문 폰트
+    opentype.load('https://cdn.jsdelivr.net/npm/opentype.js@1.3.4/fonts/FiraSansMedium.woff', (err2, font2) => {
+      if (!err2) loadedFont = font2;
+    });
+  } else {
+    loadedFont = font;
+  }
+});
+
+outlineModeBtn.addEventListener('click', () => {
   // 다른 모드 끄기
   if (isOrganicMode) {
     isOrganicMode = false;
     modeBtn.textContent = '🖌 유기적 모드';
     stopDrawAnimation();
   }
-  
-  isGradMode = !isGradMode;
-  gradModeBtn.textContent = isGradMode ? '✏️ 기본 모드' : '🌈 그라데이션 브러시';
-  
   if (isGradMode) {
-    // 그라데이션 브러시 모드:
-    // 레이어 1~3 숨기고, 레이어 4(그라데이션)만 두껍게
-    layers[0].style.display = 'none';
-    layers[1].style.display = 'none';
-    layers[2].style.display = 'none';
-    layers[3].style.display = '';
+    isGradMode = false;
+    gradModeBtn.textContent = '🌈 그라데이션 브러시';
+    stopDrawAnimation();
+    layers.forEach(l => l.style.display = '');
+    layers[3].setAttribute('stroke-width', '2');
+  }
+  
+  isOutlineMode = !isOutlineMode;
+  outlineModeBtn.textContent = isOutlineMode ? '✏️ 기본 모드' : '✍️ 윤곽선 브러시';
+  
+  if (isOutlineMode) {
+    // 기존 텍스트 레이어 숨기기
+    layers.forEach(l => l.style.display = 'none');
     
-    // 그라데이션 레이어를 두껍게
-    layers[3].setAttribute('stroke-width', '40');
-    layers[3].setAttribute('stroke', 'url(#brushGradient)');
-    
-    // 강한 왜곡
-    displacement.setAttribute('scale', '60');
-    turbulence.setAttribute('baseFrequency', '0.008');
-    fontSizeSlider.value = 300;
-    layers[3].setAttribute('font-size', '300');
-    
-    // 슬라이더 동기화
-    displaceSlider.value = 60;
-    freqSlider.value = 0.008;
-    document.getElementById('displaceVal').textContent = '60';
-    document.getElementById('freqVal').textContent = '0.008';
-    document.getElementById('sizeVal').textContent = '300';
-    
-    // 선 그리기 애니메이션
-    const pathLength = 4000;
-    layers[3].style.strokeDasharray = pathLength;
-    layers[3].style.strokeDashoffset = pathLength;
-    layers[3].style.transition = 'none';
-    
-    setTimeout(() => {
-      layers[3].style.transition = 'stroke-dashoffset 4s cubic-bezier(0.4, 0, 0.2, 1)';
-      layers[3].style.strokeDashoffset = '0';
-    }, 100);
-    
-    // 흔들림
-    setTimeout(() => animateWobble(), 4000);
-    
+    // 윤곽선 path 생성
+    renderOutlineBrush(textInput.value || '비정형');
   } else {
     // 기본 모드 복원
+    layers.forEach(l => l.style.display = '');
+    
+    // 윤곽선 path 제거
+    const outlineGroup = document.getElementById('outline-group');
+    if (outlineGroup) outlineGroup.remove();
+    
     stopDrawAnimation();
-    layers[0].style.display = '';
-    layers[1].style.display = '';
-    layers[2].style.display = '';
-    
-    layers[3].setAttribute('stroke-width', '2');
-    
     strokeSlider.value = 8;
     displaceSlider.value = 25;
     freqSlider.value = 0.015;
     fontSizeSlider.value = 180;
-    
     strokeSlider.dispatchEvent(new Event('input'));
     displaceSlider.dispatchEvent(new Event('input'));
     freqSlider.dispatchEvent(new Event('input'));
     fontSizeSlider.dispatchEvent(new Event('input'));
+  }
+});
+
+function renderOutlineBrush(text) {
+  if (!loadedFont) {
+    alert('폰트 로딩 중... 잠시 후 다시 시도해주세요.');
+    return;
+  }
+  
+  // 기존 윤곽선 그룹 제거
+  const existing = document.getElementById('outline-group');
+  if (existing) existing.remove();
+  
+  const svg = document.getElementById('svg');
+  const svgNS = 'http://www.w3.org/2000/svg';
+  
+  // opentype.js로 글리프 path 추출
+  const fontSize = 250;
+  const path = loadedFont.getPath(text, 150, 500, fontSize);
+  const pathData = path.toPathData(2); // SVG path d 문자열
+  
+  // 윤곽선 그룹 생성
+  const group = document.createElementNS(svgNS, 'g');
+  group.id = 'outline-group';
+  group.setAttribute('filter', 'url(#brush-filter)');
+  
+  // 색상 레이어 3개 (색수차) + 그라데이션 1개
+  const layerConfigs = [
+    { stroke: '#0066ff', width: 5, dx: -5, dy: -4 },
+    { stroke: '#00cc44', width: 3.5, dx: 5, dy: 4 },
+    { stroke: '#ff88cc', width: 3, dx: 0, dy: 0 },
+    { stroke: 'url(#brushGradient)', width: 1.5, dx: 0, dy: 0 },
+  ];
+  
+  layerConfigs.forEach((cfg, i) => {
+    const pathEl = document.createElementNS(svgNS, 'path');
+    pathEl.setAttribute('d', pathData);
+    pathEl.setAttribute('fill', 'none');
+    pathEl.setAttribute('stroke', cfg.stroke);
+    pathEl.setAttribute('stroke-width', cfg.width);
+    pathEl.setAttribute('stroke-linecap', 'round');
+    pathEl.setAttribute('stroke-linejoin', 'round');
+    if (cfg.dx || cfg.dy) {
+      pathEl.setAttribute('transform', `translate(${cfg.dx},${cfg.dy})`);
+    }
+    
+    // 그리기 애니메이션
+    const totalLength = pathEl.getTotalLength ? 5000 : 5000;
+    pathEl.style.strokeDasharray = totalLength;
+    pathEl.style.strokeDashoffset = totalLength;
+    pathEl.style.transition = 'none';
+    
+    group.appendChild(pathEl);
+    
+    // 시차 애니메이션
+    setTimeout(() => {
+      pathEl.style.transition = `stroke-dashoffset 3s cubic-bezier(0.4, 0, 0.2, 1)`;
+      pathEl.style.strokeDashoffset = '0';
+    }, 100 + i * 300);
+  });
+  
+  svg.appendChild(group);
+  
+  // 왜곡 강화
+  displacement.setAttribute('scale', '40');
+  turbulence.setAttribute('baseFrequency', '0.012');
+  displaceSlider.value = 40;
+  freqSlider.value = 0.012;
+  document.getElementById('displaceVal').textContent = '40';
+  document.getElementById('freqVal').textContent = '0.012';
+  
+  // 그려진 후 흔들림
+  setTimeout(() => animateWobble(), 3500);
+}
+
+// 텍스트 변경 시 윤곽선 모드면 다시 그리기
+textInput.addEventListener('input', () => {
+  if (isOutlineMode) {
+    renderOutlineBrush(textInput.value || '비정형');
   }
 });
 </script>
