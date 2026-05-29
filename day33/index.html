@@ -359,16 +359,16 @@ function switchMode(mode) {
   }
   else if (mode === 'gradient') {
     layers[0].style.display = 'none'; layers[1].style.display = 'none'; layers[2].style.display = 'none';
-    layers[3].setAttribute('stroke-width', '100');
+    layers[3].setAttribute('stroke-width', '134');
     layers[3].setAttribute('stroke', 'url(#brushGradient)');
-    displacement.setAttribute('scale', '70'); turbulence.setAttribute('baseFrequency', '0.01');
-    fontSizeSlider.value = 280; layers[3].setAttribute('font-size', '280');
-    strokeSlider.value = 100;
-    displaceSlider.value = 70; freqSlider.value = 0.01;
-    document.getElementById('strokeVal').textContent = '100';
-    document.getElementById('displaceVal').textContent = '70';
-    document.getElementById('freqVal').textContent = '0.01';
-    document.getElementById('sizeVal').textContent = '280';
+    displacement.setAttribute('scale', '52'); turbulence.setAttribute('baseFrequency', '0.014');
+    fontSizeSlider.value = 250; layers[3].setAttribute('font-size', '250');
+    strokeSlider.value = 134;
+    displaceSlider.value = 52; freqSlider.value = 0.014;
+    document.getElementById('strokeVal').textContent = '134';
+    document.getElementById('displaceVal').textContent = '52';
+    document.getElementById('freqVal').textContent = '0.014';
+    document.getElementById('sizeVal').textContent = '250';
     const pathLength = 4000;
     layers[3].style.strokeDasharray = pathLength;
     layers[3].style.strokeDashoffset = pathLength;
