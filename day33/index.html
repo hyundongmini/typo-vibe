@@ -725,52 +725,72 @@ function extractBrushContours(text, W, H, step) {
     return data[(y * W + x) * 4 + 3] > 128;
   }
   
+  // 경계 픽셀: 안쪽이면서 상하좌우 중 바깥이 있음
   function isBorder(x, y) {
     if (!isInside(x, y)) return false;
-    return !isInside(x-step, y) || !isInside(x+step, y) || !isInside(x, y-step) || !isInside(x, y+step);
+    return !isInside(x-1, y) || !isInside(x+1, y) || 
+           !isInside(x, y-1) || !isInside(x, y+1);
   }
   
-  const borderPixels = new Set();
+  // 경계 픽셀을 step 간격으로 수집
+  const borderSet = new Set();
   const borderList = [];
   
   for (let y = 0; y < H; y += step) {
     for (let x = 0; x < W; x += step) {
       if (isBorder(x, y)) {
-        borderPixels.add(`${x},${y}`);
+        const key = `${x},${y}`;
+        borderSet.add(key);
         borderList.push([x, y]);
       }
     }
   }
   
-  // Contour tracing
+  // 8방향 이웃 추적으로 연결된 윤곽선 추출
   const contours = [];
   const visited = new Set();
   const dirs = [[step,0],[step,step],[0,step],[-step,step],[-step,0],[-step,-step],[0,-step],[step,-step]];
   
   for (const [sx, sy] of borderList) {
-    if (visited.has(`${sx},${sy}`)) continue;
+    const startKey = `${sx},${sy}`;
+    if (visited.has(startKey)) continue;
+    
     const contour = [];
     let cx = sx, cy = sy;
+    let prevDir = 0; // 이전 방향 기억 (같은 방향 우선)
     
-    for (let i = 0; i < 10000; i++) {
+    for (let iter = 0; iter < 20000; iter++) {
       const key = `${cx},${cy}`;
-      if (visited.has(key) && contour.length > 2) break;
+      if (visited.has(key) && contour.length > 4) break;
+      
       visited.add(key);
       contour.push([cx, cy]);
       
+      // 다음 이웃 찾기 (이전 방향부터 시계방향으로 탐색)
       let found = false;
-      for (const [dx, dy] of dirs) {
-        const nKey = `${cx+dx},${cy+dy}`;
-        if (borderPixels.has(nKey) && !visited.has(nKey)) {
-          cx += dx; cy += dy;
+      for (let d = 0; d < 8; d++) {
+        const di = (prevDir + d) % 8;
+        const [dx, dy] = dirs[di];
+        const nx = cx + dx;
+        const ny = cy + dy;
+        const nKey = `${nx},${ny}`;
+        
+        if (borderSet.has(nKey) && !visited.has(nKey)) {
+          cx = nx;
+          cy = ny;
+          prevDir = (di + 6) % 8; // 다음 탐색 시작 방향 (반시계 2칸)
           found = true;
           break;
         }
       }
+      
       if (!found) break;
     }
     
-    if (contour.length > 10) contours.push(contour);
+    // 짧은 윤곽선 필터 + 직선 필터
+    if (contour.length > 15) {
+      contours.push(contour);
+    }
   }
   
   return contours;
