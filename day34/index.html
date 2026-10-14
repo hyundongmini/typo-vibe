@@ -1,0 +1,2452 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Cigarette · Three.js PBR + GPU Smoke</title>
+  <style>
+/* Mold Admin Design System — colors & type tokens
+ * Derived from 📘 [몰드] 어드민가이드 V1.fig
+ * ----------------------------------------------------------- */
+
+/* Fonts
+ * - Spoqa Han Sans Neo: served locally from fonts/ (user-provided woff2).
+ * - BM Hanna Black OTF: proprietary display face, falls back to sans-serif.
+ * - Inter / IBM Plex Sans: Latin numerals via Google Fonts.
+ */
+@font-face {
+  font-family: 'Spoqa Han Sans Neo';
+  src: url('fonts/SpoqaHanSansNeo-Regular.woff2') format('woff2');
+  font-weight: 400; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'Spoqa Han Sans Neo';
+  src: url('fonts/SpoqaHanSansNeo-Medium.woff2') format('woff2');
+  font-weight: 500; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'Spoqa Han Sans Neo';
+  src: url('fonts/SpoqaHanSansNeo-Bold.woff2') format('woff2');
+  font-weight: 700; font-style: normal; font-display: swap;
+}
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;700&display=swap');
+
+:root {
+  /* ───── Core neutrals ───── */
+  --mold-fg-strong: #181A1C;   /* Primary text / headings */
+  --mold-fg:        #121212;   /* True black, stroke */
+  --mold-fg-dim:    #676D75;   /* Secondary text alt */
+  --mold-fg-muted:  #7E8082;   /* Secondary text, disabled labels */
+  --mold-fg-subtle: #B1B3B5;   /* Tertiary / placeholder */
+  --mold-fg-on-dark:#FFFFFF;
+
+  --mold-bg:        #FFFFFF;
+  --mold-bg-soft:   #F3F5F7;   /* Section bg, disabled inputs */
+  --mold-bg-info:   #F4F8FE;   /* Blue-tinted info surface */
+  --mold-bg-dark:   #171717;   /* Cover bg only */
+
+  --mold-border:        #E4E6E8;
+  --mold-border-strong: #313335;
+
+  /* ───── Primary ───── */
+  --mold-primary:        #1A7CFF;
+  --mold-primary-hover:  #1571E8;
+  --mold-primary-press:  #1165D0;
+  --mold-primary-bg:     #D2E9FC;
+  --mold-primary-subtle: #F4F8FE;
+
+  /* ───── Semantic ───── */
+  --mold-warning:    #FF6610;
+  --mold-warning-bg: #FFEDD2;
+  --mold-success:    #38AD0E;
+  --mold-success-bg: #CCF4DD;
+  --mold-danger:     #FF403E;
+  --mold-danger-bg:  #FFDFDF;
+
+  /* ───── Guide-only / accent ───── */
+  --mold-spec:          #E8178A;  /* Measurement overlays — never product */
+  --mold-accent-cyan:   #2AC1BC;
+  --mold-accent-yellow: #FFC600;  /* Logo slanted-bar accent */
+  --mold-accent-orange: #FF8400;
+
+  /* ───── Radius ───── */
+  --mold-r-1:   2px;
+  --mold-r-2:   3px;
+  --mold-r-3:   4px;   /* default */
+  --mold-r-4:   8px;   /* modal / sheet */
+  --mold-r-full: 100px;
+
+  /* ───── Shadows ───── */
+  --mold-shadow-1: 0 2px 4px rgba(0,0,0,0.08);   /* header */
+  --mold-shadow-2: 0 4px 8px rgba(0,0,0,0.05);   /* card hover */
+  --mold-shadow-3: 0 8px 24px rgba(0,0,0,0.12);  /* modal */
+
+  /* ───── Spacing (8-pt) ───── */
+  --mold-s-1: 2px;
+  --mold-s-2: 4px;
+  --mold-s-3: 8px;
+  --mold-s-4: 12px;
+  --mold-s-5: 16px;
+  --mold-s-6: 20px;
+  --mold-s-7: 24px;
+  --mold-s-8: 32px;
+  --mold-s-9: 40px;
+  --mold-s-10: 48px;
+  --mold-s-11: 60px;
+  --mold-s-12: 64px;
+  --mold-s-13: 80px;
+  --mold-s-14: 120px;
+
+  /* ───── Layout ───── */
+  --mold-header-h: 64px;
+  --mold-lnb-w:    240px;
+  --mold-content-min: 1200px;
+  --mold-content-max: 1440px;
+
+  /* ───── Type families ───── */
+  --mold-font-ui:      'Spoqa Han Sans Neo', sans-serif;
+  --mold-font-display: 'BM Hanna Black OTF', sans-serif;
+  --mold-font-mono:    'IBM Plex Sans', 'Inter', ui-monospace, SFMono-Regular, monospace;
+  --mold-font-latin:   'Inter', system-ui, sans-serif;
+
+  /* ───── Type sizes ───── */
+  --mold-t-display: 50px / 1.1 / -1.5px;
+  --mold-t-h1-size: 32px; --mold-t-h1-lh: 48px; --mold-t-h1-ls: -1.2px; --mold-t-h1-w: 700;
+  --mold-t-h2-size: 24px; --mold-t-h2-lh: 32px; --mold-t-h2-ls: -0.4px; --mold-t-h2-w: 700;
+  --mold-t-h3-size: 20px; --mold-t-h3-lh: 28px; --mold-t-h3-ls: -0.3px; --mold-t-h3-w: 700;
+  --mold-t-h4-size: 16px; --mold-t-h4-lh: 24px; --mold-t-h4-ls: -0.2px; --mold-t-h4-w: 700;
+
+  --mold-t-body-size:   14px; --mold-t-body-lh:   20px; --mold-t-body-ls:   -0.2px;
+  --mold-t-body-lg-size:16px; --mold-t-body-lg-lh:24px; --mold-t-body-lg-ls:-0.2px;
+  --mold-t-caption-size:12px; --mold-t-caption-lh:18px; --mold-t-caption-ls:-0.1px;
+  --mold-t-tiny-size:   10px; --mold-t-tiny-lh:   14px; --mold-t-tiny-ls:    0;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Semantic type classes — drop onto any element
+   ═══════════════════════════════════════════════════════════ */
+
+.mold-display {
+  font-family: var(--mold-font-display);
+  font-size: 50px; line-height: 1.1; letter-spacing: -1.5px;
+  color: var(--mold-fg-strong);
+}
+
+.mold-h1 {
+  font-family: var(--mold-font-ui); font-weight: 700;
+  font-size: 32px; line-height: 48px; letter-spacing: -1.2px;
+  color: var(--mold-fg-strong);
+}
+
+.mold-h2 {
+  font-family: var(--mold-font-ui); font-weight: 700;
+  font-size: 24px; line-height: 32px; letter-spacing: -0.4px;
+  color: var(--mold-fg-strong);
+}
+
+.mold-h3 {
+  font-family: var(--mold-font-ui); font-weight: 700;
+  font-size: 20px; line-height: 28px; letter-spacing: -0.3px;
+  color: var(--mold-fg-strong);
+}
+
+.mold-h4 {
+  font-family: var(--mold-font-ui); font-weight: 700;
+  font-size: 16px; line-height: 24px; letter-spacing: -0.2px;
+  color: var(--mold-fg-strong);
+}
+
+.mold-body {
+  font-family: var(--mold-font-ui); font-weight: 400;
+  font-size: 14px; line-height: 20px; letter-spacing: -0.2px;
+  color: var(--mold-fg-strong);
+}
+
+.mold-body-medium { font-weight: 500; }
+.mold-body-bold   { font-weight: 700; }
+
+.mold-body-lg {
+  font-family: var(--mold-font-ui); font-weight: 400;
+  font-size: 16px; line-height: 24px; letter-spacing: -0.2px;
+  color: var(--mold-fg-strong);
+}
+
+.mold-caption {
+  font-family: var(--mold-font-ui); font-weight: 400;
+  font-size: 12px; line-height: 18px; letter-spacing: -0.1px;
+  color: var(--mold-fg-muted);
+}
+
+.mold-tiny {
+  font-family: var(--mold-font-ui); font-weight: 500;
+  font-size: 10px; line-height: 14px;
+  color: var(--mold-fg-muted);
+}
+
+.mold-mono {
+  font-family: var(--mold-font-mono); font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.mold-muted   { color: var(--mold-fg-muted); }
+.mold-subtle  { color: var(--mold-fg-subtle); }
+.mold-primary-text { color: var(--mold-primary); }
+.mold-danger-text  { color: var(--mold-danger); }
+.mold-success-text { color: var(--mold-success); }
+
+/* ═══════════════════════════════════════════════════════════
+   Base resets helpful inside the kit
+   ═══════════════════════════════════════════════════════════ */
+
+.mold-surface {
+  background: var(--mold-bg);
+  color: var(--mold-fg-strong);
+  font-family: var(--mold-font-ui);
+}
+
+* { box-sizing: border-box; }
+
+</style>
+  <style>
+    :root { color-scheme: dark; }
+    html, body {
+      margin: 0;
+      height: 100%;
+      background: #0a0b0d;
+      font-family: var(--mold-font-ui, "Spoqa Han Sans Neo", system-ui, sans-serif);
+      color: #e8eaed;
+      overflow: hidden;
+    }
+    #app {
+      position: fixed;
+      inset: 0;
+    }
+    canvas { display: block; }
+
+    /* ---- HUD (uses Mold tokens for type) ---- */
+    .hud {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      pointer-events: none;
+      z-index: 10;
+    }
+    .hud-card {
+      background: rgba(18, 20, 24, 0.72);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: var(--mold-r-4, 4px);
+      padding: 12px 14px;
+      min-width: 220px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    }
+    .hud-eyebrow {
+      font-size: 10px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #7E8082;
+      font-weight: 500;
+      margin-bottom: 4px;
+    }
+    .hud-title {
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: -0.2px;
+      color: #e8eaed;
+    }
+
+    .state-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 4px;
+      margin-top: 8px;
+    }
+    .state-pill {
+      font-size: 10px;
+      letter-spacing: 0.08em;
+      text-align: center;
+      padding: 6px 4px;
+      border-radius: 2px;
+      background: rgba(255,255,255,0.04);
+      color: #7E8082;
+      font-weight: 600;
+      transition: background 150ms, color 150ms;
+    }
+    .state-pill.active {
+      background: #1A7CFF;
+      color: white;
+    }
+
+    .meter {
+      margin-top: 10px;
+    }
+    .meter-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      color: #B1B3B5;
+      margin-bottom: 4px;
+    }
+    .meter-label span:last-child {
+      font-variant-numeric: tabular-nums;
+      color: #e8eaed;
+    }
+    .meter-track {
+      height: 4px;
+      background: rgba(255,255,255,0.08);
+      border-radius: 100px;
+      overflow: hidden;
+    }
+    .meter-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #FF6610 0%, #FF403E 100%);
+      width: 0%;
+      transition: width 200ms cubic-bezier(0.4,0,0.2,1);
+    }
+
+    .hint {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 12px;
+      color: rgba(255,255,255,0.55);
+      letter-spacing: 0.04em;
+      text-align: center;
+      pointer-events: none;
+      z-index: 10;
+      line-height: 1.7;
+    }
+    .hint kbd {
+      display: inline-block;
+      padding: 1px 6px;
+      border: 1px solid rgba(255,255,255,0.18);
+      border-radius: 3px;
+      font-family: ui-monospace, monospace;
+      font-size: 10px;
+      color: #e8eaed;
+      background: rgba(255,255,255,0.05);
+      margin: 0 2px;
+    }
+
+    /* ---- Breath card additions ---- */
+    .hud-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+    .mic-btn {
+      pointer-events: auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 9px;
+      border-radius: 3px;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(255,255,255,0.04);
+      color: #e8eaed;
+      font-family: inherit;
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: -0.1px;
+      cursor: pointer;
+      transition: background 150ms, border-color 150ms;
+    }
+    .mic-btn:hover {
+      background: rgba(255,255,255,0.08);
+      border-color: rgba(255,255,255,0.20);
+    }
+    .mic-btn.active {
+      background: rgba(26,124,255,0.18);
+      border-color: rgba(26,124,255,0.55);
+      color: #cfe2ff;
+    }
+    .mic-btn.denied {
+      background: rgba(255,64,62,0.10);
+      border-color: rgba(255,64,62,0.45);
+      color: #ffb4b3;
+    }
+    .mic-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 100px;
+      background: #B1B3B5;
+      box-shadow: 0 0 0 0 rgba(56,173,14,0);
+      transition: background 150ms;
+    }
+    .mic-btn.active .mic-dot {
+      background: #38AD0E;
+      animation: pulse 1.4s ease-in-out infinite;
+    }
+    .mic-btn.denied .mic-dot { background: #FF403E; }
+    @keyframes pulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(56,173,14,0.4); }
+      50% { box-shadow: 0 0 0 5px rgba(56,173,14,0); }
+    }
+    .mic-hint {
+      margin-top: 8px;
+      font-size: 10px;
+      letter-spacing: 0.02em;
+      color: #7E8082;
+      line-height: 1.5;
+    }
+    .mic-hint kbd {
+      display: inline-block;
+      padding: 0 5px;
+      border: 1px solid rgba(255,255,255,0.18);
+      border-radius: 2px;
+      font-family: ui-monospace, monospace;
+      font-size: 9px;
+      color: #e8eaed;
+      background: rgba(255,255,255,0.05);
+    }
+
+    /* breath state title color shifts by state */
+    #breath-state[data-state="INHALING"] { color: #2AC1BC; }
+    #breath-state[data-state="EXHALING"] { color: #FFC600; }
+
+    /* ---- finished toast ---- */
+    .finished-toast {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, calc(-50% + 20px));
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 18px 22px;
+      background: rgba(18, 20, 24, 0.92);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 64, 62, 0.35);
+      border-radius: var(--mold-r-4, 4px);
+      box-shadow: 0 12px 40px rgba(0,0,0,0.55), 0 0 80px rgba(255,64,62,0.18);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 240ms cubic-bezier(0.4,0,0.2,1), transform 240ms cubic-bezier(0.4,0,0.2,1);
+      z-index: 100;
+      min-width: 320px;
+    }
+    .finished-toast.visible {
+      opacity: 1;
+      transform: translate(-50%, -50%);
+    }
+    .finished-icon {
+      font-size: 28px;
+      line-height: 1;
+      filter: saturate(0.6);
+    }
+    .finished-title {
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: -0.3px;
+      color: #ffb4b3;
+      margin-bottom: 3px;
+    }
+    .finished-sub {
+      font-size: 11px;
+      letter-spacing: 0.02em;
+      color: #B1B3B5;
+    }
+
+    .legend {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      pointer-events: none;
+      z-index: 10;
+    }
+    .legend-card {
+      background: rgba(18, 20, 24, 0.72);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: var(--mold-r-4, 4px);
+      padding: 12px 14px;
+      width: 250px;
+    }
+    .legend-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      padding: 3px 0;
+      color: #B1B3B5;
+    }
+    .legend-row b {
+      color: #e8eaed;
+      font-weight: 500;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .crosshair {
+      position: fixed;
+      left: 50%;
+      top: 50%;
+      width: 20px;
+      height: 20px;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 200ms;
+      z-index: 5;
+    }
+    .crosshair.visible { opacity: 0.55; }
+    .crosshair::before,
+    .crosshair::after {
+      content: "";
+      position: absolute;
+      background: white;
+    }
+    .crosshair::before { left: 50%; top: 0; bottom: 0; width: 1px; transform: translateX(-50%); }
+    .crosshair::after  { top: 50%; left: 0; right: 0; height: 1px; transform: translateY(-50%); }
+  </style>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <div id="app"></div>
+
+  <div class="hud">
+    <div class="hud-card">
+      <div class="hud-eyebrow">cigarette · state machine</div>
+      <div class="hud-title" id="state-title">RESTING</div>
+      <div class="state-row" id="state-row">
+        <div class="state-pill" data-state="IDLE">IDLE</div>
+        <div class="state-pill" data-state="HELD">HELD</div>
+        <div class="state-pill" data-state="SMOKING">SMOKING</div>
+        <div class="state-pill active" data-state="RESTING">REST</div>
+      </div>
+      <div class="meter">
+        <div class="meter-label"><span>burn progress</span><span id="burn-val">0%</span></div>
+        <div class="meter-track"><div class="meter-fill" id="burn-fill"></div></div>
+      </div>
+      <div class="meter">
+        <div class="meter-label"><span>ember intensity</span><span id="ember-val">0.0</span></div>
+        <div class="meter-track"><div class="meter-fill" id="ember-fill" style="background: linear-gradient(90deg, #FFC600, #FF403E);"></div></div>
+      </div>
+    </div>
+
+    <div class="hud-card">
+      <div class="hud-row">
+        <div>
+          <div class="hud-eyebrow">breath · 호흡</div>
+          <div class="hud-title" id="breath-state">IDLE</div>
+        </div>
+        <button class="mic-btn" id="mic-btn" type="button">
+          <span class="mic-dot"></span>
+          <span id="mic-label">마이크 활성화</span>
+        </button>
+      </div>
+      <div class="meter">
+        <div class="meter-label"><span>mic level</span><span id="mic-val">0.00</span></div>
+        <div class="meter-track"><div class="meter-fill" id="mic-fill" style="background: linear-gradient(90deg, #2AC1BC 0%, #1A7CFF 100%);"></div></div>
+      </div>
+      <div class="meter">
+        <div class="meter-label"><span>exhale</span><span id="exhale-val">0%</span></div>
+        <div class="meter-track"><div class="meter-fill" id="exhale-fill" style="background: linear-gradient(90deg, #B1B3B5, #E4E6E8);"></div></div>
+      </div>
+      <div class="mic-hint" id="mic-hint">마이크 권한이 필요해요 · <kbd>Space</kbd> 키로도 흡연할 수 있어요</div>
+    </div>
+  </div>
+
+  <div class="legend">
+    <div class="legend-card">
+      <div class="hud-eyebrow" style="margin-bottom: 8px;">render stats</div>
+      <div class="legend-row"><span>smoke particles</span><b id="stat-particles">1500</b></div>
+      <div class="legend-row"><span>lifecycle</span><b>2.5s · curl noise</b></div>
+      <div class="legend-row"><span>materials</span><b>PBR · concrete · paper</b></div>
+      <div class="legend-row"><span>post fx</span><b>UnrealBloom</b></div>
+      <div class="legend-row"><span>fps</span><b id="stat-fps">—</b></div>
+    </div>
+  </div>
+
+  <div class="crosshair" id="crosshair"></div>
+
+  <div class="finished-toast" id="finished-toast" aria-hidden="true">
+    <div class="finished-icon">🫁</div>
+    <div class="finished-body">
+      <div class="finished-title">콜록 콜록…</div>
+      <div class="finished-sub">담배를 다 피웠어요 · 새 담배를 받으려면 다시 클릭하세요</div>
+    </div>
+  </div>
+
+  <div class="hint">
+    <kbd>click</kbd> 담배를 집어듭니다 &nbsp;·&nbsp;
+    <kbd>마이크</kbd> / <kbd>Space</kbd> 호흡으로 흡연 &nbsp;·&nbsp;
+    <kbd>재떨이 클릭</kbd> 거치 (RESTING) &nbsp;·&nbsp;
+    <kbd>드래그</kbd> 카메라 회전
+  </div>
+
+  <script type="module">
+import * as THREE from "three";
+import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
+import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
+import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+
+// ==== BUNDLED CIGARETTE SCENE ====
+// All src/*.js modules concatenated into one inline module.
+// Source order: src/SmokeSystem.js → src/CoughSynth.js → src/BreathDetector.js → src/Ashtray.js → src/Cigarette.js → src/Interaction.js → src/PostFX.js → src/hud.js → src/main.js
+
+// ---- src/SmokeSystem.js ----
+// SmokeSystem.js
+// GPU billboard particles using InstancedBufferGeometry.
+// 1500 particles, 2.5s lifecycle, curl-noise advection in the vertex shader.
+//
+// CPU side maintains: spawnTime[], anchor[] per particle and recycles dead
+// particles based on the current emit rate.
+//
+// The module is intentionally self-contained so the same SmokeSystem instance
+// can later be swapped for a volumetric raymarching pass without touching
+// `main.js` (see `SmokeBackend` interface below).
+
+
+/**
+ * @typedef {Object} SmokeBackend
+ * @property {THREE.Object3D} mesh
+ * @property {(pos: THREE.Vector3, dir: THREE.Vector3) => void} setAnchor
+ * @property {(rate: number) => void} setEmitRate
+ * @property {(dt: number, t: number) => void} update
+ */
+
+const VERT = /* glsl */ `
+  precision highp float;
+
+  uniform float uTime;
+  uniform float uLifetime;
+  uniform float uBuoyancy;
+  uniform float uCurlStrength;
+  uniform float uNoiseScale;
+  uniform float uSizeScale;
+  uniform float uSizeBirth;
+  uniform float uAlphaScale;
+
+  attribute vec3  aAnchor;
+  attribute float aSpawnTime;
+  attribute vec3  aSeed;
+  attribute vec3  aInitVel;
+
+  varying vec3  vColor;
+  varying float vAlpha;
+  varying vec2  vUv;
+
+  // ---------- hash / value noise / curl ----------
+  float hash13(vec3 p) {
+    p = fract(p * 0.3183099 + vec3(0.1, 0.2, 0.3));
+    p *= 17.0;
+    return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
+  }
+  float vnoise(vec3 p) {
+    vec3 i = floor(p);
+    vec3 f = fract(p);
+    vec3 u = f * f * (3.0 - 2.0 * f);
+    float n000 = hash13(i + vec3(0.0,0.0,0.0));
+    float n100 = hash13(i + vec3(1.0,0.0,0.0));
+    float n010 = hash13(i + vec3(0.0,1.0,0.0));
+    float n110 = hash13(i + vec3(1.0,1.0,0.0));
+    float n001 = hash13(i + vec3(0.0,0.0,1.0));
+    float n101 = hash13(i + vec3(1.0,0.0,1.0));
+    float n011 = hash13(i + vec3(0.0,1.0,1.0));
+    float n111 = hash13(i + vec3(1.0,1.0,1.0));
+    return mix(
+      mix(mix(n000, n100, u.x), mix(n010, n110, u.x), u.y),
+      mix(mix(n001, n101, u.x), mix(n011, n111, u.x), u.y),
+      u.z
+    );
+  }
+  vec3 noise3(vec3 p) {
+    return vec3(
+      vnoise(p),
+      vnoise(p + vec3(31.4, 47.8, 12.7)),
+      vnoise(p + vec3(-29.4, 73.6, 18.1))
+    );
+  }
+  vec3 curlNoise(vec3 p) {
+    float e = 0.6;
+    vec3 dx = vec3(e, 0.0, 0.0);
+    vec3 dy = vec3(0.0, e, 0.0);
+    vec3 dz = vec3(0.0, 0.0, e);
+    vec3 px0 = noise3(p - dx), px1 = noise3(p + dx);
+    vec3 py0 = noise3(p - dy), py1 = noise3(p + dy);
+    vec3 pz0 = noise3(p - dz), pz1 = noise3(p + dz);
+    float cx = (py1.z - py0.z) - (pz1.y - pz0.y);
+    float cy = (pz1.x - pz0.x) - (px1.z - px0.z);
+    float cz = (px1.y - px0.y) - (py1.x - py0.x);
+    return vec3(cx, cy, cz) / (2.0 * e);
+  }
+
+  void main() {
+    float age = uTime - aSpawnTime;
+    float na  = clamp(age / uLifetime, 0.0, 1.0);
+    vUv = uv;
+
+    float alive = step(0.0, age) * step(age, uLifetime);
+
+    // base path: anchor + initial impulse + buoyancy
+    vec3 worldPos = aAnchor;
+    worldPos += aInitVel * age * 0.5;
+    worldPos.y += uBuoyancy * age * (0.65 + aSeed.y * 0.35);
+
+    // curl-noise advection — scales with age so trails diverge, not the source
+    vec3 nP = aAnchor * uNoiseScale + vec3(0.0, uTime * 0.35, 0.0) + aSeed * 5.7;
+    vec3 curl = curlNoise(nP);
+    worldPos += curl * uCurlStrength * age * (0.6 + na * 0.9);
+
+    // size — small at birth, grows as it diffuses
+    float size = mix(uSizeBirth, 0.055 * uSizeScale, na) * (0.65 + aSeed.x * 0.7);
+    size *= alive;
+
+    // alpha curve — quick fade-in, long fade-out
+    float fadeIn  = smoothstep(0.0, 0.08, na);
+    float fadeOut = 1.0 - smoothstep(0.40, 1.0, na);
+    vAlpha = fadeIn * fadeOut * 0.13 * uAlphaScale * alive;
+
+    // color: hot-tan near birth → cool grey → near-white at dispersion
+    vec3 cEarly = vec3(0.92, 0.78, 0.55);
+    vec3 cMid   = vec3(0.78, 0.80, 0.83);
+    vec3 cLate  = vec3(0.95, 0.96, 0.97);
+    vec3 col = mix(cEarly, cMid, smoothstep(0.0, 0.18, na));
+    col = mix(col, cLate, smoothstep(0.45, 1.0, na));
+    vColor = col;
+
+    // billboard
+    vec4 mvPos = viewMatrix * vec4(worldPos, 1.0);
+    float rot = aSeed.z * 6.28318 + uTime * (aSeed.x - 0.5) * 0.3;
+    float cr = cos(rot), sr = sin(rot);
+    vec2 corner = vec2(position.x * cr - position.y * sr, position.x * sr + position.y * cr);
+    mvPos.xy += corner * size;
+    gl_Position = projectionMatrix * mvPos;
+  }
+`;
+
+const FRAG = /* glsl */ `
+  precision highp float;
+  varying vec3  vColor;
+  varying float vAlpha;
+  varying vec2  vUv;
+
+  void main() {
+    vec2 p = vUv * 2.0 - 1.0;
+    float r = length(p);
+    if (r > 1.0) discard;
+    float disk = 1.0 - r;
+    disk = pow(disk, 1.8);
+    float a = disk * vAlpha;
+    if (a < 0.002) discard;
+    gl_FragColor = vec4(vColor, a);
+  }
+`;
+
+class SmokeSystem {
+  /**
+   * @param {{ count?: number, lifetime?: number, sizeScale?: number, sizeBirth?: number, alphaScale?: number, buoyancy?: number, curlStrength?: number }} opts
+   */
+  constructor({
+    count = 1500,
+    lifetime = 2.5,
+    sizeScale = 1,
+    sizeBirth = 0.004,
+    alphaScale = 1,
+    buoyancy = 0.20,
+    curlStrength = 0.045,
+  } = {}) {
+    this.count = count;
+    this.lifetime = lifetime;
+
+    // --- CPU data ---
+    this.spawnTime = new Float32Array(count);
+    this.anchor = new Float32Array(count * 3);
+    this.seed = new Float32Array(count * 3);
+    this.initVel = new Float32Array(count * 3);
+
+    this._curAnchor = new THREE.Vector3(0, 0.1, 0);
+    this._curDir = new THREE.Vector3(0, 1, 0);
+    this._velScale = 1;
+    this._sizeScale = 1;
+    this._emitRate = 0;
+    this._emitAccumulator = 0;
+    this._cursor = 0; // round-robin pointer for respawn
+
+    // seed: all particles start dead, populated lazily by emit rate
+    for (let i = 0; i < count; i++) {
+      this.spawnTime[i] = -lifetime * 10; // far in the past — guaranteed dead
+      this.anchor[i * 3 + 0] = 0;
+      this.anchor[i * 3 + 1] = 0;
+      this.anchor[i * 3 + 2] = 0;
+      this.seed[i * 3 + 0] = Math.random();
+      this.seed[i * 3 + 1] = Math.random();
+      this.seed[i * 3 + 2] = Math.random();
+      this.initVel[i * 3 + 0] = 0;
+      this.initVel[i * 3 + 1] = 0;
+      this.initVel[i * 3 + 2] = 0;
+    }
+
+    // --- geometry ---
+    const geom = new THREE.InstancedBufferGeometry();
+    const quadPos = new Float32Array([
+      -0.5, -0.5, 0,
+       0.5, -0.5, 0,
+       0.5,  0.5, 0,
+      -0.5,  0.5, 0,
+    ]);
+    const quadUv = new Float32Array([0,0,  1,0,  1,1,  0,1]);
+    const indices = new Uint16Array([0, 1, 2, 0, 2, 3]);
+    geom.setAttribute("position", new THREE.BufferAttribute(quadPos, 3));
+    geom.setAttribute("uv", new THREE.BufferAttribute(quadUv, 2));
+    geom.setIndex(new THREE.BufferAttribute(indices, 1));
+    geom.instanceCount = count;
+
+    this.aAnchor = new THREE.InstancedBufferAttribute(this.anchor, 3);
+    this.aSpawnTime = new THREE.InstancedBufferAttribute(this.spawnTime, 1);
+    this.aSeed = new THREE.InstancedBufferAttribute(this.seed, 3);
+    this.aInitVel = new THREE.InstancedBufferAttribute(this.initVel, 3);
+    this.aAnchor.setUsage(THREE.DynamicDrawUsage);
+    this.aSpawnTime.setUsage(THREE.DynamicDrawUsage);
+    geom.setAttribute("aAnchor", this.aAnchor);
+    geom.setAttribute("aSpawnTime", this.aSpawnTime);
+    geom.setAttribute("aSeed", this.aSeed);
+    geom.setAttribute("aInitVel", this.aInitVel);
+
+    // generous bounding sphere — particles move arbitrarily in world space
+    geom.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 0.5, 0), 10);
+
+    // --- material ---
+    const mat = new THREE.ShaderMaterial({
+      vertexShader: VERT,
+      fragmentShader: FRAG,
+      uniforms: {
+        uTime: { value: 0 },
+        uLifetime: { value: lifetime },
+        uBuoyancy: { value: buoyancy },
+        uCurlStrength: { value: curlStrength },
+        uNoiseScale: { value: 6.0 },
+        uSizeScale: { value: sizeScale },
+        uSizeBirth: { value: sizeBirth },
+        uAlphaScale: { value: alphaScale },
+      },
+      transparent: true,
+      depthWrite: false,
+      depthTest: true,
+      blending: THREE.NormalBlending,
+    });
+    this.mat = mat;
+
+    this.mesh = new THREE.Mesh(geom, mat);
+    this.mesh.frustumCulled = false;
+    this.mesh.renderOrder = 5;
+    this.mesh.name = "SmokeSystem";
+  }
+
+  setAnchor(worldPos, worldDir, opts) {
+    this._curAnchor.copy(worldPos);
+    this._curDir.copy(worldDir);
+    this._velScale = (opts && opts.velScale != null) ? opts.velScale : 1;
+    this._sizeScale = (opts && opts.sizeScale != null) ? opts.sizeScale : 1;
+  }
+
+  setEmitRate(particlesPerSec) {
+    this._emitRate = Math.max(0, particlesPerSec);
+  }
+
+  update(dt, t) {
+    this.mat.uniforms.uTime.value = t;
+
+    // determine how many to respawn this frame
+    this._emitAccumulator += this._emitRate * dt;
+    let toSpawn = Math.floor(this._emitAccumulator);
+    if (toSpawn > 60) toSpawn = 60; // safety cap per frame
+    this._emitAccumulator -= toSpawn;
+
+    if (toSpawn === 0) return;
+
+    let dirty = false;
+    let dirtyAnchor = false;
+    for (let n = 0; n < toSpawn; n++) {
+      // find a dead particle starting from the cursor
+      let found = -1;
+      for (let k = 0; k < this.count; k++) {
+        const idx = (this._cursor + k) % this.count;
+        const age = t - this.spawnTime[idx];
+        if (age >= this.lifetime) { found = idx; break; }
+      }
+      if (found < 0) break; // pool exhausted, will pick up next frame
+      this._cursor = (found + 1) % this.count;
+
+      // respawn at current anchor with a tiny radial jitter
+      const jr = 0.003 * Math.random();
+      const ja = Math.random() * Math.PI * 2;
+      const i3 = found * 3;
+      this.anchor[i3 + 0] = this._curAnchor.x + Math.cos(ja) * jr;
+      this.anchor[i3 + 1] = this._curAnchor.y + (Math.random() - 0.5) * 0.002;
+      this.anchor[i3 + 2] = this._curAnchor.z + Math.sin(ja) * jr;
+
+      // an initial impulse aligned with the tip direction, scaled by _velScale
+      const v = 0.02 * this._velScale;
+      const spread = 0.01 * Math.max(1, this._velScale * 0.5);
+      const ivx = this._curDir.x * v + (Math.random() - 0.5) * spread;
+      const ivy = Math.max(0.005, this._curDir.y * v) + Math.random() * 0.015;
+      const ivz = this._curDir.z * v + (Math.random() - 0.5) * spread;
+      this.initVel[i3 + 0] = ivx;
+      this.initVel[i3 + 1] = ivy;
+      this.initVel[i3 + 2] = ivz;
+
+      // slight spawn-time jitter so particles don't quantize to frames
+      this.spawnTime[found] = t - Math.random() * dt;
+
+      dirty = true;
+      dirtyAnchor = true;
+    }
+
+    if (dirty) {
+      this.aSpawnTime.needsUpdate = true;
+      this.aAnchor.needsUpdate = true;
+      this.aInitVel.needsUpdate = true;
+    }
+  }
+}
+
+
+// ---- src/CoughSynth.js ----
+// CoughSynth.js — procedural cough via Web Audio.
+// Each cough = a noise burst shaped by an attack/decay envelope and a swept
+// low-pass filter (open at ~2.2 kHz, closes to ~400 Hz over 200 ms) giving
+// that wet, chesty "kuh" timbre. 2-3 coughs are chained with small random gaps.
+//
+// Triggered once when the cigarette's burn passes the "finished" threshold,
+// using the same AudioContext that's lazily created for the mic detector.
+
+class CoughSynth {
+  constructor() {
+    this._ctx = null;
+    this._lastFiredAt = -Infinity;
+  }
+
+  attach(audioContext) {
+    // share an existing context (e.g. from BreathDetector) so we don't fight
+    // browser autoplay policy with multiple contexts
+    if (audioContext && !this._ctx) this._ctx = audioContext;
+  }
+
+  trigger() {
+    const ctx = this._ensureContext();
+    if (!ctx) return;
+    if (ctx.state === "suspended") ctx.resume().catch(() => {});
+
+    const now = ctx.currentTime;
+    if (now - this._lastFiredAt < 1.2) return; // debounce
+    this._lastFiredAt = now;
+
+    const count = 2 + Math.floor(Math.random() * 2);
+    let t = now + 0.02;
+    for (let i = 0; i < count; i++) {
+      const gain = 0.65 - i * 0.12;
+      this._spawn(ctx, t, gain, i === 0);
+      t += 0.16 + Math.random() * 0.13;
+    }
+  }
+
+  _ensureContext() {
+    if (this._ctx) return this._ctx;
+    try {
+      const AudioCtor = window.AudioContext || window.webkitAudioContext;
+      this._ctx = new AudioCtor();
+    } catch (e) {
+      return null;
+    }
+    return this._ctx;
+  }
+
+  _spawn(ctx, startTime, gainPeak, primary) {
+    // 250 ms of shaped white noise
+    const dur = 0.26;
+    const len = Math.floor(ctx.sampleRate * dur);
+    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    // pinkish noise via simple integration of white noise
+    let last = 0;
+    for (let i = 0; i < len; i++) {
+      const w = Math.random() * 2 - 1;
+      last = last * 0.95 + w * 0.05;
+      data[i] = last * 6 + w * 0.4;
+    }
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+
+    // high-pass to remove DC + sub-bass
+    const hp = ctx.createBiquadFilter();
+    hp.type = "highpass";
+    hp.frequency.value = 220;
+
+    // sweeping low-pass: opens then closes — gives the "kuh" articulation
+    const lp = ctx.createBiquadFilter();
+    lp.type = "lowpass";
+    lp.Q.value = 6.5;
+    lp.frequency.setValueAtTime(primary ? 2400 : 1700, startTime);
+    lp.frequency.exponentialRampToValueAtTime(420, startTime + 0.20);
+
+    // chest resonance peak
+    const peak = ctx.createBiquadFilter();
+    peak.type = "peaking";
+    peak.frequency.value = 380;
+    peak.Q.value = 2.2;
+    peak.gain.value = 9;
+
+    // envelope
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.0001, startTime);
+    gain.gain.linearRampToValueAtTime(gainPeak, startTime + 0.018);
+    gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.22);
+
+    src.connect(hp);
+    hp.connect(lp);
+    lp.connect(peak);
+    peak.connect(gain);
+    gain.connect(ctx.destination);
+    src.start(startTime);
+    src.stop(startTime + 0.30);
+  }
+}
+
+
+// ---- src/BreathDetector.js ----
+// BreathDetector.js
+// Microphone-driven inhale / exhale detector.
+//
+// Conceptually:
+//   • When mic level rises and stays above THRESH_ENTER for INHALE_MIN ms,
+//     we're INHALING (the user is sucking in / breathing into the mic).
+//   • When the level drops below THRESH_EXIT, INHALING ends and we trigger
+//     an EXHALING burst whose duration + intensity scales with how long /
+//     loud the inhale was. After EXHALE_DURATION we return to IDLE.
+//
+// We also expose a continuous `level` (0..1) so the rest of the scene can
+// modulate ember brightness etc. by mic volume rather than just the discrete
+// state.
+//
+// Spacebar fallback: when held, behaves as a clean synthetic inhale at level
+// 0.8 — lets the demo work without granting mic permission.
+
+class BreathDetector {
+  constructor() {
+    /** @type {"IDLE" | "INHALING" | "EXHALING"} */
+    this.state = "IDLE";
+    this.level = 0;          // smoothed 0..1
+    this.exhalePhase = 0;    // 0..1 during EXHALING
+    this.exhaleStrength = 0; // 0..1, scales emit rate during EXHALING
+
+    /** @type {"pending" | "granted" | "denied" | "off"} */
+    this.permission = "off";
+    this.errorMessage = null;
+
+    // Tunables
+    this.threshEnter = 0.22;   // normalized level to start INHALING
+    this.threshExit = 0.12;    // hysteresis exit
+    this.inhaleMinMs = 120;    // must stay above threshEnter this long to count
+    this.exhaleDuration = 1.6; // seconds
+
+    // internal
+    this._stream = null;
+    this._ctx = null;
+    this._analyser = null;
+    this._timeBuf = null;
+    this._inhaleAboveSince = 0;
+    this._inhaleStartTime = 0;
+    this._inhaleAccum = 0; // ∫ level dt
+    this._exhaleStartTime = 0;
+
+    // spacebar fallback
+    this._spaceLevel = 0;
+    window.addEventListener("keydown", (e) => {
+      if (e.code === "Space" && !e.repeat) {
+        e.preventDefault();
+        this._spaceLevel = 0.85;
+      }
+    });
+    window.addEventListener("keyup", (e) => {
+      if (e.code === "Space") {
+        e.preventDefault();
+        this._spaceLevel = 0;
+      }
+    });
+  }
+
+  async enable() {
+    if (this.permission === "granted") return true;
+    this.permission = "pending";
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false,
+        },
+      });
+      const AudioCtor = window.AudioContext || window.webkitAudioContext;
+      const ctx = new AudioCtor();
+      // Some browsers create suspended contexts after a permission prompt.
+      if (ctx.state === "suspended") await ctx.resume();
+      const source = ctx.createMediaStreamSource(stream);
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 1024;
+      analyser.smoothingTimeConstant = 0.6;
+      source.connect(analyser);
+      this._stream = stream;
+      this._ctx = ctx;
+      this._analyser = analyser;
+      this._timeBuf = new Float32Array(analyser.fftSize);
+      this.permission = "granted";
+      return true;
+    } catch (e) {
+      this.permission = "denied";
+      this.errorMessage = e?.message || String(e);
+      return false;
+    }
+  }
+
+  disable() {
+    if (this._stream) {
+      this._stream.getTracks().forEach((t) => t.stop());
+      this._stream = null;
+    }
+    if (this._ctx) {
+      this._ctx.close();
+      this._ctx = null;
+    }
+    this._analyser = null;
+    this._timeBuf = null;
+    this.permission = "off";
+    this.state = "IDLE";
+    this.level = 0;
+  }
+
+  /** Returns raw mic level (0..1), or spacebar value as fallback. */
+  _readLevel() {
+    let micLevel = 0;
+    if (this._analyser && this._timeBuf) {
+      this._analyser.getFloatTimeDomainData(this._timeBuf);
+      let sum = 0;
+      for (let i = 0; i < this._timeBuf.length; i++) {
+        const v = this._timeBuf[i];
+        sum += v * v;
+      }
+      const rms = Math.sqrt(sum / this._timeBuf.length);
+      // -55dB ~= silence floor; -18dB ~= loud blow / shout. Map to 0..1.
+      const db = 20 * Math.log10(rms + 1e-6);
+      micLevel = Math.max(0, Math.min(1, (db + 55) / 37));
+    }
+    return Math.max(micLevel, this._spaceLevel);
+  }
+
+  update(dt, t) {
+    const raw = this._readLevel();
+    // smoothed level for visualization & ember modulation
+    this.level += (raw - this.level) * Math.min(1, dt * 14);
+
+    const above = raw > this.threshEnter;
+    const below = raw < this.threshExit;
+
+    if (this.state === "IDLE") {
+      if (above) {
+        if (this._inhaleAboveSince === 0) this._inhaleAboveSince = t;
+        if ((t - this._inhaleAboveSince) * 1000 > this.inhaleMinMs) {
+          this.state = "INHALING";
+          this._inhaleStartTime = t;
+          this._inhaleAccum = 0;
+        }
+      } else {
+        this._inhaleAboveSince = 0;
+      }
+    } else if (this.state === "INHALING") {
+      this._inhaleAccum += this.level * dt;
+      if (below) {
+        // transition to EXHALING
+        const inhaleDur = Math.max(0.15, t - this._inhaleStartTime);
+        this.exhaleStrength = Math.min(1, this._inhaleAccum * 1.5 + inhaleDur * 0.25);
+        this.state = "EXHALING";
+        this._exhaleStartTime = t;
+        this._inhaleAboveSince = 0;
+      }
+    } else if (this.state === "EXHALING") {
+      this.exhalePhase = (t - this._exhaleStartTime) / this.exhaleDuration;
+      if (this.exhalePhase >= 1) {
+        this.state = "IDLE";
+        this.exhalePhase = 0;
+        this.exhaleStrength = 0;
+      }
+    }
+  }
+
+  /** 0..1: instantaneous strength of exhale puff (falls off over exhalePhase) */
+  getExhaleEmit() {
+    if (this.state !== "EXHALING") return 0;
+    // strong ramp-up, slower fade
+    const p = this.exhalePhase;
+    const env = p < 0.15 ? p / 0.15 : 1 - Math.pow((p - 0.15) / 0.85, 0.85);
+    return Math.max(0, env) * this.exhaleStrength;
+  }
+}
+
+
+// ---- src/Ashtray.js ----
+// Ashtray.js
+// Procedural concrete ashtray (stand-in for a GLB asset).
+// Geometry: thick cylinder bowl with carved interior + 4 V-notches around the rim.
+// Material: PBR with procedurally-generated concrete albedo/roughness/normal.
+
+
+const RADIUS_OUTER = 0.085;   // 85 mm
+const RADIUS_INNER = 0.062;
+const HEIGHT_OUTER = 0.022;
+const HEIGHT_INNER = 0.012;   // depth of bowl
+
+const NOTCH_COUNT = 4;
+const NOTCH_WIDTH_RAD = 0.22; // half-angle of V notch
+const NOTCH_DEPTH = 0.008;
+
+function buildAshtray() {
+  const group = new THREE.Group();
+  group.name = "Ashtray";
+
+  // ---------- materials ----------
+  const { albedo, roughness, normal } = makeConcreteTextures();
+
+  const concrete = new THREE.MeshStandardMaterial({
+    map: albedo,
+    roughnessMap: roughness,
+    normalMap: normal,
+    normalScale: new THREE.Vector2(0.4, 0.4),
+    metalness: 0.0,
+    roughness: 0.92,
+    envMapIntensity: 0.7,
+  });
+
+  // ---------- bowl (lathe) ----------
+  // Cross-section profile, swept around Y.
+  // Goes: outer-bottom → outer-top → inner-top → inner-bottom → center-bottom
+  const profile = [];
+  profile.push(new THREE.Vector2(0, 0));
+  profile.push(new THREE.Vector2(RADIUS_OUTER, 0));
+  profile.push(new THREE.Vector2(RADIUS_OUTER, HEIGHT_OUTER));
+  profile.push(new THREE.Vector2(RADIUS_OUTER - 0.004, HEIGHT_OUTER));      // small chamfer top-outer
+  profile.push(new THREE.Vector2(RADIUS_INNER, HEIGHT_OUTER - 0.002));      // rim inner edge
+  // inner curved scoop
+  const scoopSteps = 8;
+  for (let i = 1; i <= scoopSteps; i++) {
+    const u = i / scoopSteps;
+    const r = RADIUS_INNER * (1 - u) + 0.012 * u;
+    const y = HEIGHT_OUTER - 0.002 - HEIGHT_INNER * Math.sin(u * Math.PI * 0.5);
+    profile.push(new THREE.Vector2(r, y));
+  }
+  profile.push(new THREE.Vector2(0, HEIGHT_OUTER - 0.002 - HEIGHT_INNER));
+
+  const bowlGeom = new THREE.LatheGeometry(profile, 96);
+  bowlGeom.computeVertexNormals();
+  const bowl = new THREE.Mesh(bowlGeom, concrete);
+  bowl.castShadow = true;
+  bowl.receiveShadow = true;
+  group.add(bowl);
+
+  // ---------- V-notches: subtractive blocks (visual only) ----------
+  // We can't CSG easily; instead place narrow wedge cuts as separate dark slits
+  // and small "rest" indentations for the cigarette. We'll add visible notch
+  // markers + invisible snap targets used by the interaction controller.
+
+  /** @type {THREE.Vector3[]} */
+  const snapPositions = [];
+  /** @type {THREE.Vector3[]} */
+  const snapDirections = [];
+
+  for (let i = 0; i < NOTCH_COUNT; i++) {
+    // start at -π/4 so notch 0 is broadside to a camera looking from +X+Z
+    const a = -Math.PI / 4 + (i / NOTCH_COUNT) * Math.PI * 2;
+    const cx = Math.cos(a);
+    const cz = Math.sin(a);
+
+    // Carve the rim: a small flat-bottom slot in the rim. We approximate it
+    // with a thin dark "shadow band" mesh that sits flush with the top of the
+    // rim — visually reads as a notch without needing real CSG.
+    const slotW = NOTCH_WIDTH_RAD * (RADIUS_OUTER + RADIUS_INNER) * 0.5; // arc-length-ish
+    const slotL = RADIUS_OUTER - RADIUS_INNER + 0.006;
+    const slotGeom = new THREE.BoxGeometry(slotL, 0.0008, slotW * 1.3);
+    const slotMat = new THREE.MeshStandardMaterial({
+      color: 0x1a1a1a,
+      roughness: 0.95,
+      metalness: 0.0,
+      envMapIntensity: 0.15,
+    });
+    const slot = new THREE.Mesh(slotGeom, slotMat);
+    const midR = (RADIUS_OUTER + RADIUS_INNER) * 0.5;
+    slot.position.set(midR * cx, HEIGHT_OUTER - 0.0006, midR * cz);
+    slot.rotation.y = -a; // align long axis radially
+    slot.receiveShadow = true;
+    group.add(slot);
+
+    // snap target: cigarette filter end sits on the slot, tip leans toward bowl center
+    const restR = (RADIUS_OUTER + RADIUS_INNER) * 0.5 + 0.004;
+    snapPositions.push(new THREE.Vector3(restR * cx, HEIGHT_OUTER + 0.003, restR * cz));
+    const dir = new THREE.Vector3(-cx, 0.16, -cz).normalize();
+    snapDirections.push(dir);
+  }
+
+  // ---------- base shadow ring (fake AO) ----------
+  const aoTex = makeRadialFalloff();
+  const aoMat = new THREE.MeshBasicMaterial({
+    map: aoTex,
+    transparent: true,
+    opacity: 0.55,
+    depthWrite: false,
+  });
+  const ao = new THREE.Mesh(new THREE.PlaneGeometry(0.35, 0.35), aoMat);
+  ao.rotation.x = -Math.PI / 2;
+  ao.position.y = 0.0005;
+  group.add(ao);
+
+  return {
+    group,
+    snapPositions, // world-space-after-group-transform; group is at origin so == local
+    snapDirections,
+    update(_dt, _t) {},
+  };
+}
+
+// ---------- procedural textures ----------
+function makeConcreteTextures() {
+  const size = 1024;
+
+  // ALBEDO
+  const ac = document.createElement("canvas");
+  ac.width = ac.height = size;
+  const actx = ac.getContext("2d");
+  actx.fillStyle = "#8b8a86";
+  actx.fillRect(0, 0, size, size);
+
+  // splotch big patches
+  for (let i = 0; i < 80; i++) {
+    const x = Math.random() * size;
+    const y = Math.random() * size;
+    const r = 60 + Math.random() * 180;
+    const g = actx.createRadialGradient(x, y, 0, x, y, r);
+    const v = 0.4 + Math.random() * 0.4;
+    const tone = 70 + Math.random() * 60;
+    g.addColorStop(0, `rgba(${tone},${tone - 2},${tone - 5},${v * 0.45})`);
+    g.addColorStop(1, "rgba(0,0,0,0)");
+    actx.fillStyle = g;
+    actx.beginPath();
+    actx.arc(x, y, r, 0, Math.PI * 2);
+    actx.fill();
+  }
+
+  // little dark aggregate specks
+  for (let i = 0; i < 2400; i++) {
+    const x = Math.random() * size;
+    const y = Math.random() * size;
+    const r = 0.5 + Math.random() * 2.2;
+    const v = 30 + Math.random() * 40;
+    actx.fillStyle = `rgba(${v},${v},${v - 5},${0.35 + Math.random() * 0.3})`;
+    actx.beginPath();
+    actx.arc(x, y, r, 0, Math.PI * 2);
+    actx.fill();
+  }
+
+  // grain
+  const img = actx.getImageData(0, 0, size, size);
+  for (let i = 0; i < img.data.length; i += 4) {
+    const n = (Math.random() - 0.5) * 22;
+    img.data[i]     = clamp(img.data[i]     + n);
+    img.data[i + 1] = clamp(img.data[i + 1] + n);
+    img.data[i + 2] = clamp(img.data[i + 2] + n);
+  }
+  actx.putImageData(img, 0, 0);
+
+  const albedo = new THREE.CanvasTexture(ac);
+  albedo.colorSpace = THREE.SRGBColorSpace;
+  albedo.anisotropy = 8;
+  albedo.wrapS = albedo.wrapT = THREE.RepeatWrapping;
+
+  // ROUGHNESS — vary 0.7..1.0
+  const rc = document.createElement("canvas");
+  rc.width = rc.height = size;
+  const rctx = rc.getContext("2d");
+  rctx.fillStyle = "#e0e0e0";
+  rctx.fillRect(0, 0, size, size);
+  for (let i = 0; i < 400; i++) {
+    const x = Math.random() * size, y = Math.random() * size, r = 40 + Math.random() * 120;
+    const g = rctx.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, `rgba(180,180,180,${0.4 + Math.random() * 0.4})`);
+    g.addColorStop(1, "rgba(0,0,0,0)");
+    rctx.fillStyle = g;
+    rctx.beginPath(); rctx.arc(x, y, r, 0, Math.PI * 2); rctx.fill();
+  }
+  const roughness = new THREE.CanvasTexture(rc);
+  roughness.anisotropy = 8;
+
+  // NORMAL — from the albedo's luminance heightmap
+  const normal = canvasToNormalMap(ac, 1.2);
+  normal.anisotropy = 8;
+
+  return { albedo, roughness, normal };
+}
+
+function clamp(v) { return v < 0 ? 0 : v > 255 ? 255 : v; }
+
+function canvasToNormalMap(srcCanvas, strength = 1) {
+  const w = srcCanvas.width, h = srcCanvas.height;
+  const src = srcCanvas.getContext("2d").getImageData(0, 0, w, h).data;
+
+  const out = document.createElement("canvas");
+  out.width = w; out.height = h;
+  const octx = out.getContext("2d");
+  const dst = octx.createImageData(w, h);
+
+  const lum = (i) => 0.299 * src[i] + 0.587 * src[i + 1] + 0.114 * src[i + 2];
+
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const xl = (x - 1 + w) % w, xr = (x + 1) % w;
+      const yu = (y - 1 + h) % h, yd = (y + 1) % h;
+      const il = (y * w + xl) * 4;
+      const ir = (y * w + xr) * 4;
+      const iu = (yu * w + x) * 4;
+      const id = (yd * w + x) * 4;
+      const dx = (lum(ir) - lum(il)) / 255 * strength;
+      const dy = (lum(id) - lum(iu)) / 255 * strength;
+      const nx = -dx, ny = -dy, nz = 1.0;
+      const len = Math.sqrt(nx * nx + ny * ny + nz * nz);
+      const oi = (y * w + x) * 4;
+      dst.data[oi]     = (nx / len * 0.5 + 0.5) * 255;
+      dst.data[oi + 1] = (ny / len * 0.5 + 0.5) * 255;
+      dst.data[oi + 2] = (nz / len * 0.5 + 0.5) * 255;
+      dst.data[oi + 3] = 255;
+    }
+  }
+  octx.putImageData(dst, 0, 0);
+  const tex = new THREE.CanvasTexture(out);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  return tex;
+}
+
+function makeRadialFalloff() {
+  const s = 256;
+  const c = document.createElement("canvas");
+  c.width = c.height = s;
+  const ctx = c.getContext("2d");
+  const g = ctx.createRadialGradient(s / 2, s / 2, 20, s / 2, s / 2, s / 2);
+  g.addColorStop(0, "rgba(0,0,0,0.95)");
+  g.addColorStop(0.45, "rgba(0,0,0,0.35)");
+  g.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, s, s);
+  return new THREE.CanvasTexture(c);
+}
+
+
+// ---- src/Cigarette.js ----
+// Cigarette.js
+// Procedural cigarette: filter + paper + ember disc.
+// Paper material uses MeshStandardMaterial extended via onBeforeCompile to:
+//   - discard fragments above the burn front (uBurn 0..1)
+//   - add emissive ember with sin-based flicker near the burn front
+//   - paint a dark "ash" ring just behind the ember
+// Lays along its local +Y axis: filter at -Y, tip at +Y.
+
+
+// dimensions (meters)
+const L_TOTAL  = 0.084;
+const L_FILTER = 0.025;
+const L_PAPER  = L_TOTAL - L_FILTER; // 0.059
+const RADIUS   = 0.0040;             // 4mm dia
+
+function buildCigarette() {
+  const group = new THREE.Group();
+  group.name = "Cigarette";
+
+  // ---------- materials ----------
+  const paperMat = new THREE.MeshStandardMaterial({
+    color: 0xf5f1e8,
+    roughness: 0.78,
+    metalness: 0.0,
+    map: makePaperAlbedo(),
+  });
+
+  const filterMat = new THREE.MeshStandardMaterial({
+    color: 0xc5a26b,
+    roughness: 0.88,
+    metalness: 0.0,
+    map: makeFilterAlbedo(),
+  });
+
+  // ----- burn shader injection -----
+  /** @type {{ uniforms: Record<string, THREE.IUniform> } | null} */
+  let paperShader = null;
+
+  paperMat.onBeforeCompile = (shader) => {
+    shader.uniforms.uBurn = { value: 0 };
+    shader.uniforms.uTime = { value: 0 };
+    shader.uniforms.uPaperHalf = { value: L_PAPER * 0.5 }; // geometry-local: y in [-h, +h]
+    shader.uniforms.uPaperLen  = { value: L_PAPER };
+    shader.uniforms.uEmberSigma = { value: 0.0030 };
+    shader.uniforms.uEmberIntensity = { value: 0 };
+
+    shader.vertexShader = shader.vertexShader
+      .replace("#include <common>", `
+        #include <common>
+        varying float vPaperY;
+        varying vec2  vPaperUv;
+      `)
+      .replace("#include <begin_vertex>", `
+        #include <begin_vertex>
+        vPaperY = position.y;
+        vPaperUv = uv;
+      `);
+
+    shader.fragmentShader = shader.fragmentShader
+      .replace("#include <common>", `
+        #include <common>
+        uniform float uBurn;
+        uniform float uTime;
+        uniform float uPaperHalf;
+        uniform float uPaperLen;
+        uniform float uEmberSigma;
+        uniform float uEmberIntensity;
+        varying float vPaperY;
+        varying vec2  vPaperUv;
+      `)
+      .replace("#include <emissivemap_fragment>", `
+        #include <emissivemap_fragment>
+
+        // burn front in geometry-local Y (top = +uPaperHalf, retreats as uBurn grows)
+        float burnFront = uPaperHalf - uBurn * uPaperLen;
+        if (vPaperY > burnFront + 0.0002) discard;
+
+        // signed distance from burn front (positive = behind front, toward filter)
+        float d = burnFront - vPaperY;
+
+        // ember Gaussian
+        float emberMask = exp(-d*d / (2.0 * uEmberSigma * uEmberSigma));
+
+        // flicker (per-time + per-position to break uniformity)
+        float n = sin(uTime * 28.0) * 0.5 + sin(uTime * 17.3 + vPaperY * 240.0) * 0.5;
+        float flicker = 0.55 + 0.45 * n;
+
+        // hot ember adds to emissive
+        vec3 ember = vec3(2.4, 0.85, 0.18) * emberMask * flicker * uEmberIntensity;
+        totalEmissiveRadiance += ember;
+
+        // ash band just behind the ember
+        float ashMask = exp(-d*d / (0.016 * 0.016)) - emberMask;
+        ashMask = clamp(ashMask, 0.0, 0.85);
+        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.045, 0.035, 0.028), ashMask);
+      `);
+
+    paperShader = shader;
+  };
+  // make sure onBeforeCompile is rerun when reassigned
+  paperMat.customProgramCacheKey = () => "cigarette-paper-v1";
+
+  // ---------- meshes ----------
+  // filter
+  const filterGeom = new THREE.CylinderGeometry(RADIUS, RADIUS, L_FILTER, 32, 1, false);
+  const filter = new THREE.Mesh(filterGeom, filterMat);
+  filter.position.y = -L_TOTAL / 2 + L_FILTER / 2;
+  filter.castShadow = true;
+  filter.receiveShadow = true;
+  group.add(filter);
+
+  // paper
+  const paperGeom = new THREE.CylinderGeometry(RADIUS, RADIUS, L_PAPER, 32, 24, false);
+  const paper = new THREE.Mesh(paperGeom, paperMat);
+  paper.position.y = -L_TOTAL / 2 + L_FILTER + L_PAPER / 2;
+  paper.castShadow = true;
+  paper.receiveShadow = true;
+  group.add(paper);
+  // for raycasting we want the paper to be the primary pick target
+  paper.userData.pickable = "cigarette";
+  filter.userData.pickable = "cigarette";
+
+  // thin gold band where paper meets filter
+  const bandGeom = new THREE.CylinderGeometry(RADIUS * 1.005, RADIUS * 1.005, 0.0015, 32, 1, false);
+  const bandMat = new THREE.MeshStandardMaterial({
+    color: 0xb98a3c, roughness: 0.4, metalness: 0.6,
+  });
+  const band = new THREE.Mesh(bandGeom, bandMat);
+  band.position.y = filter.position.y + L_FILTER / 2 + 0.00075;
+  group.add(band);
+
+  // ember disc — small bright billboard at the burn front, additive blended.
+  const emberMat = new THREE.MeshBasicMaterial({
+    color: 0xffffff,
+    map: makeEmberDisc(),
+    transparent: true,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+  });
+  const ember = new THREE.Mesh(new THREE.CircleGeometry(RADIUS * 1.6, 24), emberMat);
+  ember.rotation.x = -Math.PI / 2; // face up along +Y by default; but we want it perpendicular to cigarette axis
+  // Actually cigarette axis is +Y. A disc perpendicular to +Y is the default CircleGeometry orientation (normal +Z).
+  // Reset rotation and rotate so disc normal is +Y:
+  ember.rotation.set(-Math.PI / 2, 0, 0);
+  // Position at the tip (top of paper); update() will move it down with burn.
+  ember.position.y = paper.position.y + L_PAPER / 2 - 0.0001;
+  ember.renderOrder = 2;
+  group.add(ember);
+
+  // tip glow — soft sprite for extra bloom punch
+  const glowMat = new THREE.SpriteMaterial({
+    map: makeGlowSprite(),
+    color: 0xff8030,
+    transparent: true,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+  });
+  const glow = new THREE.Sprite(glowMat);
+  glow.scale.set(0.05, 0.05, 0.05);
+  glow.position.y = ember.position.y;
+  glow.renderOrder = 3;
+  group.add(glow);
+
+  // ---------- state ----------
+  let burn = 0; // 0..1
+  let emberIntensity = 0;
+  let prevState = "IDLE";
+
+  // burn rates per second
+  const BURN_RATE = {
+    IDLE: 0,
+    HELD: 0.010,
+    SMOKING: 0.040,
+    RESTING: 0.015,
+  };
+  const EMBER_TARGET = {
+    IDLE: 0,
+    HELD: 0.75,
+    SMOKING: 1.30,
+    RESTING: 0.55,
+  };
+
+  // ---------- API ----------
+  const _tmpVec = new THREE.Vector3();
+  const _tmpQuat = new THREE.Quaternion();
+  const _tipLocal = new THREE.Vector3();
+
+  function getTipLocalY() {
+    // current burn front in cigarette-group local space
+    const paperTopGroupY = paper.position.y + L_PAPER / 2;
+    return paperTopGroupY - burn * L_PAPER;
+  }
+
+  return {
+    group,
+    paperMat,
+    filterMat,
+    pickTargets: [paper, filter, band],
+
+    /** Reset to a fresh cigarette (burn 0, ember 0). */
+    reset() {
+      burn = 0;
+      emberIntensity = 0;
+      if (paperShader) {
+        paperShader.uniforms.uBurn.value = 0;
+        paperShader.uniforms.uEmberIntensity.value = 0;
+      }
+    },
+
+    update(dt, t, state, breath) {
+      // Cigarette is only "lit" once picked up. While IDLE the breath should
+      // have no effect (no ember, no burn, no smoke).
+      const lit = state !== "IDLE";
+      const breathLevel = (breath && lit) ? breath.level : 0;
+      const breathState = (breath && lit) ? breath.state : "IDLE";
+      const inhaling = breathState === "INHALING";
+
+      // burn integration (clamped — cigarette can't burn past the filter band)
+      const baseRate = BURN_RATE[state] ?? 0;
+      const burnBoost = inhaling ? (1 + breathLevel * 4) : 1;
+      burn = Math.min(0.92, burn + baseRate * burnBoost * dt);
+
+      // ember intensity eases toward target. Inhaling spikes it hot.
+      const base = EMBER_TARGET[state] ?? 0;
+      const emberBoost = inhaling ? breathLevel * 1.6 : 0;
+      const target = base + emberBoost;
+      emberIntensity += (target - emberIntensity) * Math.min(1, dt * (inhaling ? 10 : 4));
+
+      // update shader uniforms
+      if (paperShader) {
+        paperShader.uniforms.uBurn.value = burn;
+        paperShader.uniforms.uTime.value = t;
+        paperShader.uniforms.uEmberIntensity.value = emberIntensity;
+      }
+
+      // ember disc tracks burn front
+      const tipY = getTipLocalY();
+      ember.position.y = tipY - 0.00005;
+      glow.position.y = tipY;
+
+      // ember disc visibility — proportional to ember intensity, with flicker
+      const flick = 0.6 + 0.4 * Math.sin(t * 24 + Math.sin(t * 11) * 2);
+      emberMat.opacity = Math.min(1, emberIntensity * 0.85 * flick);
+      glowMat.opacity = Math.min(1, emberIntensity * 0.9);
+      const sc = 0.05 + emberIntensity * 0.04 * flick;
+      glow.scale.setScalar(sc);
+
+      prevState = state;
+    },
+
+    getTipWorldPosition(out = new THREE.Vector3()) {
+      _tipLocal.set(0, getTipLocalY(), 0);
+      out.copy(_tipLocal);
+      group.localToWorld(out);
+      return out;
+    },
+
+    getTipWorldDirection(out = new THREE.Vector3()) {
+      // +Y of group in world space
+      out.set(0, 1, 0);
+      group.getWorldQuaternion(_tmpQuat);
+      out.applyQuaternion(_tmpQuat);
+      return out;
+    },
+
+    getBurn() { return burn; },
+    getEmberIntensity() { return emberIntensity; },
+
+    // resting pose
+    placeAtRest(pos, dir) {
+      group.position.copy(pos).add(_tmpVec.copy(dir).multiplyScalar(L_TOTAL / 2));
+      group.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.clone().normalize());
+    },
+  };
+}
+
+// ---------- procedural textures ----------
+function makePaperAlbedo() {
+  const w = 512, h = 256;
+  const c = document.createElement("canvas");
+  c.width = w; c.height = h;
+  const ctx = c.getContext("2d");
+  ctx.fillStyle = "#f6f1e6";
+  ctx.fillRect(0, 0, w, h);
+  // subtle paper grain
+  const img = ctx.getImageData(0, 0, w, h);
+  for (let i = 0; i < img.data.length; i += 4) {
+    const n = (Math.random() - 0.5) * 14;
+    img.data[i]     += n;
+    img.data[i + 1] += n;
+    img.data[i + 2] += n;
+  }
+  ctx.putImageData(img, 0, 0);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 8;
+  return tex;
+}
+
+function makeFilterAlbedo() {
+  const w = 256, h = 256;
+  const c = document.createElement("canvas");
+  c.width = w; c.height = h;
+  const ctx = c.getContext("2d");
+  // cork-style mottled tan
+  ctx.fillStyle = "#c5a26b";
+  ctx.fillRect(0, 0, w, h);
+  for (let i = 0; i < 1800; i++) {
+    const x = Math.random() * w, y = Math.random() * h;
+    const r = 0.6 + Math.random() * 2.2;
+    const tone = 80 + Math.random() * 60;
+    ctx.fillStyle = `rgba(${tone},${tone - 18},${tone - 35},${0.3 + Math.random() * 0.35})`;
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+  }
+  // dark dotted band at the paper-side end
+  ctx.fillStyle = "rgba(48,30,15,0.6)";
+  for (let i = 0; i < 600; i++) {
+    const x = Math.random() * w;
+    const y = h - 12 - Math.random() * 14;
+    ctx.beginPath(); ctx.arc(x, y, 0.8, 0, Math.PI * 2); ctx.fill();
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 8;
+  return tex;
+}
+
+function makeEmberDisc() {
+  const s = 128;
+  const c = document.createElement("canvas");
+  c.width = c.height = s;
+  const ctx = c.getContext("2d");
+  // hot center with cracked dark spots
+  const g = ctx.createRadialGradient(s / 2, s / 2, 4, s / 2, s / 2, s / 2);
+  g.addColorStop(0, "rgba(255,240,200,1)");
+  g.addColorStop(0.25, "rgba(255,130,40,0.95)");
+  g.addColorStop(0.6, "rgba(180,30,10,0.6)");
+  g.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.arc(s / 2, s / 2, s / 2, 0, Math.PI * 2); ctx.fill();
+  // dark ash cracks
+  ctx.globalCompositeOperation = "multiply";
+  for (let i = 0; i < 18; i++) {
+    const x = Math.random() * s, y = Math.random() * s;
+    const r = 4 + Math.random() * 14;
+    const cg = ctx.createRadialGradient(x, y, 0, x, y, r);
+    cg.addColorStop(0, "rgba(40,20,10,0.9)");
+    cg.addColorStop(1, "rgba(255,255,255,1)");
+    ctx.fillStyle = cg;
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+  }
+  const tex = new THREE.CanvasTexture(c);
+  return tex;
+}
+
+function makeGlowSprite() {
+  const s = 256;
+  const c = document.createElement("canvas");
+  c.width = c.height = s;
+  const ctx = c.getContext("2d");
+  const g = ctx.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
+  g.addColorStop(0, "rgba(255,200,120,1)");
+  g.addColorStop(0.3, "rgba(255,120,40,0.45)");
+  g.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, s, s);
+  return new THREE.CanvasTexture(c);
+}
+
+
+// ---- src/Interaction.js ----
+// Interaction.js
+// Raycaster + state machine: IDLE → HELD → SMOKING → RESTING.
+//
+//   IDLE     unlit, sits in ashtray notch, no burn, no smoke. (initial)
+//   HELD     follows the mouse cursor on a plane in front of the camera.
+//   SMOKING  pinned in front of the camera (mouth pose); burn + smoke accelerate.
+//   RESTING  snapped back to ashtray V-notch; smolders gently.
+//
+// Transitions:
+//   • Click cigarette (IDLE/RESTING)  → HELD
+//   • In HELD, cursor in upper third  → SMOKING
+//   • In SMOKING, cursor below middle → HELD
+//   • Click ashtray (HELD/SMOKING)    → RESTING
+//
+// Orbit drag stays active; only short, near-stationary mouse-ups are treated
+// as clicks (5 px / 250 ms threshold).
+
+
+const STATES = ["IDLE", "HELD", "SMOKING", "RESTING"];
+
+class InteractionController {
+  constructor({ camera, renderer, cigarette, ashtray, orbit }) {
+    this.camera = camera;
+    this.renderer = renderer;
+    this.cigarette = cigarette;
+    this.ashtray = ashtray;
+    this.orbit = orbit;
+
+    this.state = "IDLE";
+
+    this.raycaster = new THREE.Raycaster();
+    this.mouseNdc = new THREE.Vector2();
+
+    // smoothed target pose
+    this.targetPos = new THREE.Vector3();
+    this.targetQuat = new THREE.Quaternion();
+
+    // initialize at rest position 0
+    this._restIndex = 0;
+    this._computeRestTarget(this._restIndex);
+    cigarette.group.position.copy(this.targetPos);
+    cigarette.group.quaternion.copy(this.targetQuat);
+
+    // pointer click vs drag tracking
+    this._downX = 0; this._downY = 0; this._downT = 0;
+
+    this._bindEvents();
+  }
+
+  _bindEvents() {
+    const dom = this.renderer.domElement;
+    dom.addEventListener("pointermove", (e) => {
+      const rect = dom.getBoundingClientRect();
+      this.mouseNdc.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      this.mouseNdc.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+    });
+    dom.addEventListener("pointerdown", (e) => {
+      this._downX = e.clientX;
+      this._downY = e.clientY;
+      this._downT = performance.now();
+    });
+    dom.addEventListener("pointerup", (e) => {
+      const dx = e.clientX - this._downX;
+      const dy = e.clientY - this._downY;
+      const dt = performance.now() - this._downT;
+      if (dx * dx + dy * dy < 36 && dt < 280) {
+        this._onClick();
+      }
+    });
+  }
+
+  _onClick() {
+    this.raycaster.setFromCamera(this.mouseNdc, this.camera);
+
+    // Cigarette has priority — its bounding volume is smaller than the ashtray
+    const cigHits = this.raycaster.intersectObjects(this.cigarette.pickTargets, false);
+    if (cigHits.length > 0) {
+      if (this.state === "IDLE" || this.state === "RESTING") {
+        this._set("HELD");
+        return;
+      }
+    }
+
+    const ashHits = this.raycaster.intersectObject(this.ashtray.group, true);
+    if (ashHits.length > 0) {
+      if (this.state === "HELD" || this.state === "SMOKING") {
+        this._set("RESTING");
+        return;
+      }
+    }
+  }
+
+  _set(s) {
+    if (!STATES.includes(s) || this.state === s) return;
+    this.state = s;
+  }
+
+  // ---------- target-pose computers ----------
+  _computeRestTarget(idx) {
+    const L = 0.084;
+    const pos = this.ashtray.snapPositions[idx];
+    const dir = this.ashtray.snapDirections[idx].clone().normalize();
+    // butt of cigarette sits at `pos`; center is L/2 along direction
+    this.targetPos.copy(pos).addScaledVector(dir, L / 2);
+    this.targetQuat.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+  }
+
+  _computeHeldTarget() {
+    // intersect cursor ray with a plane in front of the camera
+    this.raycaster.setFromCamera(this.mouseNdc, this.camera);
+    const ray = this.raycaster.ray;
+
+    // plane perpendicular to camera forward, ~0.35m in front of camera
+    const planeDist = 0.35;
+    const camFwd = new THREE.Vector3();
+    this.camera.getWorldDirection(camFwd);
+    const planePoint = new THREE.Vector3().copy(this.camera.position).addScaledVector(camFwd, planeDist);
+    const plane = new THREE.Plane();
+    plane.setFromNormalAndCoplanarPoint(camFwd.clone().negate(), planePoint);
+
+    const p = new THREE.Vector3();
+    ray.intersectPlane(plane, p);
+    if (!p) p.copy(planePoint);
+
+    // keep above the desk
+    if (p.y < 0.04) p.y = 0.04;
+
+    // cigarette held upright, slight lean toward camera
+    this.targetPos.copy(p);
+    const up = new THREE.Vector3(0, 1, 0);
+    const toCam = new THREE.Vector3().subVectors(this.camera.position, p).normalize();
+    const dir = up.clone().multiplyScalar(0.85).addScaledVector(toCam, 0.25).normalize();
+    this.targetQuat.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+  }
+
+  _computeSmokingTarget() {
+    // pin to a fixed pose in camera space: forward + down-right offset, tip points away
+    const forward = new THREE.Vector3();
+    this.camera.getWorldDirection(forward);
+    const right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
+    const upLocal = new THREE.Vector3().crossVectors(right, forward).normalize();
+
+    this.targetPos
+      .copy(this.camera.position)
+      .addScaledVector(forward, 0.22)
+      .addScaledVector(right, 0.015)
+      .addScaledVector(upLocal, -0.045);
+
+    // tip points forward (filter near camera ≈ at mouth)
+    this.targetQuat.setFromUnitVectors(new THREE.Vector3(0, 1, 0), forward.clone().normalize());
+  }
+
+  // ---------- per-frame ----------
+  update(_dt, breath) {
+    // Breath-driven HELD ↔ SMOKING transitions.
+    // While the user is INHALING (or holds spacebar) and the cigarette is in
+    // their hand, lift it to the mouth pose. When breath ends, drop it back.
+    if (breath) {
+      if (this.state === "HELD" && breath.state === "INHALING") {
+        this._set("SMOKING");
+      } else if (this.state === "SMOKING" && breath.state !== "INHALING") {
+        this._set("HELD");
+      }
+    }
+
+    // pick the target pose for the current state
+    if (this.state === "HELD") this._computeHeldTarget();
+    else if (this.state === "SMOKING") this._computeSmokingTarget();
+    else if (this.state === "RESTING" || this.state === "IDLE") this._computeRestTarget(this._restIndex);
+
+    // smooth follow — snappier into the mouth, gentler back to rest
+    const k = (this.state === "RESTING" || this.state === "IDLE") ? 0.12
+            : (this.state === "SMOKING") ? 0.32 : 0.28;
+    this.cigarette.group.position.lerp(this.targetPos, k);
+    this.cigarette.group.quaternion.slerp(this.targetQuat, k);
+
+    // crosshair UI hint while HELD/SMOKING
+    const ch = document.getElementById("crosshair");
+    if (ch) ch.classList.toggle("visible", this.state === "HELD" || this.state === "SMOKING");
+  }
+
+  getEmissionRate(breath) {
+    // During INHALING the smoke is being drawn through the cigarette into the
+    // user's "lungs" — visible smoke at the tip drops sharply.
+    const inhaling = breath && breath.state === "INHALING";
+    switch (this.state) {
+      case "IDLE": return 0;
+      case "HELD": return inhaling ? 50 : 180;
+      case "SMOKING": return inhaling ? 90 : 320;
+      case "RESTING": return 260;
+      default: return 0;
+    }
+  }
+}
+
+
+// ---- src/PostFX.js ----
+// PostFX.js — EffectComposer + UnrealBloomPass tuned for ember glow.
+
+
+function buildPostFX(renderer, scene, camera) {
+  const composer = new EffectComposer(renderer);
+  composer.setPixelRatio(renderer.getPixelRatio());
+
+  const renderPass = new RenderPass(scene, camera);
+  composer.addPass(renderPass);
+
+  const bloom = new UnrealBloomPass(
+    new THREE.Vector2(window.innerWidth, window.innerHeight),
+    0.55,   // strength — ember pickup
+    0.40,   // radius
+    1.20    // threshold — only HDR ember (>1.0) crosses
+  );
+  composer.addPass(bloom);
+
+  const output = new OutputPass();
+  composer.addPass(output);
+
+  return {
+    composer,
+    bloom,
+    render(_dt) { composer.render(); },
+    setSize(w, h) {
+      composer.setSize(w, h);
+      bloom.setSize(w, h);
+    },
+  };
+}
+
+
+// ---- src/hud.js ----
+// hud.js — DOM HUD bindings:
+//   • cigarette state pills + burn/ember meters
+//   • mic enable button + mic level meter + breath state + exhale meter
+
+class HUD {
+  constructor() {
+    this.stateTitle = document.getElementById("state-title");
+    this.stateRow = document.getElementById("state-row");
+    this.burnFill = document.getElementById("burn-fill");
+    this.burnVal = document.getElementById("burn-val");
+    this.emberFill = document.getElementById("ember-fill");
+    this.emberVal = document.getElementById("ember-val");
+    this.fpsEl = document.getElementById("stat-fps");
+
+    // breath card
+    this.breathState = document.getElementById("breath-state");
+    this.micBtn = document.getElementById("mic-btn");
+    this.micLabel = document.getElementById("mic-label");
+    this.micFill = document.getElementById("mic-fill");
+    this.micVal = document.getElementById("mic-val");
+    this.exhaleFill = document.getElementById("exhale-fill");
+    this.exhaleVal = document.getElementById("exhale-val");
+    this.micHint = document.getElementById("mic-hint");
+
+    // finished toast
+    this.finishedToast = document.getElementById("finished-toast");
+
+    this._onEnable = null;
+  }
+
+  showFinished() {
+    if (this.finishedToast) this.finishedToast.classList.add("visible");
+  }
+  hideFinished() {
+    if (this.finishedToast) this.finishedToast.classList.remove("visible");
+  }
+
+  bindMicEnable(handler) {
+    this._onEnable = handler;
+    this.micBtn.addEventListener("click", async () => {
+      if (this.micBtn.classList.contains("active")) return;
+      this.micLabel.textContent = "권한 요청 중…";
+      const ok = await handler();
+      this._renderPermission(ok ? "granted" : "denied");
+    });
+  }
+
+  _renderPermission(perm) {
+    this.micBtn.classList.toggle("active", perm === "granted");
+    this.micBtn.classList.toggle("denied", perm === "denied");
+    if (perm === "granted") {
+      this.micLabel.textContent = "마이크 활성화 됨";
+      this.micHint.innerHTML = '담배를 입에 대고 <b style="color:#e8eaed">호흡</b>해 보세요 · 들이마시면 불꽃이 빨갛게 달아올라요';
+    } else if (perm === "denied") {
+      this.micLabel.textContent = "권한 거부됨";
+      this.micHint.innerHTML = '<kbd>Space</kbd> 키를 길게 누르면 흡연 시뮬레이션을 사용할 수 있어요';
+    }
+  }
+
+  update({ state, burn, ember, breath }) {
+    // cigarette card
+    this.stateTitle.textContent = state;
+    this.stateRow.querySelectorAll(".state-pill").forEach((el) => {
+      el.classList.toggle("active", el.dataset.state === state);
+    });
+    const bPct = (burn * 100).toFixed(0) + "%";
+    this.burnFill.style.width = bPct;
+    this.burnVal.textContent = bPct;
+
+    const ePct = Math.min(100, ember * 60).toFixed(0) + "%";
+    this.emberFill.style.width = ePct;
+    this.emberVal.textContent = ember.toFixed(2);
+
+    // breath card
+    if (breath) {
+      this.breathState.textContent = breath.state;
+      this.breathState.setAttribute("data-state", breath.state);
+
+      const mPct = (breath.level * 100).toFixed(0) + "%";
+      this.micFill.style.width = mPct;
+      this.micVal.textContent = breath.level.toFixed(2);
+
+      const exhaleEmit = breath.getExhaleEmit();
+      const xPct = (exhaleEmit * 100).toFixed(0) + "%";
+      this.exhaleFill.style.width = xPct;
+      this.exhaleVal.textContent = xPct;
+    }
+  }
+
+  commitFps(n) {
+    if (this.fpsEl) this.fpsEl.textContent = String(n);
+  }
+}
+
+
+// ---- src/main.js ----
+// main.js — orchestrator
+// In a Vite/TS project this is `main.ts`; module signatures map 1:1.
+
+
+
+// ---------- renderer / scene / camera ----------
+const app = document.getElementById("app");
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: "high-performance" });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 0.85;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+app.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color("#0a0b0d");
+
+// PMREM environment for PBR
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+
+const camera = new THREE.PerspectiveCamera(38, window.innerWidth / window.innerHeight, 0.05, 50);
+camera.position.set(0.42, 0.28, 0.52);
+camera.lookAt(0, 0.03, 0);
+
+// ---------- lights ----------
+// key light - warm
+const keyLight = new THREE.DirectionalLight(0xfff3e0, 1.4);
+keyLight.position.set(1.6, 2.4, 1.1);
+keyLight.castShadow = true;
+keyLight.shadow.mapSize.set(2048, 2048);
+keyLight.shadow.camera.left = -1.5;
+keyLight.shadow.camera.right = 1.5;
+keyLight.shadow.camera.top = 1.5;
+keyLight.shadow.camera.bottom = -1.5;
+keyLight.shadow.camera.near = 0.1;
+keyLight.shadow.camera.far = 8;
+keyLight.shadow.bias = -0.0005;
+keyLight.shadow.normalBias = 0.02;
+scene.add(keyLight);
+
+// fill - cool
+const fill = new THREE.DirectionalLight(0x8fb0ff, 0.35);
+fill.position.set(-1.2, 0.9, -0.8);
+scene.add(fill);
+
+// rim
+const rim = new THREE.PointLight(0xffa66e, 0.9, 2.5, 2);
+rim.position.set(-0.6, 0.3, -0.6);
+scene.add(rim);
+
+scene.add(new THREE.AmbientLight(0xffffff, 0.08));
+
+// ---------- ground (desk surface) ----------
+const groundMat = new THREE.MeshStandardMaterial({
+  color: 0x111317,
+  roughness: 0.65,
+  metalness: 0.0,
+});
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(8, 8), groundMat);
+ground.rotation.x = -Math.PI / 2;
+ground.position.y = 0;
+ground.receiveShadow = true;
+scene.add(ground);
+
+// subtle desk highlight ring (procedural)
+const rugTex = makeRugTexture();
+groundMat.map = rugTex;
+groundMat.needsUpdate = true;
+
+// ---------- scene objects ----------
+const ashtray = buildAshtray();
+ashtray.group.position.y = 0;
+scene.add(ashtray.group);
+
+const cigarette = buildCigarette();
+scene.add(cigarette.group);
+
+// Smoke particle system. 1500 instanced billboards from the cigarette tip.
+const smoke = new SmokeSystem({
+  count: 1500,
+  lifetime: 2.5,
+});
+scene.add(smoke.mesh);
+
+// Separate, smaller system that emits from the user's "mouth" (camera) during
+// the EXHALING phase. Kept isolated so the cigarette's smolder smoke and the
+// exhale puff can have independent emission anchors, velocities, lifetimes,
+// AND density/size characteristics.
+const smokeMouth = new SmokeSystem({
+  count: 900,
+  lifetime: 2.2,
+  sizeBirth: 0.030,    // start at ~3cm (vs 4mm) so the puff is visible immediately
+  sizeScale: 1.6,      // grows to ~9cm
+  alphaScale: 1.5,     // denser
+  buoyancy: 0.08,      // less up-drift; momentum-driven
+  curlStrength: 0.060, // more turbulent rollover
+});
+scene.add(smokeMouth.mesh);
+
+// Mic-driven breath detector. Disabled until the user clicks "마이크 활성화".
+// Spacebar works as a fallback so the demo is usable without mic permission.
+const breath = new BreathDetector();
+
+// Procedural cough audio. Triggered once when the cigarette is fully consumed.
+const cough = new CoughSynth();
+
+// ---------- post fx ----------
+const post = buildPostFX(renderer, scene, camera);
+
+// ---------- controls ----------
+const orbit = new OrbitControls(camera, renderer.domElement);
+orbit.target.set(0, 0.03, 0);
+orbit.enableDamping = true;
+orbit.dampingFactor = 0.08;
+orbit.minDistance = 0.35;
+orbit.maxDistance = 1.4;
+orbit.minPolarAngle = 0.2;
+orbit.maxPolarAngle = Math.PI / 2 - 0.05;
+orbit.update();
+
+// ---------- interaction state machine ----------
+const interaction = new InteractionController({
+  camera,
+  renderer,
+  cigarette,
+  ashtray,
+  orbit,
+});
+
+// ---------- HUD ----------
+const hud = new HUD();
+hud.bindMicEnable(async () => {
+  const ok = await breath.enable();
+  // share the mic's AudioContext with the cough synth (avoids autoplay issues)
+  if (ok && breath._ctx) cough.attach(breath._ctx);
+  return ok;
+});
+
+// ---------- resize ----------
+window.addEventListener("resize", () => {
+  const w = window.innerWidth, h = window.innerHeight;
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  renderer.setSize(w, h);
+  post.setSize(w, h);
+});
+
+// ---------- main loop ----------
+// Use rAF when the tab is visible; fall back to setTimeout when it isn't,
+// so verification screenshots still capture a live frame.
+const clock = new THREE.Clock();
+let frame = 0, fpsT = 0;
+
+// reused per-frame to avoid allocations
+const _fwd = new THREE.Vector3();
+const _right = new THREE.Vector3();
+const _up = new THREE.Vector3();
+const _mouthPos = new THREE.Vector3();
+const _mouthDir = new THREE.Vector3();
+
+// finished-cigarette tracking
+const BURN_FINISHED = 0.90;
+let finished = false;
+let finishedAt = 0;
+
+function schedule(fn) {
+  if (document.hidden) setTimeout(fn, 16);
+  else requestAnimationFrame(fn);
+}
+
+function tick() {
+  const dt = Math.min(clock.getDelta(), 1 / 30);
+  const t = clock.elapsedTime;
+
+  // breath drives ember/burn modulation and HELD↔SMOKING transitions
+  breath.update(dt, t);
+
+  interaction.update(dt, breath);
+  cigarette.update(dt, t, interaction.state, breath);
+  ashtray.update(dt, t);
+
+  // ---- finished-cigarette: trigger cough + force a final exhale puff ----
+  if (!finished && cigarette.getBurn() >= BURN_FINISHED && interaction.state !== "IDLE") {
+    finished = true;
+    finishedAt = t;
+    cough.trigger();
+    // synthesize a strong exhale via the breath detector so the smoke puff fires
+    breath.state = "EXHALING";
+    breath.exhalePhase = 0.05;
+    breath.exhaleStrength = 1.0;
+    breath._exhaleStartTime = t;
+    interaction._set("RESTING");
+    hud.showFinished();
+  }
+
+  // allow a fresh cigarette by clicking after a cooldown
+  if (finished && (t - finishedAt) > 2.4 && interaction.state === "HELD") {
+    cigarette.reset();
+    finished = false;
+    hud.hideFinished();
+  }
+
+  // ---- smoke from cigarette tip (smolder + suppressed during inhale) ----
+  const tipWorld = cigarette.getTipWorldPosition();
+  const tipDir = cigarette.getTipWorldDirection();
+  smoke.setAnchor(tipWorld, tipDir);
+  smoke.setEmitRate(interaction.getEmissionRate(breath));
+  smoke.update(dt, t);
+
+  // ---- mouth exhale puff: spawn from camera-relative mouth position ----
+  const exhaleEmit = breath.getExhaleEmit();
+  if (exhaleEmit > 0.001) {
+    _fwd.setFromMatrixColumn(camera.matrixWorld, 2).negate().normalize();
+    _right.setFromMatrixColumn(camera.matrixWorld, 0).normalize();
+    _up.setFromMatrixColumn(camera.matrixWorld, 1).normalize();
+    _mouthPos.copy(camera.position)
+      .addScaledVector(_fwd, 0.12)
+      .addScaledVector(_up, -0.05)
+      .addScaledVector(_right, 0.02);
+    // exhale velocity: mostly forward, slight downward, with spread
+    _mouthDir.copy(_fwd).addScaledVector(_up, -0.10).normalize();
+    smokeMouth.setAnchor(_mouthPos, _mouthDir, { velScale: 12 });
+    smokeMouth.setEmitRate(exhaleEmit * 420);
+  } else {
+    smokeMouth.setEmitRate(0);
+  }
+  smokeMouth.update(dt, t);
+
+  orbit.update();
+  post.render(dt);
+
+  hud.update({
+    state: interaction.state,
+    burn: cigarette.getBurn(),
+    ember: cigarette.getEmberIntensity(),
+    breath,
+    fps: ++frame,
+  });
+  if (t - fpsT > 0.5) {
+    hud.commitFps((frame / (t - fpsT)) | 0);
+    frame = 0; fpsT = t;
+  }
+
+  schedule(tick);
+}
+
+// expose for debugging / programmatic control
+window.__scene = { scene, camera, renderer, cigarette, ashtray, smoke, smokeMouth, interaction, post, breath };
+
+schedule(tick);
+
+// ---------- helpers ----------
+function makeRugTexture() {
+  const s = 512;
+  const c = document.createElement("canvas");
+  c.width = c.height = s;
+  const ctx = c.getContext("2d");
+
+  // dark base
+  ctx.fillStyle = "#101216";
+  ctx.fillRect(0, 0, s, s);
+
+  // soft radial vignette to fake desk highlight
+  const grad = ctx.createRadialGradient(s / 2, s / 2, 30, s / 2, s / 2, s * 0.55);
+  grad.addColorStop(0, "rgba(120,135,160,0.10)");
+  grad.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, s, s);
+
+  // micro grain
+  const img = ctx.getImageData(0, 0, s, s);
+  for (let i = 0; i < img.data.length; i += 4) {
+    const n = (Math.random() - 0.5) * 8;
+    img.data[i] += n;
+    img.data[i + 1] += n;
+    img.data[i + 2] += n;
+  }
+  ctx.putImageData(img, 0, 0);
+
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(2, 2);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+
+
+</script>
+</body>
+</html>
