@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>typo-vibe s2</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#fff;font-family:'Pretendard',-apple-system,sans-serif;color:#111}
+
+/* Top bar: title left, day nav + season link right */
+.topbar{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;
+  border:1px solid #111;padding:28px 28px 24px}
+.topbar h1{font-size:32px;font-weight:900;line-height:1.05;letter-spacing:-0.03em}
+.topbar nav{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:4px 16px}
+.topbar nav a{font-size:13px;font-weight:400;color:#111;text-decoration:none;
+  padding:4px 0;transition:opacity .2s}
+.topbar nav a:hover{opacity:.4}
+.topbar nav .season{margin-left:8px}
+
+/* 4 cards per row */
+.grid{display:grid;grid-template-columns:repeat(4,1fr);grid-auto-rows:240px;border-left:1px solid #111}
+.card{border-right:1px solid #111;border-bottom:1px solid #111;
+  position:relative;overflow:hidden;display:block;text-decoration:none;color:inherit;
+  cursor:pointer;transition:background .2s}
+.card:hover{background:#f8f8f8}
+.card iframe{width:400%;height:400%;transform:scale(.25);transform-origin:top left;
+  border:none;pointer-events:none;position:absolute;top:0;left:0}
+.card .label{position:absolute;bottom:8px;left:10px;right:10px;
+  font-size:9px;color:#999;opacity:0;transition:opacity .2s}
+.card:hover .label{opacity:1}
+.empty{border-right:1px solid #111;border-bottom:1px solid #111;
+  display:flex;align-items:flex-end;padding:10px;font-size:9px;color:#999}
+
+@media(max-width:900px){
+  .topbar{flex-direction:column;align-items:flex-start;padding:24px 20px}
+  .topbar h1{font-size:26px}
+  .topbar nav{justify-content:flex-start}
+  .grid{grid-template-columns:repeat(2,1fr)}
+}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <h1>typo vibe s2</h1>
+  <nav id="nav"></nav>
+</header>
+<main class="grid" id="grid"></main>
+
+<script>
+// Newest first. Each entry maps to season2/<day>/index.html
+const items = [
+  { day:'day01', title:'구멍 너머 티스베' },
+];
+
+const nav = document.getElementById('nav');
+const grid = document.getElementById('grid');
+
+nav.innerHTML = items.map(it =>
+  `<a href="${it.day}/index.html" title="${it.title}">${it.day.replace('day', '')}</a>`).join('')
+  + `<a class="season" href="../index.html">← s1</a>`;
+
+items.forEach(item => {
+  const card = document.createElement('a');
+  card.className = 'card';
+  card.href = item.day + '/index.html';
+  card.innerHTML = `
+    <iframe src="${item.day}/index.html?preview" loading="lazy" tabindex="-1" aria-hidden="true"></iframe>
+    <div class="label">${item.day} — ${item.title}</div>`;
+  grid.appendChild(card);
+});
+
+// Pad the last row with empty cells so the grid lines stay closed
+const pad = items.length === 0 ? 4 : (4 - items.length % 4) % 4;
+for (let i = 0; i < pad; i++) {
+  const cell = document.createElement('div');
+  cell.className = 'empty';
+  if (items.length === 0 && i === 0) cell.textContent = 'coming soon';
+  grid.appendChild(cell);
+}
+</script>
+</body>
+</html>

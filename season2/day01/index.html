@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>구멍 너머 티스베 — typo-vibe s2</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/galmuri@2.39.3/dist/galmuri.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="menubar">
+  <a class="menubar-home" href="../index.html" aria-label="시즌 2 목록으로">◆</a>
+  <span class="menubar-title">구멍</span>
+  <span class="menubar-status">
+    <span id="night-name"></span>
+    <span class="hearts" id="hearts"></span>
+    <span class="candles" id="candles"></span>
+    <ol class="nights" id="nights" aria-label="지나온 밤"></ol>
+  </span>
+  <button type="button" class="menubar-sound" id="sound" aria-pressed="true">♪ 소리</button>
+</header>
+
+<main class="desk">
+  <section class="win hole-win" aria-labelledby="hole-title">
+    <h2 class="win-title"><span id="hole-title">구멍</span></h2>
+    <div class="scene-box" id="scene-box">
+      <canvas id="scene" role="img" aria-label="벽의 구멍"></canvas>
+    </div>
+    <div class="caption" id="caption" aria-live="polite"></div>
+
+  </section>
+
+  <section class="win side-win" aria-labelledby="side-title">
+    <h2 class="win-title"><span id="side-title">추리</span></h2>
+    <div class="clue-box">
+      <p class="clue-lead">티스베는 이렇게 생겼다</p>
+      <div class="clues" id="clues"></div>
+    </div>
+    <div class="controls">
+      <p class="step"><b>1</b> 누구를 볼까 <small>고르면 노크가 들린다</small></p>
+      <div class="people" id="people" role="group" aria-label="구멍 앞의 사람들"></div>
+
+      <p class="step"><b>2</b> 어디를 볼까 <small>처음 보는 곳은 촛불 1개</small></p>
+      <div class="probes">
+        <button type="button" class="cmd" data-probe="eye"></button>
+        <button type="button" class="cmd" data-probe="mouth"></button>
+        <button type="button" class="cmd" data-probe="hand"></button>
+        <button type="button" class="cmd" data-probe="talk"></button>
+      </div>
+
+      <p class="step"><b>3</b> 티스베를 찾았다면</p>
+      <div class="decide">
+        <button type="button" class="cmd" id="exclude"></button>
+        <button type="button" class="cmd verdict" id="accuse"></button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<dialog class="modal" id="modal" aria-labelledby="modal-title">
+  <h2 class="win-title"><span id="modal-title"></span></h2>
+  <div class="modal-body">
+    <p class="modal-mark" id="modal-mark"></p>
+    <p class="modal-text" id="modal-text"></p>
+    <ul class="modal-list" id="modal-list"></ul>
+    <button type="button" class="cmd modal-btn" id="modal-btn"></button>
+  </div>
+</dialog>
+
+<script src="story.js"></script>
+<script src="sound.js"></script>
+<script src="scene.js"></script>
+<script src="game.js"></script>
+</body>
+</html>
