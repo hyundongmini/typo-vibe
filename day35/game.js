@@ -483,8 +483,8 @@
   window.addEventListener('resize', fitCanvas);
   Scene.showEmpty();
   renderStatus();
-  // Index cards embed the page with ?preview: skip the intro dialog so the wall shows
-  const isPreview = new URLSearchParams(location.search).has('preview');
+  // Index cards embed the page in an iframe: skip the intro dialog so the wall shows
+  const isPreview = window.self !== window.top;
   document.documentElement.classList.toggle('preview', isPreview);
   if (!isPreview) modal({ title: S.intro.title, text: S.intro.text, button: UI.start, onClose: newGame });
 })();

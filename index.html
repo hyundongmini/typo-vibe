@@ -19,9 +19,6 @@ body{background:#fff;font-family:'Pretendard',-apple-system,sans-serif;color:#11
 .menu-col nav a{font-size:13px;font-weight:400;color:#111;text-decoration:none;
   padding:8px 0;transition:opacity .2s;display:block}
 .menu-col nav a:hover{opacity:.4}
-.menu-col .season{display:inline-block;font-size:13px;font-weight:700;color:#111;text-decoration:none;
-  margin:-16px 0 24px;transition:opacity .2s}
-.menu-col .season:hover{opacity:.4}
 
 /* Right 3 columns grid */
 .card{border-right:1px solid #111;border-bottom:1px solid #111;
@@ -51,6 +48,7 @@ body{background:#fff;font-family:'Pretendard',-apple-system,sans-serif;color:#11
 
 <script>
 const items = [
+  { day:'day35', title:'구멍 너머 티스베' },
   { day:'day34', title:'숨으로 피우는 담배' },
   { day:'day33', title:'비정형 브러시 타이포' },
   { day:'day32', title:'아스키 변도동' },
@@ -94,7 +92,7 @@ const rows = Math.ceil(items.length / 3);
 const menu = document.createElement('div');
 menu.className = 'menu-col';
 menu.style.gridRow = '1 / ' + (rows + 1);
-menu.innerHTML = `<h1>typo<br>vibe</h1><a class="season" href="season2/index.html">s2 →</a><nav>${items.map(it => 
+menu.innerHTML = `<h1>typo<br>vibe</h1><nav>${items.map(it => 
   `<a href="${it.day}/index.html">${it.title}</a>`).join('')}</nav>`;
 layout.appendChild(menu);
 
