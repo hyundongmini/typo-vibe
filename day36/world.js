@@ -181,7 +181,7 @@ function drawFace(g, f, blush) {
     g.lineWidth = 2.5;
     [48, 58, 68, 78].forEach((x, i) => { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, 10 + (i % 2) * 4); g.stroke(); });
   }
-  if (blush > 0) {
+  if (blush > 0 && !f.live) {
     const big = f.live ? 1.5 : 1;
     // Cheek height differs: on a live face the cheeks sit higher on the head patch
     const cy = f.live ? 64 : 80;
@@ -248,15 +248,15 @@ function faceMask() {
     g.fillStyle = '#000';
     g.fillRect(0, 0, w, h);
     g.save();
-    g.translate(w / 2, h * 0.54);
-    g.scale(0.8, 1);
-    const grad = g.createRadialGradient(0, 0, 40, 0, 0, 118);
+    g.translate(w / 2, h * 0.5);
+    g.scale(0.92, 1);
+    const grad = g.createRadialGradient(0, 0, 60, 0, 0, 128);
     grad.addColorStop(0, '#fff');
-    grad.addColorStop(0.65, '#fff');
+    grad.addColorStop(0.82, '#fff');
     grad.addColorStop(1, '#000');
     g.fillStyle = grad;
     g.beginPath();
-    g.arc(0, 0, 120, 0, Math.PI * 2);
+    g.arc(0, 0, 128, 0, Math.PI * 2);
     g.fill();
     g.restore();
   });
@@ -337,7 +337,7 @@ function makePerson({ coat, isPlayer = false } = {}) {
   // edges so it melts into the skin, under the 3D hair; a layer on top carries blush and sweat
   let videoFace = null, videoOverlay = null;
   if (isPlayer) {
-    const patch = r => new THREE.SphereGeometry(r, 32, 24, Math.PI * 1.5 - 1.2, 2.4, Math.PI / 2 - 0.72, 1.95);
+    const patch = r => new THREE.SphereGeometry(r, 32, 24, Math.PI * 1.5 - 1.35, 2.7, Math.PI / 2 - 1.2, 2.25);
     videoFace = new THREE.Mesh(patch(0.1418), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, alphaMap: faceMask(), depthWrite: false }));
     videoOverlay = new THREE.Mesh(patch(0.1428), new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false }));
     videoFace.visible = videoOverlay.visible = false;
@@ -1044,9 +1044,9 @@ const World = {
     const v = faceCrop.video;
     if (!v || !box || !v.videoWidth) return;
     const W = v.videoWidth, H = v.videoHeight;
-    // Tight square on the features only (brows to chin); the 3D hair supplies the rest
-    const size = Math.min(Math.max(box.w, box.h) * 1.2, W, H);
-    const cx = box.x + box.w / 2, cy = box.y + box.h * 0.56;
+    // Square from forehead to chin; the 3D hair supplies everything above
+    const size = Math.min(Math.max(box.w, box.h) * 1.3, W, H);
+    const cx = box.x + box.w / 2, cy = box.y + box.h * 0.46;
     const x = clamp(cx - size / 2, 0, W - size), y = clamp(cy - size / 2, 0, H - size);
     faceCrop.target = { x: x / W, y: y / H, w: size / W, h: size / H };
     faceCrop.lastSeen = clock.elapsedTime;
