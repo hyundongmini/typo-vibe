@@ -84,6 +84,7 @@ window.STORY = {
     walletWrong: '이건 신용카드다. 도로 넣자.',
     walletCards: { transit: '교통카드', credit: '신용카드' },
     walletTip: '눌러서 열기',
+    cardOutTip: '이제 단말기에 찍기',
     kioskTitle: '교통카드 충전·정산기',
     kioskCard: '교통카드',
     kioskBill: n => `${n.toLocaleString('ko-KR')}원`,

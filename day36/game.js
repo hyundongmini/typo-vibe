@@ -63,6 +63,7 @@
     queue: 0,
     hand: 'card',
     isCharged: false,
+    hasSeenShort: false, // the kiosk button shows up only after the reader says the balance is short
     phase: 'intro', // intro | sign | gate | aside | passing | end
     log: [],
     photos: [], // { url, alt, name }
@@ -210,11 +211,11 @@
     const g = gate();
     const isWallet = state.hand === 'wallet';
     els.card.classList.toggle('wallet', isWallet);
-    els.cardTip.textContent = UI.walletTip;
+    if (isWallet) els.cardTip.textContent = UI.walletTip;
     els.holding.textContent = isWallet ? UI.holdingWallet : UI.holdingCard;
     els.takeOut.hidden = !isWallet;
     els.takeOut.textContent = `${UI.takeOut} (+${S.penalty.takeOut}초)`;
-    els.charge.hidden = !g.kiosk;
+    els.charge.hidden = !g.kiosk || !state.hasSeenShort;
     els.charge.textContent = `${g.kind === 'exit' ? UI.settle : UI.charge} (+${S.penalty.charge}초)`;
     els.charge.disabled = state.isCharged;
     const canAct = state.phase === 'gate';
@@ -444,6 +445,10 @@
   function fail(kind, side) {
     const g = gate();
     if (drag.isActive) endHold();
+    if (kind === 'balance' && !state.hasSeenShort) {
+      state.hasSeenShort = true;
+      renderHand();
+    }
     state.awkwardHere++;
     state.awkwardTotal++;
     state.clock += S.penalty.fail;
@@ -597,7 +602,13 @@
     state.clock += S.penalty.takeOut;
     renderHand();
     renderHud();
+    // Nudge: the card is out, now tap it
+    els.cardTip.textContent = UI.cardOutTip;
+    els.card.classList.add('tip-on');
+    clearTimeout(tipTimer);
+    tipTimer = setTimeout(() => els.card.classList.remove('tip-on'), 2500);
   }
+  let tipTimer = 0;
 
   /* ---------- kiosk ---------- */
 
@@ -608,9 +619,17 @@
     closeWallet();
     kiosk.step = 'card';
     els.kioskTitle.textContent = UI.kioskTitle;
-    els.kioskScreen.textContent = UI.kioskPlaceCard;
+    // The machine first repeats what the gate said, then asks for the card
+    els.kioskScreen.textContent = S.led.balance;
     els.kioskScreen.classList.remove('done');
-    els.kioskHint.textContent = UI.kioskHintCard;
+    els.kioskScreen.classList.add('warn');
+    els.kioskHint.textContent = '';
+    setTimeout(() => {
+      if (kiosk.step !== 'card' || els.kioskOpen.hidden) return;
+      els.kioskScreen.classList.remove('warn');
+      els.kioskScreen.textContent = UI.kioskPlaceCard;
+      els.kioskHint.textContent = UI.kioskHintCard;
+    }, 1200);
     els.kioskItems.forEach(el => {
       el.textContent = el.dataset.item === 'card' ? UI.kioskCard : UI.kioskBill(S.chargeAmount);
       el.hidden = false;
@@ -739,6 +758,7 @@
       heat: 0,
       hand: 'card',
       isCharged: false,
+      hasSeenShort: false,
       log: [],
       photos: [],
     });
