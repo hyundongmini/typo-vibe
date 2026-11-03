@@ -13,7 +13,6 @@ const QUEUE_Z = 2.35;
 const QUEUE_GAP = 1.05;
 const WALK_SPEED = 1.6;
 const HIT_SCALE = 1.35; // touch targets a bit larger than the drawn reader
-const FACE_CARD_R = 0.37; // radius of the round webcam face
 
 // Camera sits past the gates looking back at the line, so every face is visible
 const CAM_POS = { x: 0.5, y: 3.5, z: -2.7 };
@@ -219,6 +218,28 @@ function drawFace(g, f, blush) {
   }
 }
 
+// Soft oval alpha so the webcam face fades into the head's skin at the edges
+function faceMask() {
+  const tex = canvasTexture(256, 256, (g, w, h) => {
+    g.fillStyle = '#000';
+    g.fillRect(0, 0, w, h);
+    g.save();
+    g.translate(w / 2, h * 0.54);
+    g.scale(0.8, 1);
+    const grad = g.createRadialGradient(0, 0, 40, 0, 0, 118);
+    grad.addColorStop(0, '#fff');
+    grad.addColorStop(0.65, '#fff');
+    grad.addColorStop(1, '#000');
+    g.fillStyle = grad;
+    g.beginPath();
+    g.arc(0, 0, 120, 0, Math.PI * 2);
+    g.fill();
+    g.restore();
+  });
+  tex.colorSpace = THREE.NoColorSpace;
+  return tex;
+}
+
 function faceTexture(name, blush) {
   const step = Math.round(clamp(blush, 0, 1) * 4);
   const key = `${name}|${step}`;
@@ -256,9 +277,9 @@ function makePerson({ coat, isPlayer = false } = {}) {
   torso.add(body);
 
   const head = new THREE.Group();
-  head.position.y = 0.92;
-  // Slightly oversized heads keep expressions readable from the overview camera
-  head.scale.setScalar(1.35);
+  head.position.y = isPlayer ? 0.98 : 0.92;
+  // Oversized heads keep expressions readable from the overview camera; yours most of all
+  head.scale.setScalar(isPlayer ? 1.75 : 1.35);
   torso.add(head);
   const skull = new THREE.Mesh(new THREE.SphereGeometry(0.14, 16, 12), skinMat);
   skull.castShadow = true;
@@ -270,19 +291,15 @@ function makePerson({ coat, isPlayer = false } = {}) {
   );
   head.add(face);
 
-  // Player only: a round webcam "face sticker" that always turns to the camera,
-  // with a layer on top for blush and sweat
-  let faceCard = null, videoFace = null, videoOverlay = null;
+  // Player only: your webcam face set into the front of the 3D head, oval with feathered
+  // edges so it melts into the skin, under the 3D hair; a layer on top carries blush and sweat
+  let videoFace = null, videoOverlay = null;
   if (isPlayer) {
-    faceCard = new THREE.Group();
-    const rim = new THREE.Mesh(new THREE.CircleGeometry(FACE_CARD_R + 0.025, 48), new THREE.MeshBasicMaterial({ color: 0xffd400 }));
-    videoFace = new THREE.Mesh(new THREE.CircleGeometry(FACE_CARD_R, 48), new THREE.MeshBasicMaterial({ color: 0xffffff }));
-    videoFace.position.z = 0.002;
-    videoOverlay = new THREE.Mesh(new THREE.CircleGeometry(FACE_CARD_R, 48), new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false }));
-    videoOverlay.position.z = 0.004;
-    faceCard.add(rim, videoFace, videoOverlay);
-    faceCard.visible = false;
-    scene.add(faceCard);
+    const patch = r => new THREE.SphereGeometry(r, 32, 24, Math.PI * 1.5 - 1.2, 2.4, Math.PI / 2 - 0.72, 1.95);
+    videoFace = new THREE.Mesh(patch(0.1418), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, alphaMap: faceMask(), depthWrite: false }));
+    videoOverlay = new THREE.Mesh(patch(0.1428), new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false }));
+    videoFace.visible = videoOverlay.visible = false;
+    head.add(videoFace, videoOverlay);
   }
   const hair = new THREE.Mesh(new THREE.SphereGeometry(0.147, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.55), mat(pick(HAIR)));
   hair.rotation.x = 0.25;
@@ -333,7 +350,7 @@ function makePerson({ coat, isPlayer = false } = {}) {
       depthTest: false,
     }));
     tag.scale.set(0.5, 0.25, 1);
-    tag.position.y = 2.25;
+    tag.position.y = 2.42;
     tag.renderOrder = 10;
     group.add(tag);
     group.userData.tag = tag;
@@ -351,7 +368,7 @@ function makePerson({ coat, isPlayer = false } = {}) {
   scene.add(group);
 
   return {
-    group, legs, torso, head, arms, phone, moodMark, face, hair, skinMat, faceCard, videoFace, videoOverlay,
+    group, legs, torso, head, arms, phone, moodMark, face, hair, skinMat, videoFace, videoOverlay,
     baseSkin: skinMat.color.clone(),
     expr: 'neutral', exprUntil: 0, turnFrom: 0, turnUntil: 0, blush: 0, blushShown: -1, faceKey: '',
     seed: Math.random() * 100,
@@ -407,7 +424,7 @@ function animatePerson(p, t, dt) {
   p.head.rotation.y += (glance - p.head.rotation.y) * Math.min(1, dt * 6);
 
   const faceName = p.isPlayer ? (p.exprUntil > t ? p.expr : 'neutral') : QUEUE_FACES[p.level];
-  const isLive = !!(p.faceCard && p.faceCard.visible);
+  const isLive = !!(p.videoFace && p.videoFace.visible);
   // With a live face the real expression does the acting; only blush and sweat are drawn on top
   const drawn = isLive ? (FACES[faceName].sweat ? 'overlaySweat' : 'overlay') : faceName;
   const faceKey = `${drawn}|${Math.round(p.blush * 4)}`;
@@ -442,8 +459,8 @@ function animatePerson(p, t, dt) {
     g.position.y = 0;
     const level = p.isPlayer ? 0 : p.level;
     if (p.isPlayer) {
-      // Chin slightly up so the overview camera catches the face
-      headX = -0.2;
+      // Chin up so the overview camera catches the face
+      headX = p.videoFace && p.videoFace.visible ? -0.4 : -0.2;
     } else if (level === 0) {
       // Calm: phone held in front of the chest, head down
       armRx = 0.75;
@@ -747,17 +764,6 @@ function updateFaceCrop(dt) {
   applyCrop(tex);
 }
 
-// Keep the webcam face just in front of the head, facing the camera
-const faceDir = new THREE.Vector3();
-function placeFaceCard() {
-  const card = player.faceCard;
-  if (!card || !card.visible) return;
-  const head = player.head.getWorldPosition(new THREE.Vector3());
-  faceDir.copy(camera.position).sub(head).normalize();
-  card.position.copy(head).addScaledVector(faceDir, 0.2);
-  card.quaternion.copy(camera.quaternion);
-}
-
 function bindOrbit(el) {
   el.addEventListener('contextmenu', e => e.preventDefault());
   el.addEventListener('pointerdown', e => {
@@ -801,7 +807,6 @@ function tick() {
 
   updateCamera(dt);
   updateFaceCrop(dt);
-  placeFaceCard();
 
   renderer.render(scene, camera);
   placeReaderButtons();
@@ -923,7 +928,7 @@ const World = {
 
   // video: a playing <video> of the webcam, or null to go back to the drawn face
   setPlayerVideo(video) {
-    const { videoFace, faceCard, face } = player;
+    const { videoFace, videoOverlay, face } = player;
     if (!videoFace) return;
     if (videoFace.material.map) videoFace.material.map.dispose();
     if (video) {
@@ -939,9 +944,10 @@ const World = {
       faceCrop.video = faceCrop.target = faceCrop.now = null;
     }
     videoFace.material.needsUpdate = true;
-    faceCard.visible = !!video;
-    // The webcam frame already shows your own hair
-    face.visible = player.hair.visible = !video;
+    videoFace.visible = videoOverlay.visible = !!video;
+    face.visible = !video;
+    // Sweep the 3D hair back so it frames the forehead instead of covering the face
+    player.hair.rotation.x = video ? 0.8 : 0.25;
     player.faceKey = '';
   },
 
@@ -950,9 +956,9 @@ const World = {
     const v = faceCrop.video;
     if (!v || !box || !v.videoWidth) return;
     const W = v.videoWidth, H = v.videoHeight;
-    // A square around the face with room for hair and chin, nudged up a little
-    const size = Math.min(Math.max(box.w, box.h) * 1.7, W, H);
-    const cx = box.x + box.w / 2, cy = box.y + box.h / 2 - box.h * 0.1;
+    // Tight square on the features only (brows to chin); the 3D hair supplies the rest
+    const size = Math.min(Math.max(box.w, box.h) * 1.2, W, H);
+    const cx = box.x + box.w / 2, cy = box.y + box.h * 0.56;
     const x = clamp(cx - size / 2, 0, W - size), y = clamp(cy - size / 2, 0, H - size);
     faceCrop.target = { x: x / W, y: y / H, w: size / W, h: size / H };
     faceCrop.lastSeen = clock.elapsedTime;
