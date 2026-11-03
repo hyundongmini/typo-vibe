@@ -90,7 +90,6 @@ window.STORY = {
     awkward: n => `머쓱 ${n}`,
     awkwardLabel: (total, here, max) => `머쓱 총 ${total}회, 이 개찰구 ${here}/${max}`,
     fare: (kind, fare) => (kind === 'exit' ? '하차' : fare ? `운임 ${fare.toLocaleString('ko-KR')}원` : '환승 무료'),
-    hint: '커서가 곧 카드. 단말기 위에서 꾹 누르고, 노란 링이 다 찰 때까지 떼지 말 것. 카메라: 오른쪽 버튼 드래그 또는 ◀ ▶. 키보드: 단말기에서 Space를 꾹.',
     stepAsideTitle: '머쓱',
     nextGate: '다음 개찰구',
     sound: '♪ 소리',
@@ -101,7 +100,6 @@ window.STORY = {
     photoAlt: info => `머쓱 사진 ${info.number}: ${info.station} ${info.time}, ${info.what}`,
     webcamOn: '📷 내 얼굴로',
     webcamOff: '📷 얼굴 끄기',
-    webcamPrivacy: '카메라 영상은 이 브라우저 안에서만 쓰이고, 저장하거나 어디로도 보내지 않습니다.',
     webcamDenied: '카메라 권한이 거부되어 그림 얼굴로 진행합니다. 주소창의 카메라 권한을 허용하면 다시 쓸 수 있습니다.',
     webcamFailed: '카메라를 열 수 없어 그림 얼굴로 진행합니다.',
     faceTrackFailed: '얼굴 인식을 불러오지 못해 화면 가운데를 보여 줍니다.',
@@ -115,11 +113,7 @@ window.STORY = {
     title: '다시 찍어 주세요',
     text:
       '오전 8시 40분. 9시까지 회사에 가야 한다.\n' +
-      '가는 길에 개찰구가 다섯 번.\n\n' +
-      '카드를 단말기에 올리고 "삑" 소리가 날 때까지 떼지 않으면 통과.\n' +
-      '너무 빨리 떼거나, 밀려서 미끄러지면 "다시 찍어 주세요".\n' +
-      '실패할수록 뒷줄이 길어지고, 머쓱해진다.\n\n' +
-      '카메라를 허용하면 캐릭터 얼굴이 내 얼굴이 된다. 영상은 이 브라우저 안에서만 쓰이고 저장·전송되지 않는다.',
+      '가는 길에 개찰구가 다섯 번. 카드를 찍고 지나가자.',
   },
 
   endings: {

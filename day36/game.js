@@ -709,17 +709,16 @@
     World.setPlayerVideo(video);
     els.webcam.textContent = UI.webcamOff;
     els.webcam.setAttribute('aria-pressed', 'true');
-    els.webcamNote.textContent = UI.webcamPrivacy;
     // Zoom onto the face once the detector loads; without it the center of the frame is shown
     if (!window.FaceTrack) {
-      els.webcamNote.textContent = `${UI.webcamPrivacy} ${UI.faceTrackFailed}`;
+      els.webcamNote.textContent = UI.faceTrackFailed;
       return;
     }
     try {
       await FaceTrack.start(video, box => World.setFaceBox(box));
     } catch (err) {
       console.error('Face detection unavailable', err);
-      els.webcamNote.textContent = `${UI.webcamPrivacy} ${UI.faceTrackFailed}`;
+      els.webcamNote.textContent = UI.faceTrackFailed;
     }
   }
 
@@ -734,7 +733,6 @@
   els.charge.addEventListener('click', charge);
   els.sound.setAttribute('aria-pressed', String(Sound.isEnabled()));
   els.sound.addEventListener('click', () => els.sound.setAttribute('aria-pressed', String(Sound.toggle())));
-  els.hint.textContent = UI.hint;
   window.addEventListener('resize', () => {
     if (!drag.isActive) placeCardHome();
   });
