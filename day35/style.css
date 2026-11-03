@@ -34,7 +34,7 @@ button { font: inherit; color: inherit; }
   background: var(--paper);
   border-bottom: 1px solid var(--ink);
 }
-.menubar-home { color: var(--ink); text-decoration: none; font-size: 14px; padding: 0 4px; }
+.menubar-home { color: var(--ink); text-decoration: none; font-weight: 700; border: 1px solid var(--ink); padding: 1px 8px; }
 .menubar-home:hover, .menubar-home:focus-visible { background: var(--ink); color: var(--paper); outline: none; }
 .menubar-title { font-weight: 700; }
 .menubar-status { display: flex; align-items: center; gap: 14px; margin-left: auto; }
