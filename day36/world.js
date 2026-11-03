@@ -153,6 +153,9 @@ const FACES = {
   push: { eyes: 'squeeze', brows: 'worried', mouth: 'flat' },
   aside: { eyes: 'happy', brows: 'worried', mouth: 'grin', sweat: true },
   ok: { eyes: 'happy', brows: 'none', mouth: 'smile' },
+  // Drawn over a live webcam face: only the blush and sweat
+  overlay: { eyes: 'none', brows: 'none', mouth: 'none' },
+  overlaySweat: { eyes: 'none', brows: 'none', mouth: 'none', sweat: true },
 };
 const QUEUE_FACES = ['phone', 'annoyed', 'angry', 'fuming'];
 // Reactions that get the close-up camera, and the ones where you turn back to face the line
@@ -265,6 +268,16 @@ function makePerson({ coat, isPlayer = false } = {}) {
     new THREE.MeshStandardMaterial({ map: faceTexture('neutral', 0), transparent: true, roughness: 0.8 }),
   );
   head.add(face);
+
+  // Player only: a wider patch for the live webcam face, plus a layer for blush and sweat on top
+  let videoFace = null, videoOverlay = null;
+  if (isPlayer) {
+    const patch = r => new THREE.SphereGeometry(r, 32, 20, Math.PI * 1.5 - 1.2, 2.4, Math.PI / 2 - 1.0, 2.0);
+    videoFace = new THREE.Mesh(patch(0.1425), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+    videoOverlay = new THREE.Mesh(patch(0.1435), new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false }));
+    videoFace.visible = videoOverlay.visible = false;
+    head.add(videoFace, videoOverlay);
+  }
   const hair = new THREE.Mesh(new THREE.SphereGeometry(0.147, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.55), mat(pick(HAIR)));
   hair.rotation.x = 0.25;
   head.add(hair);
@@ -332,7 +345,7 @@ function makePerson({ coat, isPlayer = false } = {}) {
   scene.add(group);
 
   return {
-    group, legs, torso, head, arms, phone, moodMark, face, skinMat,
+    group, legs, torso, head, arms, phone, moodMark, face, hair, skinMat, videoFace, videoOverlay,
     baseSkin: skinMat.color.clone(),
     expr: 'neutral', exprUntil: 0, turnFrom: 0, turnUntil: 0, blush: 0, blushShown: -1, faceKey: '',
     seed: Math.random() * 100,
@@ -388,11 +401,15 @@ function animatePerson(p, t, dt) {
   p.head.rotation.y += (glance - p.head.rotation.y) * Math.min(1, dt * 6);
 
   const faceName = p.isPlayer ? (p.exprUntil > t ? p.expr : 'neutral') : QUEUE_FACES[p.level];
-  const faceKey = `${faceName}|${Math.round(p.blush * 4)}`;
+  const isLive = !!(p.videoFace && p.videoFace.visible);
+  // With a live face the real expression does the acting; only blush and sweat are drawn on top
+  const drawn = isLive ? (FACES[faceName].sweat ? 'overlaySweat' : 'overlay') : faceName;
+  const faceKey = `${drawn}|${Math.round(p.blush * 4)}`;
   if (faceKey !== p.faceKey) {
     p.faceKey = faceKey;
-    p.face.material.map = faceTexture(faceName, p.blush);
-    p.face.material.needsUpdate = true;
+    const target = isLive ? p.videoOverlay : p.face;
+    target.material.map = faceTexture(drawn, p.blush);
+    target.material.needsUpdate = true;
   }
   if (p.blushShown !== p.blush) {
     p.blushShown = p.blush;
@@ -855,6 +872,30 @@ const World = {
 
   setBlush(v) {
     player.blush = clamp(v, 0, 1);
+  },
+
+  // video: a playing <video> of the webcam, or null to go back to the drawn face
+  setPlayerVideo(video) {
+    const { videoFace, videoOverlay, face } = player;
+    if (!videoFace) return;
+    if (videoFace.material.map) videoFace.material.map.dispose();
+    if (video) {
+      const tex = new THREE.VideoTexture(video);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      // Center-crop to a square and mirror, like a selfie
+      const aspect = (video.videoWidth || 4) / (video.videoHeight || 3);
+      const crop = Math.min(1, 1 / aspect);
+      tex.repeat.set(-crop, 1);
+      tex.offset.set(1 - (1 - crop) / 2, 0);
+      videoFace.material.map = tex;
+    } else {
+      videoFace.material.map = null;
+    }
+    videoFace.material.needsUpdate = true;
+    videoFace.visible = videoOverlay.visible = !!video;
+    // The webcam frame already shows your own hair
+    face.visible = player.hair.visible = !video;
+    player.faceKey = '';
   },
 
   // True for the whole close-up, including its first frame when the blend is still 0

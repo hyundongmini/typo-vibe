@@ -27,6 +27,8 @@
     charge: $('#charge'),
     resetView: $('#reset-view'),
     turnLeft: $('#turn-left'),
+    webcam: $('#webcam'),
+    webcamNote: $('#webcam-note'),
     turnRight: $('#turn-right'),
     hint: $('#hint'),
     modal: $('#modal'),
@@ -575,11 +577,48 @@
     requestAnimationFrame(tick);
   }
 
+  /* ---------- webcam face ---------- */
+
+  let webcamStream = null;
+
+  async function toggleWebcam() {
+    if (webcamStream) {
+      webcamStream.getTracks().forEach(t => t.stop());
+      webcamStream = null;
+      World.setPlayerVideo(null);
+      els.webcam.textContent = UI.webcamOn;
+      els.webcam.setAttribute('aria-pressed', 'false');
+      return;
+    }
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      els.webcamNote.textContent = UI.webcamUnsupported;
+      return;
+    }
+    try {
+      webcamStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: 480, height: 360 }, audio: false });
+    } catch (err) {
+      console.error('Webcam unavailable', err);
+      els.webcamNote.textContent = err.name === 'NotAllowedError' ? UI.webcamDenied : UI.webcamFailed;
+      return;
+    }
+    const video = document.createElement('video');
+    video.muted = true;
+    video.playsInline = true;
+    video.srcObject = webcamStream;
+    await video.play();
+    World.setPlayerVideo(video);
+    els.webcam.textContent = UI.webcamOff;
+    els.webcam.setAttribute('aria-pressed', 'true');
+    els.webcamNote.textContent = UI.webcamPrivacy;
+  }
+
   /* ---------- wiring ---------- */
 
   els.takeOut.addEventListener('click', takeOut);
   els.resetView.addEventListener('click', () => World.resetView());
   els.turnLeft.addEventListener('click', () => World.turnView(-0.5));
+  els.webcam.textContent = UI.webcamOn;
+  els.webcam.addEventListener('click', toggleWebcam);
   els.turnRight.addEventListener('click', () => World.turnView(0.5));
   els.charge.addEventListener('click', charge);
   els.sound.setAttribute('aria-pressed', String(Sound.isEnabled()));
