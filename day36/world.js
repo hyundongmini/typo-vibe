@@ -2,7 +2,7 @@
 // reader, and the line behind you that grows and gets visibly impatient.
 import * as THREE from 'three';
 
-const LANE_W = 1;
+const LANE_W = 1.15;
 const BODY_W = 0.4;
 const BODY_D = 1.6;
 const BODY_H = 1.0;
@@ -10,12 +10,12 @@ const READER_R = 0.17;
 const READER_Z = 0.5;
 const PLAYER_Z = 1.25;
 const QUEUE_Z = 2.05;
-const QUEUE_GAP = 0.72;
+const QUEUE_GAP = 0.95;
 const WALK_SPEED = 1.6;
 const HIT_SCALE = 1.35; // touch targets a bit larger than the drawn reader
 
-const CAM_POS = { x: 4.2, y: 6.2, z: 7.6 };
-const CAM_LOOK = new THREE.Vector3(0, 0.5, 2.1);
+const CAM_POS = { x: 3.4, y: 8.4, z: 8.2 };
+const CAM_LOOK = new THREE.Vector3(0, 0.3, 2.6);
 
 // Left to right: B0 | L lane | B1 | mine | B2 | R lane | B3
 const LANE_X = { left: -(LANE_W + BODY_W), mine: 0, right: LANE_W + BODY_W };
@@ -475,7 +475,7 @@ function queueSlot(i) {
 // isInstant: place people in their slots (scene start) instead of walking in from behind
 function fillSideQueue(name, isInstant) {
   const list = sideQueues[name];
-  while (list.length < 3) {
+  while (list.length < 2) {
     const p = makePerson();
     const z = PLAYER_Z + list.length * QUEUE_GAP;
     p.group.position.set(LANE_X[name], 0, isInstant ? z : z + 2.5);
@@ -634,7 +634,7 @@ const World = {
       p.group.position.set((Math.random() - 0.5) * 0.6, 0, isInstant ? z : z + 2.5);
       queue.push(p);
     }
-    queue.forEach((p, i) => walkTo(p, (i % 2 ? 0.04 : -0.04), queueSlot(i)));
+    queue.forEach((p, i) => walkTo(p, 0, queueSlot(i)));
     applyMood();
   },
 
