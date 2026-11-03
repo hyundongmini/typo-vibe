@@ -291,44 +291,12 @@ function drawFace(g, f, blush) {
 }
 
 // Soft oval alpha so the webcam face fades into the head's skin at the edges
-// Your t-shirt print: a black cat face, drawn once
+// Your t-shirt print: a photo of your cat
 function catPrintTexture() {
-  return canvasTexture(256, 256, (g, w) => {
-    const cx = w / 2, cy = 140;
-    g.fillStyle = '#1b1b1b';
-    [-1, 1].forEach(side => {
-      g.beginPath();
-      g.moveTo(cx + side * 30, cy - 50);
-      g.lineTo(cx + side * 70, cy - 105);
-      g.lineTo(cx + side * 80, cy - 20);
-      g.fill();
-    });
-    g.beginPath();
-    g.ellipse(cx, cy, 82, 70, 0, 0, Math.PI * 2);
-    g.fill();
-    [-1, 1].forEach(side => {
-      g.fillStyle = '#ffd23f';
-      g.beginPath();
-      g.ellipse(cx + side * 32, cy - 8, 16, 19, 0, 0, Math.PI * 2);
-      g.fill();
-      g.fillStyle = '#1b1b1b';
-      g.beginPath();
-      g.ellipse(cx + side * 32, cy - 8, 5, 15, 0, 0, Math.PI * 2);
-      g.fill();
-    });
-    g.fillStyle = '#f29bb0';
-    g.beginPath();
-    g.moveTo(cx - 8, cy + 18); g.lineTo(cx + 8, cy + 18); g.lineTo(cx, cy + 27);
-    g.fill();
-    g.strokeStyle = '#f4f4f2';
-    g.lineWidth = 3;
-    [-1, 1].forEach(side => [-8, 4].forEach(dy => {
-      g.beginPath();
-      g.moveTo(cx + side * 22, cy + 26 + dy / 2);
-      g.lineTo(cx + side * 68, cy + 20 + dy);
-      g.stroke();
-    }));
-  });
+  const tex = new THREE.TextureLoader().load('cat.jpg');
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  return tex;
 }
 
 function faceMask() {
@@ -470,7 +438,7 @@ function makePerson({ coat, isPlayer = false } = {}) {
       return sleeve;
     });
     // Model faces -z, so the print sits on the -z side of the chest, turned to face out
-    const catPrint = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 0.3), new THREE.MeshStandardMaterial({ map: catPrintTexture(), transparent: true, roughness: 0.9 }));
+    const catPrint = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 0.3 * 385 / 512), new THREE.MeshStandardMaterial({ map: catPrintTexture(), roughness: 0.9 }));
     catPrint.position.set(0, 0.38, -0.143);
     catPrint.rotation.y = Math.PI;
     torso.add(catPrint);

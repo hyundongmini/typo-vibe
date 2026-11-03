@@ -82,6 +82,8 @@
     pointerType: null,
     contact: null,
     contactSince: 0,
+    isHover: false, // a mouse over the stage: just resting the card on a reader counts
+    mustLeave: false, // after a reader answers, the card has to come off before the next tap
   };
 
   let onModalClose = null;
@@ -280,6 +282,7 @@
   function setContact(side, now) {
     if (side === drag.contact) return;
     if (side) drag.didTouch = true;
+    if (side && !drag.isActive) drag.nextPush = now + (gate().push ? rand(...gate().push.gap) * 1000 : Infinity);
     const prev = drag.contact;
     if (prev) {
       setReader(prev, null);
@@ -338,6 +341,7 @@
   }
 
   els.stage.addEventListener('pointermove', e => {
+    drag.isHover = e.pointerType === 'mouse';
     if (drag.keySide || (drag.isActive && e.pointerId !== drag.pointerId)) return;
     cardToPointer(e);
   });
@@ -356,13 +360,16 @@
     drag.pointerId = e.pointerId;
     drag.downAt = performance.now();
     drag.didTouch = false;
+    // Pressing is a fresh, deliberate tap even if the card never left the reader
+    drag.mustLeave = false;
     drag.nextPush = performance.now() + (gate().push ? rand(...gate().push.gap) * 1000 : Infinity);
     els.card.classList.add('dragging');
   });
 
   const release = e => {
     if (!drag.isActive || e.pointerId !== drag.pointerId) return;
-    setContact(null, performance.now());
+    // A mouse button coming up doesn't lift the card: it stays resting under the cursor
+    if (e.pointerType !== 'mouse') setContact(null, performance.now());
     if (drag.isActive) endHold();
     // A quick click that never touched a reader opens the wallet in your hand
     const isClick = !drag.didTouch && performance.now() - drag.downAt < 350;
@@ -371,6 +378,7 @@
   els.stage.addEventListener('pointerup', release);
   els.stage.addEventListener('pointercancel', release);
   els.stage.addEventListener('pointerleave', e => {
+    drag.isHover = false;
     if (!drag.isActive && e.pointerType === 'mouse') placeCardHome();
   });
 
@@ -383,6 +391,7 @@
       if (e.repeat || state.phase !== 'gate' || drag.isActive || World.isCinematic()) return;
       drag.isActive = true;
       drag.keySide = side;
+      drag.mustLeave = false;
       const st = els.stage.getBoundingClientRect();
       const rr = r.getBoundingClientRect();
       drag.x = rr.left - st.left + rr.width / 2 - els.card.offsetWidth / 2;
@@ -419,6 +428,7 @@
   function resolve(side) {
     const g = gate();
     endHold();
+    drag.mustLeave = true;
     if (side !== g.reader) return fail('neighbor', side);
     if (state.hand === 'wallet') return fail('wallet', side);
     if (g.fare > state.balance) return fail('balance', side);
@@ -841,19 +851,28 @@
       if (state.awkwardHere > 0) state.heat = Math.min(0.35, state.heat + dt * 0.012);
       World.setBlush(blushLevel());
     }
-    if (drag.isActive && state.phase === 'gate') {
-      crowdPush(now);
+    const isOverlayOpen = !els.walletOpen.hidden || !els.kioskOpen.hidden;
+    const isHovering = drag.isHover && !drag.isActive && !isOverlayOpen && !World.isCinematic();
+    if ((drag.isActive || isHovering) && state.phase === 'gate') {
+      // Hovering, the crowd only shoves while the card is on a reader
+      if (drag.isActive || drag.contact) crowdPush(now);
       const k = Math.exp(-dt / PUSH_DECAY);
       drag.pushX *= k;
       drag.pushY *= k;
       applyCard();
-      const side = drag.keySide || readerUnderCard();
+      let side = drag.keySide || readerUnderCard();
+      if (drag.mustLeave && !drag.keySide) {
+        if (!side) drag.mustLeave = false;
+        side = null;
+      }
       setContact(side, now);
       if (drag.contact) {
         const ratio = (now - drag.contactSince) / 1000 / gate().read;
         showProgress(drag.contact, Math.min(1, ratio));
         if (ratio >= 1) resolve(drag.contact);
       }
+    } else if (drag.contact && !drag.isActive) {
+      setContact(null, now);
     }
     requestAnimationFrame(tick);
   }
