@@ -24,6 +24,9 @@
     sound: $('#sound'),
     holding: $('#holding'),
     takeOut: $('#take-out'),
+    walletOpen: $('#wallet-open'),
+    walletHint: $('#wallet-hint'),
+    slotCards: [...document.querySelectorAll('.slot-card')],
     charge: $('#charge'),
     resetView: $('#reset-view'),
     turnLeft: $('#turn-left'),
@@ -48,6 +51,7 @@
     balance: S.startBalance,
     awkwardTotal: 0,
     awkwardHere: 0,
+    heat: 0, // slow extra redness while you stay stuck and get shoved
     queue: 0,
     hand: 'card',
     isCharged: false,
@@ -206,6 +210,7 @@
     els.charge.disabled = state.isCharged;
     const canAct = state.phase === 'gate';
     els.takeOut.disabled = !canAct;
+    if (!isWallet || !canAct) closeWallet();
     if (g.kiosk && !state.isCharged) els.charge.disabled = !canAct;
   }
 
@@ -385,6 +390,7 @@
     drag.pushY += Math.sin(angle) * push.force * w;
     drag.nextPush = now + rand(...push.gap) * 1000;
     Sound.sfx('push');
+    state.heat = Math.min(0.35, state.heat + 0.02);
     World.shove();
     World.react('push');
     if (Math.random() < 0.35) bubble(pick(S.reactions.push), 'player');
@@ -484,8 +490,90 @@
     renderHand();
   }
 
-  // Redness builds within a gate and a little carries over from earlier ones
-  const blushLevel = () => Math.min(1, state.awkwardHere * 0.3 + state.awkwardTotal * 0.06);
+  // Redness builds within a gate, creeps up while you stay stuck, and a little carries over
+  const blushLevel = () => Math.min(1, state.awkwardHere * 0.28 + state.awkwardTotal * 0.06 + state.heat);
+
+  /* ---------- wallet ---------- */
+
+  const pull = { el: null, startY: 0, isDone: false };
+
+  function openWallet() {
+    if (state.phase !== 'gate' || state.hand !== 'wallet' || drag.isActive) return;
+    els.slotCards.forEach(c => {
+      c.textContent = UI.walletCards[c.dataset.card];
+      c.classList.remove('snap');
+      c.style.transform = '';
+    });
+    els.walletHint.textContent = UI.walletHint;
+    els.walletOpen.hidden = false;
+    els.card.classList.add('away');
+    Sound.sfx('walletOpen');
+    els.slotCards.find(c => c.dataset.card === 'transit').focus();
+  }
+
+  function closeWallet() {
+    if (els.walletOpen.hidden) return;
+    els.walletOpen.hidden = true;
+    els.card.classList.remove('away');
+    pull.el = null;
+  }
+
+  function snapBack(el) {
+    el.classList.add('snap');
+    el.style.transform = '';
+  }
+
+  function pulledOut(el) {
+    pull.isDone = true;
+    if (el.dataset.card === 'credit') {
+      snapBack(el);
+      els.walletHint.textContent = UI.walletWrong;
+      return;
+    }
+    el.classList.add('snap');
+    el.style.transform = 'translateY(-150%) rotate(-6deg)';
+    Sound.sfx('cardOut');
+    setTimeout(() => {
+      closeWallet();
+      takeOut();
+    }, 260);
+  }
+
+  els.walletOpen.addEventListener('pointerdown', e => {
+    // Keep the stage from treating this as a tap
+    e.stopPropagation();
+    if (e.target === els.walletOpen) closeWallet();
+  });
+  els.walletOpen.addEventListener('keydown', e => {
+    if (e.key === 'Escape') closeWallet();
+  });
+  els.slotCards.forEach(el => {
+    el.addEventListener('pointerdown', e => {
+      e.preventDefault();
+      el.setPointerCapture(e.pointerId);
+      el.classList.remove('snap');
+      pull.el = el;
+      pull.startY = e.clientY;
+      pull.isDone = false;
+    });
+    el.addEventListener('pointermove', e => {
+      if (pull.el !== el || pull.isDone) return;
+      const dy = Math.min(0, e.clientY - pull.startY);
+      el.style.transform = `translateY(${dy}px) rotate(${(dy / el.offsetHeight) * 4}deg)`;
+      if (dy < -el.offsetHeight * 0.7) pulledOut(el);
+    });
+    const letGo = () => {
+      if (pull.el !== el) return;
+      if (!pull.isDone) snapBack(el);
+      pull.el = null;
+    };
+    el.addEventListener('pointerup', letGo);
+    el.addEventListener('pointercancel', letGo);
+    // Keyboard (Enter/Space) pulls the card out in one go; pointer clicks have detail > 0
+    el.addEventListener('click', e => {
+      if (e.detail === 0) pulledOut(el);
+    });
+  });
 
   function takeOut() {
     if (state.phase !== 'gate' || state.hand !== 'wallet') return;
@@ -514,6 +602,7 @@
       clock: S.startClock,
       balance: S.startBalance,
       awkwardTotal: 0,
+      heat: 0,
       hand: 'card',
       isCharged: false,
       log: [],
@@ -533,6 +622,7 @@
     state.phase = 'sign';
     state.clock += g.travel * 60;
     state.awkwardHere = 0;
+    state.heat *= 0.4;
     state.queue = g.queue;
     if (g.wallet) state.hand = 'wallet';
     els.stage.classList.remove('fading');
@@ -592,6 +682,9 @@
     if ((state.phase === 'gate' || state.phase === 'aside') && !World.isCinematic()) {
       state.clock += dt;
       renderHud();
+      // Standing there stuck slowly makes it worse
+      if (state.awkwardHere > 0) state.heat = Math.min(0.35, state.heat + dt * 0.012);
+      World.setBlush(blushLevel());
     }
     if (drag.isActive && state.phase === 'gate') {
       crowdPush(now);
@@ -731,7 +824,7 @@
 
   /* ---------- wiring ---------- */
 
-  els.takeOut.addEventListener('click', takeOut);
+  els.takeOut.addEventListener('click', openWallet);
   els.resetView.addEventListener('click', () => World.resetView());
   els.turnLeft.addEventListener('click', () => World.turnView(-0.5));
   els.webcam.textContent = UI.webcamOn;

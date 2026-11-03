@@ -311,10 +311,13 @@ function faceMask() {
   return tex;
 }
 
+// Drawn-face blush is cached in steps; enough of them that the flush looks gradual
+const BLUSH_STEPS = 10;
+
 function faceTexture(name, blush) {
-  const step = Math.round(clamp(blush, 0, 1) * 4);
+  const step = Math.round(clamp(blush, 0, 1) * BLUSH_STEPS);
   const key = `${name}|${step}`;
-  if (!faceCache.has(key)) faceCache.set(key, canvasTexture(128, 128, g => drawFace(g, FACES[name], step / 4)));
+  if (!faceCache.has(key)) faceCache.set(key, canvasTexture(128, 128, g => drawFace(g, FACES[name], step / BLUSH_STEPS)));
   return faceCache.get(key);
 }
 
@@ -465,7 +468,7 @@ function makePerson({ coat, isPlayer = false } = {}) {
   return {
     group, legs, torso, head, arms, phone, moodMark, face, hair, skinMat, videoFace, videoOverlay,
     baseSkin: skinMat.color.clone(),
-    expr: 'neutral', exprUntil: 0, turnFrom: 0, turnUntil: 0, blush: 0, blushShown: -1, faceKey: '',
+    expr: 'neutral', exprUntil: 0, turnFrom: 0, turnUntil: 0, blush: 0, blushNow: 0, blushShown: -1, faceKey: '',
     seed: Math.random() * 100,
     target: null,
     onArrive: null,
@@ -523,18 +526,21 @@ function animatePerson(p, t, dt) {
   const isLive = !!(p.videoFace && p.videoFace.visible);
   // With a live face the real expression does the acting; only blush and sweat are drawn on top
   const drawn = isLive ? (GLOOMY.has(faceName) ? 'overlayGloom' : FACES[faceName].sweat ? 'overlaySweat' : 'overlay') : faceName;
-  const faceKey = `${drawn}|${Math.round(p.blush * 4)}`;
+  // Redness eases toward its target so the face flushes gradually
+  p.blushNow += (p.blush - p.blushNow) * Math.min(1, dt * 1.2);
+  const blush = p.blushNow;
+  const faceKey = `${drawn}|${Math.round(blush * BLUSH_STEPS)}`;
   if (faceKey !== p.faceKey) {
     p.faceKey = faceKey;
     const target = isLive ? p.videoOverlay : p.face;
-    target.material.map = faceTexture(drawn, p.blush);
+    target.material.map = faceTexture(drawn, blush);
     target.material.needsUpdate = true;
   }
-  if (p.blushShown !== p.blush) {
-    p.blushShown = p.blush;
+  if (Math.abs(p.blushShown - blush) > 0.004) {
+    p.blushShown = blush;
     // Embarrassment filter: the live face itself turns red
-    if (p.videoFace) p.videoFace.material.color.setRGB(1, 1 - p.blush * 0.6, 1 - p.blush * 0.65);
-    p.skinMat.color.copy(p.baseSkin).lerp(new THREE.Color(0xe2584a), p.blush * 0.55);
+    if (p.videoFace) p.videoFace.material.color.setRGB(1, 1 - blush * 0.6, 1 - blush * 0.65);
+    p.skinMat.color.copy(p.baseSkin).lerp(new THREE.Color(0xe2584a), blush * 0.55);
   }
 
   const [legL, legR] = p.legs;

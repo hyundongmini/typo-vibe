@@ -107,6 +107,9 @@ window.Sound = (() => {
     },
     push: t => thud(t, 90, 0.3),
     charge: t => [0, 0.08, 0.16].forEach((at, i) => tone('square', 1046 + i * 262, t + at, 0.06, 0.06)),
+    // Leather wallet flipping open, and a card sliding out of its slot
+    walletOpen: t => burst(t, 0.12, 'lowpass', 700, 0.3),
+    cardOut: t => burst(t, 0.18, 'highpass', 3000, 0.12),
     // Camera shutter: a click and a short mechanical swish
     shutter: t => {
       burst(t, 0.03, 'highpass', 4000, 0.3);

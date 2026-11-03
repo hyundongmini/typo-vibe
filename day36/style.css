@@ -269,6 +269,64 @@ button { font: inherit; color: inherit; }
 .btn:disabled { opacity: 0.35; cursor: default; }
 .btn.primary { background: var(--ink); color: var(--paper); }
 .btn.primary:hover { background: #333; }
+/* Open wallet: pull the transit card up out of its slot */
+.wallet-open {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 12px;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 4;
+  cursor: auto;
+}
+.wallet-open[hidden] { display: none; }
+.wallet-inside {
+  position: relative;
+  width: min(48%, 340px);
+  aspect-ratio: 1.5;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #8a5a33, #5b3a1f);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
+  animation: wallet-in 0.25s ease;
+}
+@keyframes wallet-in { from { transform: scale(0.6) rotate(-8deg); opacity: 0; } }
+.slot-card {
+  position: absolute;
+  top: 12%;
+  width: 52%;
+  aspect-ratio: 1.586;
+  border: none;
+  border-radius: 8% / 13%;
+  padding: 5% 7%;
+  display: flex;
+  align-items: flex-start;
+  color: #fff;
+  font-weight: 700;
+  font-size: clamp(11px, 1.4vw, 14px);
+  cursor: grab;
+  touch-action: none;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+}
+.slot-card:active { cursor: grabbing; }
+.slot-card.transit { left: 6%; background: linear-gradient(135deg, #2f6fe0, #1b3f8a); }
+.slot-card.credit { right: 6%; top: 3%; justify-content: flex-end; background: linear-gradient(135deg, #e34a4a, #8a1b1b); }
+.slot-card.snap { transition: transform 0.22s ease; }
+.slot-card:focus-visible { outline: 3px solid #3a7bff; outline-offset: 2px; }
+.wallet-pocket {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 60%;
+  border-radius: 0 0 14px 14px;
+  border-top: 2px solid rgba(201, 165, 107, 0.5);
+  background: linear-gradient(#6e4527, #4f321b);
+  pointer-events: none;
+}
+.wallet-hint { color: #fff; font-weight: 700; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6); }
+.card.away { visibility: hidden; }
 .hint { font-size: 12px; color: var(--muted); }
 .hint:empty { display: none; }
 
@@ -329,9 +387,11 @@ button { font: inherit; color: inherit; }
   .card { width: 18%; }
   .board { width: 92%; }
   .led { border-width: 4px; }
+  .wallet-inside { width: 72%; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .bubble, .flash.on, .polaroid.on { animation: none; }
+  .bubble, .flash.on, .polaroid.on, .wallet-inside { animation: none; }
+  .slot-card.snap { transition: none; }
   .fade, .card.returning { transition: none; }
 }

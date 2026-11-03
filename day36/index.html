@@ -38,6 +38,15 @@
     <img class="polaroid" id="polaroid" alt="" aria-hidden="true">
     <div class="queue" id="queue"><span id="queue-count"></span></div>
 
+    <div class="wallet-open" id="wallet-open" hidden>
+      <div class="wallet-inside">
+        <button type="button" class="slot-card credit" data-card="credit"></button>
+        <button type="button" class="slot-card transit" data-card="transit"></button>
+        <div class="wallet-pocket"></div>
+      </div>
+      <p class="wallet-hint" id="wallet-hint" aria-live="polite"></p>
+    </div>
+
     <div class="card" id="card" aria-hidden="true">
       <span class="card-face"></span><span class="card-face second"></span>
     </div>
