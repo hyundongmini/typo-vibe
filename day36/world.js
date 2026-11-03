@@ -13,7 +13,7 @@ const QUEUE_Z = 2.35;
 const QUEUE_GAP = 1.05;
 const WALK_SPEED = 1.6;
 const HIT_SCALE = 1.35; // touch targets a bit larger than the drawn reader
-const FACE_CARD_R = 0.31; // radius of the round webcam face
+const FACE_CARD_R = 0.37; // radius of the round webcam face
 
 // Camera sits past the gates looking back at the line, so every face is visible
 const CAM_POS = { x: 0.5, y: 3.5, z: -2.7 };
@@ -721,6 +721,32 @@ function updateCamera(dt) {
 }
 
 // Right-button drag turns the camera; the left button belongs to the card
+// Square region of the webcam frame shown in the round face, in 0..1 frame coordinates (y down)
+const faceCrop = { video: null, target: null, now: null, lastSeen: 0 };
+
+function centerCrop(video) {
+  const aspect = (video.videoWidth || 4) / (video.videoHeight || 3);
+  const w = Math.min(1, 1 / aspect), h = Math.min(1, aspect);
+  return { x: (1 - w) / 2, y: (1 - h) / 2, w, h };
+}
+
+// Mirrored like a selfie: u=0 maps to the crop's right edge
+function applyCrop(tex) {
+  const c = faceCrop.now;
+  tex.repeat.set(-c.w, c.h);
+  tex.offset.set(c.x + c.w, 1 - (c.y + c.h));
+}
+
+function updateFaceCrop(dt) {
+  const tex = player.videoFace && player.videoFace.material.map;
+  if (!tex || !faceCrop.now) return;
+  // Lost the face for a while: ease back out to the plain center crop
+  if (clock.elapsedTime - faceCrop.lastSeen > 1.5) faceCrop.target = centerCrop(faceCrop.video);
+  const k = Math.min(1, dt * 6);
+  ['x', 'y', 'w', 'h'].forEach(key => { faceCrop.now[key] += (faceCrop.target[key] - faceCrop.now[key]) * k; });
+  applyCrop(tex);
+}
+
 // Keep the webcam face just in front of the head, facing the camera
 const faceDir = new THREE.Vector3();
 function placeFaceCard() {
@@ -774,6 +800,7 @@ function tick() {
   }
 
   updateCamera(dt);
+  updateFaceCrop(dt);
   placeFaceCard();
 
   renderer.render(scene, camera);
@@ -902,20 +929,33 @@ const World = {
     if (video) {
       const tex = new THREE.VideoTexture(video);
       tex.colorSpace = THREE.SRGBColorSpace;
-      // Center-crop to a square and mirror, like a selfie
-      const aspect = (video.videoWidth || 4) / (video.videoHeight || 3);
-      const crop = Math.min(1, 1 / aspect);
-      tex.repeat.set(-crop, 1);
-      tex.offset.set(1 - (1 - crop) / 2, 0);
       videoFace.material.map = tex;
+      faceCrop.video = video;
+      faceCrop.target = centerCrop(video);
+      faceCrop.now = { ...faceCrop.target };
+      applyCrop(tex);
     } else {
       videoFace.material.map = null;
+      faceCrop.video = faceCrop.target = faceCrop.now = null;
     }
     videoFace.material.needsUpdate = true;
     faceCard.visible = !!video;
     // The webcam frame already shows your own hair
     face.visible = player.hair.visible = !video;
     player.faceKey = '';
+  },
+
+  // box: detected face in video pixels, or null when none is found
+  setFaceBox(box) {
+    const v = faceCrop.video;
+    if (!v || !box || !v.videoWidth) return;
+    const W = v.videoWidth, H = v.videoHeight;
+    // A square around the face with room for hair and chin, nudged up a little
+    const size = Math.min(Math.max(box.w, box.h) * 1.7, W, H);
+    const cx = box.x + box.w / 2, cy = box.y + box.h / 2 - box.h * 0.1;
+    const x = clamp(cx - size / 2, 0, W - size), y = clamp(cy - size / 2, 0, H - size);
+    faceCrop.target = { x: x / W, y: y / H, w: size / W, h: size / H };
+    faceCrop.lastSeen = clock.elapsedTime;
   },
 
   // True for the whole close-up, including its first frame when the blend is still 0

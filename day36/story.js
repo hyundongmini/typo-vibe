@@ -97,6 +97,7 @@ window.STORY = {
     webcamPrivacy: '카메라 영상은 이 브라우저 안에서만 쓰이고, 저장하거나 어디로도 보내지 않습니다.',
     webcamDenied: '카메라 권한이 거부되어 그림 얼굴로 진행합니다. 주소창의 카메라 권한을 허용하면 다시 쓸 수 있습니다.',
     webcamFailed: '카메라를 열 수 없어 그림 얼굴로 진행합니다.',
+    faceTrackFailed: '얼굴 인식을 불러오지 못해 화면 가운데를 보여 줍니다.',
     webcamUnsupported: '이 브라우저는 카메라를 지원하지 않아 그림 얼굴로 진행합니다.',
     no3d: '이 브라우저에서는 3D 화면을 열 수 없습니다. 다른 브라우저로 열어 주세요.',
     // The camera faces the player, so the player's left-hand reader shows on the right of the screen

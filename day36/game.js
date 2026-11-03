@@ -591,6 +591,7 @@
     if (!webcamStream) return startWebcam();
     webcamStream.getTracks().forEach(t => t.stop());
     webcamStream = null;
+    if (window.FaceTrack) FaceTrack.stop();
     World.setPlayerVideo(null);
     els.webcam.textContent = UI.webcamOn;
     els.webcam.setAttribute('aria-pressed', 'false');
@@ -619,6 +620,17 @@
     els.webcam.textContent = UI.webcamOff;
     els.webcam.setAttribute('aria-pressed', 'true');
     els.webcamNote.textContent = UI.webcamPrivacy;
+    // Zoom onto the face once the detector loads; without it the center of the frame is shown
+    if (!window.FaceTrack) {
+      els.webcamNote.textContent = `${UI.webcamPrivacy} ${UI.faceTrackFailed}`;
+      return;
+    }
+    try {
+      await FaceTrack.start(video, box => World.setFaceBox(box));
+    } catch (err) {
+      console.error('Face detection unavailable', err);
+      els.webcamNote.textContent = `${UI.webcamPrivacy} ${UI.faceTrackFailed}`;
+    }
   }
 
   /* ---------- wiring ---------- */
