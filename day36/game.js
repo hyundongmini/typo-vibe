@@ -11,11 +11,10 @@
     stage: $('#stage'),
     led: $('#led'),
     fare: $('#fare'),
+    world: $('#world'),
+    fade: $('#fade'),
     readers: { left: $('[data-reader="left"]'), right: $('[data-reader="right"]') },
-    arrows: { left: $('[data-body="left"] .arrow'), right: $('[data-body="right"] .arrow') },
-    lanes: { left: $('[data-lane="left"]'), mine: $('[data-lane="mine"]'), right: $('[data-lane="right"]') },
     reactions: $('#reactions'),
-    heads: $('#heads'),
     queueCount: $('#queue-count'),
     card: $('#card'),
     route: $('#route'),
@@ -95,19 +94,23 @@
     }, 1600);
   }
 
-  function bubble(text, isNote) {
+  // Speech bubble over someone's head; who: 'player' | 'front' | a person from World | undefined (anyone near the front)
+  function bubble(text, who, isNote) {
+    const at = World.headScreen(who);
+    if (!at) return;
     const b = document.createElement('p');
     b.className = 'bubble' + (isNote ? ' note' : '');
     b.textContent = text;
+    b.style.left = `${at.x}px`;
+    b.style.top = `${at.y}px`;
     els.reactions.appendChild(b);
     while (els.reactions.children.length > 3) els.reactions.firstChild.remove();
     setTimeout(() => b.remove(), 2500);
   }
 
-  function retrigger(el, cls) {
-    el.classList.remove(cls);
-    void el.offsetWidth;
-    el.classList.add(cls);
+  function setReader(side, kind) {
+    els.readers[side].className = 'reader' + (kind ? ` ${kind}` : '');
+    World.readerState(side, kind);
   }
 
   function modal({ line, color, title, text, list, button, onClose }) {
@@ -175,22 +178,18 @@
   }
 
   function renderQueue() {
-    els.heads.innerHTML = '<i></i>'.repeat(Math.min(state.queue, 12));
     els.queueCount.textContent = UI.queue(state.queue);
+    World.setQueue(state.queue);
   }
 
   function renderGate() {
     const g = gate();
     document.documentElement.style.setProperty('--line-color', g.color);
     ['left', 'right'].forEach(side => {
-      const r = els.readers[side];
-      r.style.setProperty('--scale', g.scale);
-      r.className = 'reader';
-      r.setAttribute('aria-label', UI.readerLabel(side, side === g.reader));
-      // Each reader's arrow points at the lane it opens
-      els.arrows[side].textContent = g.reader === 'right' ? '←' : '→';
+      els.readers[side].className = 'reader';
+      els.readers[side].setAttribute('aria-label', UI.readerLabel(side, side === g.reader));
     });
-    Object.values(els.lanes).forEach(l => l.classList.remove('open', 'walk'));
+    World.setGate(g, state.queue);
     els.fare.textContent = UI.fare(g.kind, g.fare);
     renderHand();
     renderQueue();
@@ -227,7 +226,8 @@
     if (side === drag.contact) return;
     const prev = drag.contact;
     if (prev) {
-      els.readers[prev].classList.remove('contact');
+      setReader(prev, null);
+      World.reach(null);
       const held = (now - drag.contactSince) / 1000;
       // Lifted or slid off before the reader finished: the classic retry.
       // A key press is always deliberate, so any early release counts.
@@ -239,7 +239,8 @@
     drag.contact = side;
     drag.contactSince = now;
     if (side) {
-      els.readers[side].classList.add('contact');
+      setReader(side, 'contact');
+      World.reach(side);
       led('reading', 'info');
     } else if (state.phase === 'gate') {
       led('idle', 'info');
@@ -253,7 +254,8 @@
     drag.isActive = false;
     drag.pointerId = null;
     drag.keySide = null;
-    if (drag.contact) els.readers[drag.contact].classList.remove('contact');
+    if (drag.contact) setReader(drag.contact, null);
+    World.reach(null);
     drag.contact = null;
     els.card.classList.remove('dragging');
     els.card.classList.add('returning');
@@ -323,7 +325,8 @@
     drag.pushY += Math.sin(angle) * push.force * w;
     drag.nextPush = now + rand(...push.gap) * 1000;
     Sound.sfx('push');
-    if (Math.random() < 0.35) bubble(pick(S.reactions.push));
+    World.shove();
+    if (Math.random() < 0.35) bubble(pick(S.reactions.push), 'player');
   }
 
   /* ---------- outcomes ---------- */
@@ -343,14 +346,15 @@
     state.phase = 'passing';
     const key = g.kind === 'enter' ? 'enter' : g.kind === 'exit' ? 'exit' : g.fare ? 'transferFare' : 'transfer';
     led(key, 'ok', { blink: true });
-    els.readers[g.reader].classList.add('ok');
-    els.lanes.mine.classList.add('open');
+    setReader(g.reader, 'ok');
     Sound.sfx('ok');
     Sound.sfx('flapOpen');
     renderHud();
     renderHand();
-    setTimeout(() => els.stage.classList.add('passing'), 700);
-    setTimeout(nextGate, 1500);
+    World.passMine(() => {
+      els.stage.classList.add('fading');
+      setTimeout(nextGate, 450);
+    });
   }
 
   function fail(kind, side) {
@@ -362,25 +366,30 @@
     state.queue++;
     state.log.push(`${g.station} — ${S.failNames[kind]}`);
     Sound.sfx('fail');
-    retrigger(els.readers[side], 'bad');
-    setTimeout(() => els.readers[side].classList.remove('bad'), 900);
+    setReader(side, 'bad');
+    setTimeout(() => setReader(side, null), 900);
 
     if (kind === 'neighbor') {
       // Your tap opened the next lane and a stranger walked through
-      const lane = els.lanes[side === 'left' ? 'left' : 'right'];
-      lane.classList.add('open');
-      retrigger(lane, 'walk');
+      World.neighborPass(side);
       Sound.sfx('flapOpen');
-      setTimeout(() => lane.classList.remove('open'), 1200);
       led('idle', 'error', { blink: true });
     } else {
       flashLed(kind, 'error');
-      retrigger(els.stage, 'bump');
+      World.bump();
       Sound.sfx('flapBump');
     }
-    bubble(pick(S.reactions[kind]));
+    bubble(pick(S.reactions[kind]), kind === 'neighbor' ? 'player' : undefined);
+    World.setMood(state.awkwardHere);
     renderHud();
     renderQueue();
+    // From the second miss on, someone at the back gives up on your lane
+    const defector = state.awkwardHere >= 2 ? World.defect() : null;
+    if (defector) {
+      state.queue--;
+      setTimeout(() => bubble(S.reactions.defect, defector), 500);
+      renderQueue();
+    }
 
     if (state.awkwardHere >= S.maxAwkward) stepAside();
   }
@@ -389,12 +398,16 @@
     state.phase = 'aside';
     state.awkwardHere = 0;
     state.clock += S.penalty.stepAside;
+    bubble(S.reactions.stepAside, 'player', true);
+    World.stepAside(2);
+    state.queue = Math.max(0, state.queue - 2);
+    els.queueCount.textContent = UI.queue(state.queue);
     setTimeout(() => {
-      bubble(S.reactions.stepAside, true);
       state.queue = gate().queue;
+      World.setMood(0);
       renderQueue();
       renderHud();
-    }, 700);
+    }, 2200);
     setTimeout(() => {
       state.phase = 'gate';
       led('idle', 'info');
@@ -445,7 +458,7 @@
     state.awkwardHere = 0;
     state.queue = g.queue;
     if (g.wallet) state.hand = 'wallet';
-    els.stage.classList.remove('passing');
+    els.stage.classList.remove('fading');
     renderGate();
     renderRoute();
     renderHud();
@@ -524,19 +537,40 @@
     if (!drag.isActive) placeCardHome();
   });
 
-  Led.init(els.led);
-  // Re-rasterize once the pixel font arrives; the first frame may use the fallback
-  document.fonts.load('12px Galmuri11', '환승입니다').then(() => lastLed && Led.show(...lastLed));
+  function boot() {
+    // Canvas text in the 3D signs needs the fonts first; don't wait forever on a slow network
+    const fonts = Promise.all([
+      document.fonts.load('800 40px Pretendard', '역'),
+      document.fonts.load('900 30px Pretendard', '나'),
+      document.fonts.load('12px Galmuri11', '환승입니다'),
+    ]);
+    const timeout = new Promise(resolve => setTimeout(resolve, 1500));
+    Promise.race([fonts, timeout]).finally(start);
+  }
 
-  renderGate();
-  renderRoute();
-  renderHud();
-  placeCardHome();
-  led('idle', 'info');
-  requestAnimationFrame(tick);
+  function start() {
+    if (!World.init(els.world)) {
+      els.stage.classList.add('no-3d');
+      els.hint.textContent = UI.no3d;
+      return;
+    }
+    World.bindReaders(els.readers);
+    Led.init(els.led);
 
-  // Index cards embed the page in an iframe: skip the intro dialog
-  const isPreview = window.self !== window.top;
-  document.documentElement.classList.toggle('preview', isPreview);
-  if (!isPreview) modal({ title: S.intro.title, text: S.intro.text, button: UI.start, onClose: newGame });
+    renderGate();
+    renderRoute();
+    renderHud();
+    placeCardHome();
+    led('idle', 'info');
+    requestAnimationFrame(tick);
+
+    // Index cards embed the page in an iframe: skip the intro dialog
+    const isPreview = window.self !== window.top;
+    document.documentElement.classList.toggle('preview', isPreview);
+    if (!isPreview) modal({ title: S.intro.title, text: S.intro.text, button: UI.start, onClose: newGame });
+  }
+
+  // world.js is an ES module and runs after this classic script
+  if (window.World) boot();
+  else window.addEventListener('world-ready', boot, { once: true });
 })();

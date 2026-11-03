@@ -64,6 +64,7 @@ window.STORY = {
     neighbor: ['어? 감사합니다!', '(옆 사람이 꾸벅하고 지나갔다)', '제 문이 열렸네요?'],
     push: ['(뒤에서 밀었다)', '(가방에 밀렸다)', '(누가 어깨를 쳤다)'],
     stepAside: '옆으로 비켜섰다. 뒷사람들이 먼저 지나간다.',
+    defect: '(맨 뒷사람이 옆 줄로 옮겼다)',
   },
 
   // Labels for the awkward-moment log on the ending card
@@ -91,6 +92,7 @@ window.STORY = {
     stepAsideTitle: '머쓱',
     nextGate: '다음 개찰구',
     sound: '♪ 소리',
+    no3d: '이 브라우저에서는 3D 화면을 열 수 없습니다. 다른 브라우저로 열어 주세요.',
     readerLabel: (side, isMine) => `${side === 'left' ? '왼쪽' : '오른쪽'} 단말기${isMine ? '' : ' (옆 통로)'}`,
   },
 

@@ -24,25 +24,17 @@
 
 <main class="wrap">
   <section class="stage" id="stage" aria-label="개찰구">
-    <canvas class="led" id="led" role="img" aria-live="polite"></canvas>
-    <p class="fare" id="fare"></p>
+    <div class="world" id="world"></div>
+    <button type="button" class="reader" data-reader="left"></button>
+    <button type="button" class="reader" data-reader="right"></button>
 
-    <div class="gates" id="gates">
-      <div class="lane side" data-lane="left"><span class="flap l"></span><span class="flap r"></span><span class="person"></span></div>
-      <div class="body" data-body="left">
-        <span class="arrow" aria-hidden="true"></span>
-        <button type="button" class="reader" data-reader="left"></button>
-      </div>
-      <div class="lane mine" data-lane="mine"><span class="flap l"></span><span class="flap r"></span></div>
-      <div class="body" data-body="right">
-        <span class="arrow" aria-hidden="true"></span>
-        <button type="button" class="reader" data-reader="right"></button>
-      </div>
-      <div class="lane side" data-lane="right"><span class="flap l"></span><span class="flap r"></span><span class="person"></span></div>
+    <div class="board">
+      <canvas class="led" id="led" role="img" aria-live="polite"></canvas>
+      <p class="fare" id="fare"></p>
     </div>
-
     <div class="reactions" id="reactions" aria-live="polite"></div>
-    <div class="queue" id="queue"><span class="heads" id="heads"></span><span id="queue-count"></span></div>
+    <div class="fade" id="fade"></div>
+    <div class="queue" id="queue"><span id="queue-count"></span></div>
 
     <div class="card" id="card" aria-hidden="true">
       <span class="card-face"></span><span class="card-face second"></span>
@@ -68,9 +60,11 @@
   </div>
 </dialog>
 
+<script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }</script>
 <script src="story.js"></script>
 <script src="sound.js"></script>
 <script src="led.js"></script>
 <script src="game.js"></script>
+<script type="module" src="world.js"></script>
 </body>
 </html>
