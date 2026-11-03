@@ -59,6 +59,17 @@ button { font: inherit; color: inherit; }
 .sound { background: none; border: 1px solid var(--ink); padding: 4px 10px; cursor: pointer; font-size: 13px; }
 .sound[aria-pressed="false"] { text-decoration: line-through; }
 .sound:focus-visible, .btn:focus-visible, .reader:focus-visible { outline: 3px solid #3a7bff; outline-offset: 2px; }
+/* Reading progress: a ring that fills clockwise while the card stays on */
+.reader::after {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  background: conic-gradient(#ffb93a calc(var(--p, 0) * 1turn), transparent 0);
+  -webkit-mask: radial-gradient(circle, transparent 62%, #000 63%);
+  mask: radial-gradient(circle, transparent 62%, #000 63%);
+  pointer-events: none;
+}
 
 /* ---------- stage ---------- */
 .wrap { padding: 16px; display: grid; justify-items: center; gap: 12px; }
@@ -71,6 +82,8 @@ button { font: inherit; color: inherit; }
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
+  /* The card follows the pointer instead of the system cursor */
+  cursor: none;
   background: var(--tile);
 }
 
@@ -113,10 +126,22 @@ button { font: inherit; color: inherit; }
   border-radius: 50%;
   border: none;
   background: transparent;
-  cursor: pointer;
+  /* Keyboard focus target only; pointer input goes to the stage */
+  pointer-events: none;
   z-index: 2;
 }
 .reader:focus-visible { outline: 3px solid #3a7bff; outline-offset: 2px; }
+/* Reading progress: a ring that fills clockwise while the card stays on */
+.reader::after {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  background: conic-gradient(#ffb93a calc(var(--p, 0) * 1turn), transparent 0);
+  -webkit-mask: radial-gradient(circle, transparent 62%, #000 63%);
+  mask: radial-gradient(circle, transparent 62%, #000 63%);
+  pointer-events: none;
+}
 
 .fade {
   position: absolute;
@@ -136,12 +161,12 @@ button { font: inherit; color: inherit; }
   top: 0;
   width: 9%;
   aspect-ratio: 1.586;
-  cursor: grab;
   z-index: 3;
-  touch-action: none;
+  pointer-events: none;
   will-change: transform;
 }
-.card.dragging { cursor: grabbing; }
+.card.dragging { filter: brightness(0.92); }
+.card.dragging .card-face { box-shadow: 0 2px 4px rgba(0, 0, 0, 0.35); }
 .card.returning { transition: transform 0.3s ease; }
 .card-face {
   position: absolute;

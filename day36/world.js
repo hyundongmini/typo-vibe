@@ -9,14 +9,14 @@ const BODY_H = 1.0;
 const READER_R = 0.17;
 const READER_Z = 0.5;
 const PLAYER_Z = 1.25;
-const QUEUE_Z = 2.05;
-const QUEUE_GAP = 0.95;
+const QUEUE_Z = 2.35;
+const QUEUE_GAP = 1.05;
 const WALK_SPEED = 1.6;
 const HIT_SCALE = 1.35; // touch targets a bit larger than the drawn reader
 
 // Camera sits past the gates looking back at the line, so every face is visible
-const CAM_POS = { x: 1.8, y: 3.7, z: -2.3 };
-const CAM_LOOK = new THREE.Vector3(-0.1, 0.9, 2.2);
+const CAM_POS = { x: 2.9, y: 3.9, z: -2.0 };
+const CAM_LOOK = new THREE.Vector3(-0.3, 0.9, 2.6);
 
 // Left to right: B0 | L lane | B1 | mine | B2 | R lane | B3
 const LANE_X = { left: -(LANE_W + BODY_W), mine: 0, right: LANE_W + BODY_W };
@@ -37,7 +37,7 @@ let player, queue = [], sideQueues = { left: [], right: [] };
 let lanes = {}, readers = {}, signTex, signMat, stripeMat, guideMat;
 let readerEls = null, mood = 0, nextAmbient = 0, shake = 0;
 // User orbit offsets and the close-up "awkward cam" envelope
-const view = { yaw: 0, pitch: 0, dragging: false, lastX: 0, lastY: 0 };
+const view = { yaw: 0, pitch: 0, yawTarget: 0, pitchTarget: 0, dragging: false, lastX: 0, lastY: 0 };
 let cinema = { start: -10, dur: 0 };
 const camPos = new THREE.Vector3(), camLook = new THREE.Vector3();
 
@@ -591,12 +591,17 @@ function queueSlot(i) {
   return QUEUE_Z + i * QUEUE_GAP;
 }
 
+// Real lines wobble; alternating sideways offsets also keep heads from hiding behind each other
+function queueX(i) {
+  return i % 2 ? 0.2 : -0.2;
+}
+
 // isInstant: place people in their slots (scene start) instead of walking in from behind
 function fillSideQueue(name, isInstant) {
   const list = sideQueues[name];
   while (list.length < 2) {
     const p = makePerson();
-    const z = PLAYER_Z + list.length * QUEUE_GAP;
+    const z = PLAYER_Z + list.length * QUEUE_GAP * 1.3;
     p.group.position.set(LANE_X[name], 0, isInstant ? z : z + 2.5);
     walkTo(p, LANE_X[name], z);
     list.push(p);
@@ -604,7 +609,7 @@ function fillSideQueue(name, isInstant) {
 }
 
 function reflowSide(name) {
-  sideQueues[name].forEach((p, i) => walkTo(p, LANE_X[name], PLAYER_Z + i * QUEUE_GAP));
+  sideQueues[name].forEach((p, i) => walkTo(p, LANE_X[name], PLAYER_Z + i * QUEUE_GAP * 1.3));
 }
 
 // The front person of a side lane taps and walks through without any trouble
@@ -668,11 +673,10 @@ function cinemaWeight() {
 
 const sph = new THREE.Spherical();
 function updateCamera(dt) {
-  if (!view.dragging) {
-    // Drift back to the default framing after the player lets go
-    view.yaw *= Math.exp(-dt * 0.6);
-    view.pitch *= Math.exp(-dt * 0.6);
-  }
+  // The view stays where the player leaves it; buttons and reset ease toward their target
+  const ease = Math.min(1, dt * 8);
+  view.yaw += (view.yawTarget - view.yaw) * ease;
+  view.pitch += (view.pitchTarget - view.pitch) * ease;
   sph.setFromVector3(new THREE.Vector3(CAM_POS.x, CAM_POS.y, CAM_POS.z).sub(CAM_LOOK));
   sph.theta += view.yaw;
   sph.phi = clamp(sph.phi + view.pitch, 0.2, 1.4);
@@ -691,8 +695,11 @@ function updateCamera(dt) {
   camera.lookAt(camLook);
 }
 
+// Right-button drag turns the camera; the left button belongs to the card
 function bindOrbit(el) {
+  el.addEventListener('contextmenu', e => e.preventDefault());
   el.addEventListener('pointerdown', e => {
+    if (e.button !== 2) return;
     view.dragging = true;
     view.lastX = e.clientX;
     view.lastY = e.clientY;
@@ -700,8 +707,8 @@ function bindOrbit(el) {
   });
   el.addEventListener('pointermove', e => {
     if (!view.dragging) return;
-    view.yaw = clamp(view.yaw - (e.clientX - view.lastX) * 0.008, -2.6, 2.6);
-    view.pitch = clamp(view.pitch - (e.clientY - view.lastY) * 0.005, -0.8, 0.5);
+    view.yawTarget = clamp(view.yawTarget - (e.clientX - view.lastX) * 0.008, -2.6, 2.6);
+    view.pitchTarget = clamp(view.pitchTarget - (e.clientY - view.lastY) * 0.005, -0.8, 0.5);
     view.lastX = e.clientX;
     view.lastY = e.clientY;
   });
@@ -800,10 +807,10 @@ const World = {
     while (queue.length < n) {
       const p = makePerson();
       const z = queueSlot(queue.length);
-      p.group.position.set((Math.random() - 0.5) * 0.6, 0, isInstant ? z : z + 2.5);
+      p.group.position.set(queueX(queue.length), 0, isInstant ? z : z + 2.5);
       queue.push(p);
     }
-    queue.forEach((p, i) => walkTo(p, 0, queueSlot(i)));
+    queue.forEach((p, i) => walkTo(p, queueX(i), queueSlot(i)));
     applyMood();
   },
 
@@ -820,7 +827,7 @@ const World = {
     const list = sideQueues[name];
     list.push(p);
     p.level = 1;
-    walkTo(p, LANE_X[name], PLAYER_Z + (list.length - 1) * QUEUE_GAP);
+    walkTo(p, LANE_X[name], PLAYER_Z + (list.length - 1) * QUEUE_GAP * 1.3);
     return p;
   },
 
@@ -865,8 +872,12 @@ const World = {
   },
 
   resetView() {
-    view.yaw = 0;
-    view.pitch = 0;
+    view.yawTarget = 0;
+    view.pitchTarget = 0;
+  },
+
+  turnView(delta) {
+    view.yawTarget = clamp(view.yawTarget + delta, -2.6, 2.6);
   },
 
   bump() {
@@ -892,7 +903,7 @@ const World = {
     player.reach = null;
     setLaneOpen('mine', true, 1.6);
     walkTo(player, 0, -3.5);
-    if (queue[0]) setTimeout(() => queue.forEach((p, i) => walkTo(p, p.group.position.x, queueSlot(i) - 0.8)), 400);
+    if (queue[0]) setTimeout(() => queue.forEach((p, i) => walkTo(p, queueX(i), queueSlot(i) - 0.8)), 400);
     setTimeout(onDone, 1500);
   },
 
@@ -907,10 +918,10 @@ const World = {
         walkTo(p, 0, -4, () => removePerson(p));
       }, 300 + i * 650);
     }
-    queue.forEach((p, i) => walkTo(p, p.group.position.x, queueSlot(i)));
+    queue.forEach((p, i) => walkTo(p, queueX(i), queueSlot(i)));
     setTimeout(() => {
       walkTo(player, 0, PLAYER_Z);
-      queue.forEach((p, i) => walkTo(p, p.group.position.x, queueSlot(i)));
+      queue.forEach((p, i) => walkTo(p, queueX(i), queueSlot(i)));
     }, 300 + count * 650);
   },
 

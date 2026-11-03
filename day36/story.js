@@ -18,7 +18,7 @@ window.STORY = {
     {
       station: '집 앞 역', line: '2', color: '#00a84d', kind: 'enter', fare: 1400, travel: 1,
       reader: 'right', scale: 1, read: 0.45, push: null, queue: 1,
-      intro: '늘 타던 역. 카드를 단말기에 올리고, 삑 소리가 날 때까지 떼지 말자.',
+      intro: '늘 타던 역. 내 통로 단말기를 꾹 누르고 있자. 노란 링이 다 차고 삑 소리가 날 때까지 떼면 안 된다.',
     },
     {
       station: '첫 환승역', line: '9', color: '#bdb092', kind: 'transfer', fare: 0, travel: 4,
@@ -88,7 +88,7 @@ window.STORY = {
     awkward: n => `머쓱 ${n}`,
     awkwardLabel: (total, here, max) => `머쓱 총 ${total}회, 이 개찰구 ${here}/${max}`,
     fare: (kind, fare) => (kind === 'exit' ? '하차' : fare ? `운임 ${fare.toLocaleString('ko-KR')}원` : '환승 무료'),
-    hint: '카드를 끌어 단말기에 올리고, 삑 할 때까지 그대로. 빈 곳을 끌면 카메라가 돌아간다. 키보드: 단말기에서 Space를 꾹.',
+    hint: '커서가 곧 카드. 단말기 위에서 꾹 누르고, 노란 링이 다 찰 때까지 떼지 말 것. 카메라: 오른쪽 버튼 드래그 또는 ◀ ▶. 키보드: 단말기에서 Space를 꾹.',
     stepAsideTitle: '머쓱',
     nextGate: '다음 개찰구',
     sound: '♪ 소리',

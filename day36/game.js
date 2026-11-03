@@ -26,6 +26,8 @@
     takeOut: $('#take-out'),
     charge: $('#charge'),
     resetView: $('#reset-view'),
+    turnLeft: $('#turn-left'),
+    turnRight: $('#turn-right'),
     hint: $('#hint'),
     modal: $('#modal'),
     modalLine: $('#modal-line'),
@@ -52,11 +54,12 @@
   const drag = {
     isActive: false,
     pointerId: null,
-    grabX: 0, grabY: 0,
     x: 0, y: 0,
     pushX: 0, pushY: 0,
     nextPush: 0,
     keySide: null,
+    captureEl: null,
+    pointerType: null,
     contact: null,
     contactSince: 0,
   };
@@ -211,16 +214,22 @@
 
   /* ---------- holding the card ---------- */
 
+  // Contact when the card covers the reader's center, like laying a card flat on the pad
   function readerUnderCard() {
     const st = els.stage.getBoundingClientRect();
-    const cx = st.left + drag.x + drag.pushX + els.card.offsetWidth / 2;
-    const cy = st.top + drag.y + drag.pushY + els.card.offsetHeight / 2;
+    const left = st.left + drag.x + drag.pushX, top = st.top + drag.y + drag.pushY;
+    const right = left + els.card.offsetWidth, bottom = top + els.card.offsetHeight;
     for (const side of ['left', 'right']) {
       const r = els.readers[side].getBoundingClientRect();
-      const dx = cx - (r.left + r.width / 2), dy = cy - (r.top + r.height / 2);
-      if (Math.hypot(dx, dy) <= r.width / 2) return side;
+      const rx = r.left + r.width / 2, ry = r.top + r.height / 2;
+      if (rx >= left && rx <= right && ry >= top && ry <= bottom) return side;
     }
     return null;
+  }
+
+  // Fill a ring on the reader while it reads, so you know to keep holding
+  function showProgress(side, ratio) {
+    ['left', 'right'].forEach(s => els.readers[s].style.setProperty('--p', s === side ? ratio : 0));
   }
 
   function setContact(side, now) {
@@ -249,40 +258,58 @@
   }
 
   function endHold() {
-    if (drag.pointerId !== null && els.card.hasPointerCapture(drag.pointerId)) {
-      els.card.releasePointerCapture(drag.pointerId);
+    const el = drag.captureEl;
+    if (el && drag.pointerId !== null && el.hasPointerCapture(drag.pointerId)) {
+      el.releasePointerCapture(drag.pointerId);
     }
+    drag.captureEl = null;
     drag.isActive = false;
     drag.pointerId = null;
     drag.keySide = null;
     if (drag.contact) setReader(drag.contact, null);
     World.reach(null);
     drag.contact = null;
+    showProgress(null, 0);
     els.card.classList.remove('dragging');
-    els.card.classList.add('returning');
-    placeCardHome();
+    drag.pushX = drag.pushY = 0;
+    // A mouse keeps the card under the cursor; a lifted finger or key sends it back to the hand
+    if (drag.pointerType === 'mouse') {
+      applyCard();
+    } else {
+      els.card.classList.add('returning');
+      placeCardHome();
+    }
+    drag.pointerType = null;
   }
 
-  els.card.addEventListener('pointerdown', e => {
-    if (World.isCinematic()) return World.skipCinematic();
-    if (state.phase !== 'gate') return;
-    e.preventDefault();
-    els.card.setPointerCapture(e.pointerId);
+  // The card is the cursor: it follows the pointer over the stage, and pressing lays it down
+  function cardToPointer(e) {
     const st = els.stage.getBoundingClientRect();
-    drag.isActive = true;
-    drag.pointerId = e.pointerId;
-    drag.grabX = e.clientX - st.left - drag.x;
-    drag.grabY = e.clientY - st.top - drag.y;
-    drag.nextPush = performance.now() + (gate().push ? rand(...gate().push.gap) * 1000 : Infinity);
+    drag.x = e.clientX - st.left - els.card.offsetWidth / 2;
+    drag.y = e.clientY - st.top - els.card.offsetHeight / 2;
     els.card.classList.remove('returning');
-    els.card.classList.add('dragging');
+    if (!drag.isActive) applyCard();
+  }
+
+  els.stage.addEventListener('pointermove', e => {
+    if (drag.keySide || (drag.isActive && e.pointerId !== drag.pointerId)) return;
+    cardToPointer(e);
   });
 
-  els.card.addEventListener('pointermove', e => {
-    if (!drag.isActive || e.pointerId !== drag.pointerId) return;
-    const st = els.stage.getBoundingClientRect();
-    drag.x = e.clientX - st.left - drag.grabX;
-    drag.y = e.clientY - st.top - drag.grabY;
+  els.stage.addEventListener('pointerdown', e => {
+    // Right button is for turning the camera
+    if (e.button !== 0 || drag.keySide) return;
+    if (World.isCinematic()) return World.skipCinematic();
+    if (state.phase !== 'gate' || drag.isActive) return;
+    e.preventDefault();
+    els.stage.setPointerCapture(e.pointerId);
+    drag.captureEl = els.stage;
+    drag.pointerType = e.pointerType;
+    cardToPointer(e);
+    drag.isActive = true;
+    drag.pointerId = e.pointerId;
+    drag.nextPush = performance.now() + (gate().push ? rand(...gate().push.gap) * 1000 : Infinity);
+    els.card.classList.add('dragging');
   });
 
   const release = e => {
@@ -290,8 +317,11 @@
     setContact(null, performance.now());
     if (drag.isActive) endHold();
   };
-  els.card.addEventListener('pointerup', release);
-  els.card.addEventListener('pointercancel', release);
+  els.stage.addEventListener('pointerup', release);
+  els.stage.addEventListener('pointercancel', release);
+  els.stage.addEventListener('pointerleave', e => {
+    if (!drag.isActive && e.pointerType === 'mouse') placeCardHome();
+  });
 
   // Keyboard: hold Space/Enter on a reader button to hold the card there
   ['left', 'right'].forEach(side => {
@@ -536,7 +566,11 @@
       applyCard();
       const side = drag.keySide || readerUnderCard();
       setContact(side, now);
-      if (drag.contact && (now - drag.contactSince) / 1000 >= gate().read) resolve(drag.contact);
+      if (drag.contact) {
+        const ratio = (now - drag.contactSince) / 1000 / gate().read;
+        showProgress(drag.contact, Math.min(1, ratio));
+        if (ratio >= 1) resolve(drag.contact);
+      }
     }
     requestAnimationFrame(tick);
   }
@@ -545,6 +579,8 @@
 
   els.takeOut.addEventListener('click', takeOut);
   els.resetView.addEventListener('click', () => World.resetView());
+  els.turnLeft.addEventListener('click', () => World.turnView(-0.5));
+  els.turnRight.addEventListener('click', () => World.turnView(0.5));
   els.charge.addEventListener('click', charge);
   els.sound.setAttribute('aria-pressed', String(Sound.isEnabled()));
   els.sound.addEventListener('click', () => els.sound.setAttribute('aria-pressed', String(Sound.toggle())));
