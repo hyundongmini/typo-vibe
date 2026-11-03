@@ -20,7 +20,6 @@
     nights: $('#nights'),
     people: $('#people'),
     probes: [...document.querySelectorAll('[data-probe]')],
-    exclude: $('#exclude'),
     accuse: $('#accuse'),
     sound: $('#sound'),
     modal: $('#modal'),
@@ -41,7 +40,8 @@
     view: 'idle',
     candles: 0,
     seen: new Set(),
-    excluded: new Set(),
+    // Player's notes: `${clueKey}:${candidateIndex}` -> 'o' | 'x'
+    marks: new Map(),
     results: [],
     phase: 'intro',
   };
@@ -212,8 +212,31 @@
 
   /* ---------- render ---------- */
 
+  const MARK_CYCLE = { '': 'o', o: 'x', x: '' };
+  const MARK_TEXT = { '': '?', o: '○', x: '×' };
+  const markOf = (k, i) => state.marks.get(`${k}:${i}`) || '';
+  const isRuledOut = i => knownClues().some(k => markOf(k, i) === 'x');
+
+  // Memo board: one row per clue, one cell per candidate the player fills in
   function renderClues() {
+    const focusKey = document.activeElement && document.activeElement.dataset.mark;
+    const cols = state.candidates.length;
+    const inNight = state.phase === 'night';
     els.clues.innerHTML = '';
+    els.clues.style.setProperty('--cols', cols);
+
+    const head = document.createElement('div');
+    head.className = 'memo-row memo-head';
+    head.innerHTML = '<span class="memo-clue"></span>';
+    state.candidates.forEach((c, i) => {
+      const cell = document.createElement('span');
+      cell.className = 'memo-col' + (i === state.selected ? ' is-current' : '');
+      cell.innerHTML = knockSvg(c.knock.pattern);
+      cell.title = c.knock.name;
+      head.appendChild(cell);
+    });
+    els.clues.appendChild(head);
+
     const known = knownClues();
     let shown = 0;
     S.nights.slice(0, state.night + 1).forEach((cfg, n) => {
@@ -223,21 +246,45 @@
       const h = document.createElement('h3');
       h.textContent = cfg.source;
       els.clues.appendChild(h);
-      const ul = document.createElement('ul');
       keys.forEach(k => {
-        const li = document.createElement('li');
-        if (n === state.night && state.night > 0) li.className = 'new';
+        const row = document.createElement('div');
+        row.className = 'memo-row' + (n === state.night && state.night > 0 ? ' new' : '');
+        const clue = document.createElement('span');
+        clue.className = 'memo-clue';
         const tag = document.createElement('span');
         tag.className = 'tag';
         tag.textContent = S.parts[S.traits[k].part];
         const text = document.createElement('span');
         text.className = 'clue-text';
         text.textContent = S.traits[k].values[state.thisbe[k]];
-        li.append(tag, text);
-        ul.appendChild(li);
+        clue.append(tag, text);
+        row.appendChild(clue);
+        state.candidates.forEach((c, i) => {
+          const mark = markOf(k, i);
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = `mark mark-${mark || 'none'}` + (i === state.selected ? ' is-current' : '');
+          btn.dataset.mark = `${k}:${i}`;
+          btn.textContent = MARK_TEXT[mark];
+          btn.setAttribute('aria-label', `${c.knock.label} 두드린 사람, ${S.parts[S.traits[k].part]} 단서: ${UI.markNames[mark]}`);
+          btn.disabled = !inNight;
+          btn.addEventListener('click', () => cycleMark(k, i));
+          row.appendChild(btn);
+        });
+        els.clues.appendChild(row);
       });
-      els.clues.appendChild(ul);
     });
+    if (focusKey) {
+      const again = els.clues.querySelector(`[data-mark="${focusKey}"]`);
+      if (again) again.focus();
+    }
+  }
+
+  function cycleMark(k, i) {
+    if (state.phase !== 'night') return;
+    const next = MARK_CYCLE[markOf(k, i)];
+    next ? state.marks.set(`${k}:${i}`, next) : state.marks.delete(`${k}:${i}`);
+    renderStatus();
   }
 
   function renderPeople() {
@@ -247,7 +294,7 @@
       btn.type = 'button';
       btn.className = 'person';
       btn.setAttribute('aria-pressed', String(i === state.selected));
-      const isExcluded = state.excluded.has(i);
+      const isExcluded = isRuledOut(i);
       if (isExcluded) btn.classList.add('excluded');
       const seenParts = Object.keys(S.parts).filter(p => state.seen.has(`${i}:${p}`));
       btn.innerHTML = `${knockSvg(c.knock.pattern)}<span class="name"></span><span class="seen"></span>`;
@@ -299,11 +346,10 @@
       btn.classList.toggle('is-seen', isSeen && state.view === part);
     });
     const who = current();
-    els.exclude.disabled = !inNight;
-    els.exclude.textContent = state.excluded.has(state.selected) ? UI.include : UI.exclude;
     els.accuse.disabled = !inNight;
     els.accuse.textContent = UI.accuse(who ? who.knock.name : '');
     renderPeople();
+    if (state.phase !== 'intro') renderClues();
   }
 
   function draw() {
@@ -345,9 +391,8 @@
     state.view = 'idle';
     state.candles = cfg.candles;
     state.seen.clear();
-    state.excluded.clear();
+    state.marks.clear();
     sayGroup([[`— ${cfg.name} —`, 'heading'], [UI.nightIntro(UI.counts[cfg.people])]]);
-    renderClues();
     draw();
     knock(current());
     renderStatus();
@@ -388,13 +433,6 @@
     if (!isSeen && state.candles === 0) lines.push([UI.noCandle, 'hint']);
     if (!isSeen || part === 'talk') sayGroup(lines);
     draw();
-    renderStatus();
-  }
-
-  function toggleExclude() {
-    if (state.phase !== 'night') return;
-    const i = state.selected;
-    state.excluded.has(i) ? state.excluded.delete(i) : state.excluded.add(i);
     renderStatus();
   }
 
@@ -470,7 +508,6 @@
   /* ---------- wiring ---------- */
 
   els.probes.forEach(btn => btn.addEventListener('click', () => probe(btn.dataset.probe)));
-  els.exclude.addEventListener('click', toggleExclude);
   els.accuse.addEventListener('click', accuse);
   els.sound.setAttribute('aria-pressed', String(Sound.isEnabled()));
   els.sound.addEventListener('click', () => {

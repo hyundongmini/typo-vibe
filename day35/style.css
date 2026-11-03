@@ -54,7 +54,7 @@ button { font: inherit; color: inherit; }
 /* ---------- desk layout ---------- */
 .desk {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 340px;
+  grid-template-columns: minmax(0, 1fr) 356px;
   gap: 14px;
   max-width: 1400px;
   margin: 16px auto;
@@ -150,7 +150,6 @@ button { font: inherit; color: inherit; }
 .person:disabled { cursor: default; }
 
 .probes { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
-.decide { display: grid; grid-template-columns: 1fr 2fr; gap: 6px; }
 .cmd {
   background: var(--paper);
   border: 1px solid var(--ink);
@@ -169,16 +168,44 @@ button { font: inherit; color: inherit; }
 .cmd:focus-visible { outline: 2px dashed var(--ink); outline-offset: 2px; }
 .cmd:disabled { cursor: default; opacity: 0.35; }
 .cmd.is-seen { box-shadow: inset 0 -3px 0 var(--ink); }
-.cmd.verdict { border-width: 2px; font-weight: 700; }
+.cmd.verdict { border-width: 2px; font-weight: 700; width: 100%; }
 
 /* ---------- clues ---------- */
 .clue-lead { font-weight: 700; font-size: 14px; }
 .clue-sub { font-size: 11px; margin-bottom: 8px; }
 .clues h3 { font-size: 11px; font-weight: 400; margin-top: 12px; text-decoration: underline; }
 .clues h3:first-child { margin-top: 0; }
-.clues ul { list-style: none; display: grid; gap: 6px; margin-top: 6px; }
-.clues li { display: grid; grid-template-columns: auto 1fr; gap: 8px; align-items: start; }
-.clues li.new .clue-text::before { content: 'NEW '; font-weight: 700; }
+.clues h3 { margin-bottom: 4px; }
+.memo-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) repeat(var(--cols), 28px);
+  gap: 3px;
+  align-items: center;
+  margin-bottom: 3px;
+}
+.memo-head { position: sticky; top: 0; background: var(--paper); margin-bottom: 6px; }
+.memo-clue { display: grid; grid-template-columns: auto 1fr; gap: 6px; align-items: start; }
+.memo-row.new .clue-text::before { content: 'NEW '; font-weight: 700; }
+.memo-col { display: grid; place-items: center; height: 14px; }
+.memo-col svg { height: 8px; width: auto; }
+.memo-col.is-current { border-bottom: 2px solid var(--ink); }
+.mark {
+  height: 28px;
+  background: var(--paper);
+  border: 1px solid var(--ink);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+}
+.mark-none { color: var(--ink); opacity: 0.4; }
+.mark.is-current { box-shadow: inset 0 0 0 1px var(--ink); }
+.mark-x { background: var(--ink); color: var(--paper); }
+.mark:focus-visible { outline: 2px dashed var(--ink); outline-offset: 1px; }
+.mark:disabled { cursor: default; }
+@media (hover: hover) {
+  .mark:hover:not(:disabled) { opacity: 1; box-shadow: inset 0 0 0 2px var(--ink); }
+}
 .tag {
   border: 1px solid var(--ink);
   padding: 0 4px;
@@ -230,5 +257,10 @@ button { font: inherit; color: inherit; }
   .nights { display: none; }
   .person .name { font-size: 11px; }
   .cmd { min-height: 44px; }
+  /* Clue text gets its own line so each mark cell can be a full touch target */
+  .memo-row { grid-template-columns: repeat(var(--cols), 44px); }
+  .memo-clue { grid-column: 1 / -1; }
+  .memo-head .memo-clue { display: none; }
+  .mark { height: 44px; }
   .caption { height: 4.8rem; }
 }

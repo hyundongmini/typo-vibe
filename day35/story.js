@@ -128,8 +128,7 @@ window.STORY = {
   lionName: '암사자',
 
   ui: {
-    exclude: '제외 표시',
-    include: '제외 취소',
+    markNames: { '': '모름', o: '맞음', x: '다름' },
     accuse: name => `${name} — 이 사람이 티스베다`,
     next: '다음 밤',
     retry: '처음부터',
