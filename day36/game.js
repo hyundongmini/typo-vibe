@@ -36,6 +36,9 @@
     modalTitle: $('#modal-title'),
     modalText: $('#modal-text'),
     modalList: $('#modal-list'),
+    modalPhotos: $('#modal-photos'),
+    flash: $('#flash'),
+    polaroid: $('#polaroid'),
     modalBtn: $('#modal-btn'),
   };
 
@@ -50,6 +53,7 @@
     isCharged: false,
     phase: 'intro', // intro | sign | gate | aside | passing | end
     log: [],
+    photos: [], // { url, alt, name }
   };
 
   // Card position is the pointer position plus a decaying shove from the crowd
@@ -119,7 +123,22 @@
     World.readerState(side, kind);
   }
 
-  function modal({ line, color, title, text, list, button, onClose }) {
+  function modal({ line, color, title, text, list, photos, button, onClose }) {
+    els.modalPhotos.innerHTML = '';
+    els.modal.classList.toggle('has-photos', !!(photos && photos.length));
+    (photos || []).forEach(photo => {
+      const fig = document.createElement('figure');
+      const img = document.createElement('img');
+      img.src = photo.url;
+      img.alt = photo.alt;
+      const save = document.createElement('a');
+      save.href = photo.url;
+      save.download = photo.name;
+      save.textContent = UI.savePhoto;
+      save.className = 'btn';
+      fig.append(img, save);
+      els.modalPhotos.appendChild(fig);
+    });
     els.modalLine.textContent = line || '';
     if (color) document.documentElement.style.setProperty('--line-color', color);
     els.modalTitle.textContent = title;
@@ -491,6 +510,7 @@
       hand: 'card',
       isCharged: false,
       log: [],
+      photos: [],
     });
     Sound.startAmbience();
     // Your own face is the default; the first game asks for the camera, later ones keep your choice
@@ -549,6 +569,7 @@
       title: ending.title,
       text: `${S.endings.summary(fmtClock(state.clock).slice(0, -3), state.awkwardTotal)}\n\n${ending.text}`,
       list: [S.endings.logTitle + (state.log.length ? '' : ` — ${S.endings.clean}`), ...state.log],
+      photos: state.photos,
       button: UI.retry,
       onClose: newGame,
     });
@@ -580,6 +601,75 @@
       }
     }
     requestAnimationFrame(tick);
+  }
+
+  /* ---------- ride photos ---------- */
+
+  // Frame a captured close-up like an amusement-park ride photo
+  function ridePhoto(shot, info) {
+    const c = document.createElement('canvas');
+    c.width = 800;
+    c.height = 640;
+    const g = c.getContext('2d');
+    g.fillStyle = '#141414';
+    g.fillRect(0, 0, c.width, c.height);
+    g.fillStyle = '#ffd400';
+    g.fillRect(0, 0, c.width, 64);
+    g.fillStyle = '#111';
+    g.font = '900 30px Pretendard, sans-serif';
+    g.textBaseline = 'middle';
+    g.fillText(UI.photoBrand, 24, 33);
+    g.textAlign = 'right';
+    g.font = '700 18px Pretendard, sans-serif';
+    g.fillText(UI.photoTagline, c.width - 24, 33);
+    g.textAlign = 'left';
+    g.fillStyle = '#fff';
+    g.fillRect(20, 80, 760, 507);
+    g.drawImage(shot, 26, 86, 748, 495);
+    // Bottom strip: photo number, where and when, what went wrong
+    g.fillStyle = '#ffd400';
+    g.font = '24px Galmuri11, monospace';
+    g.fillText(`No.${String(info.number).padStart(2, '0')}`, 24, 614);
+    g.fillStyle = '#fff';
+    g.font = '700 20px Pretendard, sans-serif';
+    g.fillText(`${info.station} · ${info.time}`, 150, 614);
+    g.textAlign = 'right';
+    g.fillStyle = '#ff5a4a';
+    g.font = '800 20px Pretendard, sans-serif';
+    g.fillText(info.what, c.width - 24, 614);
+    // Rotated sticker in the lower-left corner, clear of the pop-up word over your head
+    g.save();
+    g.translate(118, 530);
+    g.rotate(-0.15);
+    g.fillStyle = '#e8262b';
+    g.beginPath();
+    g.ellipse(0, 0, 78, 40, 0, 0, Math.PI * 2);
+    g.fill();
+    g.fillStyle = '#fff';
+    g.textAlign = 'center';
+    g.font = '900 36px Pretendard, sans-serif';
+    g.fillText(UI.photoSticker, 0, 2);
+    g.restore();
+    return c.toDataURL('image/jpeg', 0.9);
+  }
+
+  function onPhoto(shot, kind) {
+    if (state.photos.length >= S.maxPhotos) return;
+    const g = gate();
+    const number = state.photos.length + 1;
+    const info = { number, station: g.station, time: fmtClock(state.clock).slice(0, -3), what: S.failNames[kind] };
+    const url = ridePhoto(shot, info);
+    state.photos.push({ url, alt: UI.photoAlt(info), name: `mussuk-${String(number).padStart(2, '0')}.jpg` });
+    Sound.sfx('shutter');
+    retriggerClass(els.flash, 'on');
+    els.polaroid.src = url;
+    retriggerClass(els.polaroid, 'on');
+  }
+
+  function retriggerClass(el, cls) {
+    el.classList.remove(cls);
+    void el.offsetWidth;
+    el.classList.add(cls);
   }
 
   /* ---------- webcam face ---------- */
@@ -667,6 +757,7 @@
       return;
     }
     World.bindReaders(els.readers);
+    World.onPhoto = onPhoto;
     Led.init(els.led);
 
     renderGate();

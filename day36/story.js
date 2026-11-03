@@ -10,6 +10,8 @@ window.STORY = {
   penalty: { fail: 15, stepAside: 60, takeOut: 5, charge: 60 },
   // Failures at one gate before you give up and let the line pass
   maxAwkward: 3,
+  // Ride photos kept per run
+  maxPhotos: 8,
 
   // travel: minutes walked/ridden before reaching this gate
   // reader: which gate body holds YOUR reader; scale: reader size; read: seconds the card must stay
@@ -92,6 +94,11 @@ window.STORY = {
     stepAsideTitle: '머쓱',
     nextGate: '다음 개찰구',
     sound: '♪ 소리',
+    photoBrand: '머쓱 포토',
+    photoTagline: '오늘의 환승 기념 사진',
+    photoSticker: '머쓱!',
+    savePhoto: '사진 저장',
+    photoAlt: info => `머쓱 사진 ${info.number}: ${info.station} ${info.time}, ${info.what}`,
     webcamOn: '📷 내 얼굴로',
     webcamOff: '📷 얼굴 끄기',
     webcamPrivacy: '카메라 영상은 이 브라우저 안에서만 쓰이고, 저장하거나 어디로도 보내지 않습니다.',

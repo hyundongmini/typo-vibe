@@ -39,6 +39,8 @@ let readerEls = null, mood = 0, nextAmbient = 0, shake = 0;
 // User orbit offsets and the close-up "awkward cam" envelope
 const view = { yaw: 0, pitch: 0, yawTarget: 0, pitchTarget: 0, dragging: false, lastX: 0, lastY: 0 };
 let cinema = { start: -10, dur: 0 };
+// Ride-photo capture scheduled for the peak of a close-up
+let pendingShot = null;
 const camPos = new THREE.Vector3(), camLook = new THREE.Vector3();
 
 /* ---------- textures ---------- */
@@ -154,10 +156,15 @@ const FACES = {
   aside: { eyes: 'happy', brows: 'worried', mouth: 'grin', sweat: true },
   ok: { eyes: 'happy', brows: 'none', mouth: 'smile' },
   // Drawn over a live webcam face: only the blush and sweat
-  overlay: { eyes: 'none', brows: 'none', mouth: 'none' },
-  overlaySweat: { eyes: 'none', brows: 'none', mouth: 'none', sweat: true },
+  // Live overlays are louder (live: true) so the embarrassment reads on a real face
+  overlay: { eyes: 'none', brows: 'none', mouth: 'none', live: true },
+  overlaySweat: { eyes: 'none', brows: 'none', mouth: 'none', sweat: true, live: true },
+  overlayGloom: { eyes: 'none', brows: 'none', mouth: 'none', sweat: true, gloom: true, live: true },
 };
 const QUEUE_FACES = ['phone', 'annoyed', 'angry', 'fuming'];
+const GLOOMY = new Set(['retry', 'balance', 'aside']);
+// Big pop-up word over your head for each blunder
+const SHOUTS = { retry: '삑삑…', wallet: '앗', neighbor: '어…?', balance: '헉', aside: '머쓱…', push: '읏' };
 // Reactions that get the close-up camera, and the ones where you turn back to face the line
 const CLOSE_UP = new Set(['retry', 'wallet', 'neighbor', 'balance']);
 const LOOK_BACK = new Set(['retry', 'wallet', 'neighbor', 'balance', 'aside']);
@@ -168,14 +175,24 @@ function drawFace(g, f, blush) {
   g.clearRect(0, 0, 128, 128);
   g.lineCap = 'round';
   g.lineJoin = 'round';
+  if (f.gloom) {
+    // Manga "gloom" lines down the forehead
+    g.strokeStyle = 'rgba(70, 90, 200, 0.55)';
+    g.lineWidth = 2.5;
+    [48, 58, 68, 78].forEach((x, i) => { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, 10 + (i % 2) * 4); g.stroke(); });
+  }
   if (blush > 0) {
-    g.fillStyle = `rgba(235, 60, 60, ${0.25 + blush * 0.55})`;
-    [30, 98].forEach(x => { g.beginPath(); g.ellipse(x, 78, 14 + blush * 4, 8 + blush * 2, 0, 0, Math.PI * 2); g.fill(); });
-    // Embarrassment hatching on the cheeks once it gets bad
-    if (blush > 0.5) {
-      g.strokeStyle = 'rgba(200, 30, 30, 0.8)';
-      g.lineWidth = 2.5;
-      [30, 98].forEach(x => [-6, 0, 6].forEach(d => { g.beginPath(); g.moveTo(x + d - 3, 82); g.lineTo(x + d + 3, 74); g.stroke(); }));
+    const big = f.live ? 1.5 : 1;
+    // Cheek height differs: on a live face the cheeks sit higher on the head patch
+    const cy = f.live ? 64 : 80;
+    g.fillStyle = `rgba(235, 50, 50, ${(0.25 + blush * 0.55) * (f.live ? 1.15 : 1)})`;
+    [30, 98].forEach(x => { g.beginPath(); g.ellipse(x, cy, (14 + blush * 4) * big, (8 + blush * 2) * big, 0, 0, Math.PI * 2); g.fill(); });
+    // Embarrassment hatching on the cheeks once it gets bad (sooner and denser on a live face)
+    if (blush > (f.live ? 0.2 : 0.5)) {
+      g.strokeStyle = 'rgba(190, 20, 20, 0.9)';
+      g.lineWidth = f.live ? 3.5 : 2.5;
+      const marks = f.live ? [-12, -4, 4, 12] : [-6, 0, 6];
+      [30, 98].forEach(x => marks.forEach(d => { g.beginPath(); g.moveTo(x + d - 4, cy + 8); g.lineTo(x + d + 4, cy - 8); g.stroke(); }));
     }
   }
   g.strokeStyle = ink;
@@ -214,7 +231,14 @@ function drawFace(g, f, blush) {
     g.fillStyle = '#7cc6ff';
     g.strokeStyle = '#2f7fc0';
     g.lineWidth = 2;
-    g.beginPath(); g.moveTo(108, 20); g.quadraticCurveTo(118, 38, 108, 44); g.quadraticCurveTo(98, 38, 108, 20); g.fill(); g.stroke();
+    const drop = (x, y, k) => {
+      g.beginPath(); g.moveTo(x, y); g.quadraticCurveTo(x + 10 * k, y + 18 * k, x, y + 24 * k); g.quadraticCurveTo(x - 10 * k, y + 18 * k, x, y); g.fill(); g.stroke();
+    };
+    drop(108, 20, 1);
+    if (f.live) {
+      drop(116, 50, 1.3);
+      drop(16, 30, 0.9);
+    }
   }
 }
 
@@ -245,6 +269,24 @@ function faceTexture(name, blush) {
   const key = `${name}|${step}`;
   if (!faceCache.has(key)) faceCache.set(key, canvasTexture(128, 128, g => drawFace(g, FACES[name], step / 4)));
   return faceCache.get(key);
+}
+
+const shoutCache = new Map();
+function shoutTexture(text) {
+  if (!shoutCache.has(text)) {
+    shoutCache.set(text, canvasTexture(256, 128, (g, w, h) => {
+      g.font = '900 78px Pretendard, sans-serif';
+      g.textAlign = 'center';
+      g.textBaseline = 'middle';
+      g.lineJoin = 'round';
+      g.lineWidth = 14;
+      g.strokeStyle = '#fff';
+      g.strokeText(text, w / 2, h / 2);
+      g.fillStyle = '#e8262b';
+      g.fillText(text, w / 2, h / 2);
+    }));
+  }
+  return shoutCache.get(text);
 }
 
 /* ---------- people ---------- */
@@ -354,6 +396,12 @@ function makePerson({ coat, isPlayer = false } = {}) {
     tag.renderOrder = 10;
     group.add(tag);
     group.userData.tag = tag;
+
+    const shout = new THREE.Sprite(new THREE.SpriteMaterial({ depthTest: false, transparent: true }));
+    shout.renderOrder = 11;
+    shout.visible = false;
+    group.add(shout);
+    group.userData.shout = shout;
   }
 
   const moodMark = new THREE.Sprite(new THREE.SpriteMaterial({ depthTest: false, transparent: true }));
@@ -426,7 +474,7 @@ function animatePerson(p, t, dt) {
   const faceName = p.isPlayer ? (p.exprUntil > t ? p.expr : 'neutral') : QUEUE_FACES[p.level];
   const isLive = !!(p.videoFace && p.videoFace.visible);
   // With a live face the real expression does the acting; only blush and sweat are drawn on top
-  const drawn = isLive ? (FACES[faceName].sweat ? 'overlaySweat' : 'overlay') : faceName;
+  const drawn = isLive ? (GLOOMY.has(faceName) ? 'overlayGloom' : FACES[faceName].sweat ? 'overlaySweat' : 'overlay') : faceName;
   const faceKey = `${drawn}|${Math.round(p.blush * 4)}`;
   if (faceKey !== p.faceKey) {
     p.faceKey = faceKey;
@@ -437,7 +485,7 @@ function animatePerson(p, t, dt) {
   if (p.blushShown !== p.blush) {
     p.blushShown = p.blush;
     // Embarrassment filter: the live face itself turns red
-    if (p.videoFace) p.videoFace.material.color.setRGB(1, 1 - p.blush * 0.42, 1 - p.blush * 0.48);
+    if (p.videoFace) p.videoFace.material.color.setRGB(1, 1 - p.blush * 0.6, 1 - p.blush * 0.65);
     p.skinMat.color.copy(p.baseSkin).lerp(new THREE.Color(0xe2584a), p.blush * 0.55);
   }
 
@@ -495,6 +543,20 @@ function animatePerson(p, t, dt) {
   if (p.reach) {
     const arm = p.reach === 'left' ? armL : armR;
     if (arm === armL) { armLx = 1.25; armLz = -0.45; } else { armRx = 1.25; armRz = 0.45; }
+  }
+
+  const shout = p.group.userData.shout;
+  if (shout) {
+    const left = (shout.userData.until || 0) - t;
+    shout.visible = left > 0;
+    if (shout.visible) {
+      // Pop in, then bob while it lasts
+      const age = t - shout.userData.from;
+      const pop = Math.min(1, age / 0.15);
+      shout.scale.set(0.66 * pop, 0.33 * pop, 1);
+      // Model faces -z, so negative x lands on the screen's right of the head
+      shout.position.set(-0.42, 2.12 + Math.sin(age * 8) * 0.03, 0);
+    }
   }
 
   const markLevel = isWalking || p.isPlayer ? 0 : p.level;
@@ -725,7 +787,7 @@ function updateCamera(dt) {
   const normalPos = new THREE.Vector3().setFromSpherical(sph).add(CAM_LOOK);
 
   const head = player.head.getWorldPosition(new THREE.Vector3());
-  const closePos = head.clone().add(new THREE.Vector3(0.3, 0.3, -1.55));
+  const closePos = head.clone().add(new THREE.Vector3(0.22, 0.22, -1.2));
   const w = cinemaWeight();
   player.group.userData.tag.visible = w < 0.2;
   camPos.copy(normalPos).lerp(closePos, w);
@@ -809,13 +871,31 @@ function tick() {
   updateFaceCrop(dt);
 
   renderer.render(scene, camera);
+  if (pendingShot && clock.elapsedTime >= pendingShot.at) takeShot();
   placeReaderButtons();
   requestAnimationFrame(tick);
+}
+
+// Copy the frame just rendered (still in the drawing buffer this task) as a 3:2 crop
+function takeShot() {
+  const { kind } = pendingShot;
+  pendingShot = null;
+  if (!World.onPhoto) return;
+  const src = renderer.domElement;
+  const shot = document.createElement('canvas');
+  shot.width = 720;
+  shot.height = 480;
+  const sw = Math.min(src.width, src.height * 1.5), sh = sw / 1.5;
+  shot.getContext('2d').drawImage(src, (src.width - sw) / 2, (src.height - sh) / 2, sw, sh, 0, 0, shot.width, shot.height);
+  World.onPhoto(shot, kind);
 }
 
 /* ---------- public API ---------- */
 
 const World = {
+  // Set by the game: (canvas, kind) => void, called when a ride photo is taken
+  onPhoto: null,
+
   init(el) {
     container = el;
     try {
@@ -912,6 +992,13 @@ const World = {
   // Player's face for a situation: close-up camera first, then a sheepish look back at the line
   react(kind) {
     const t = clock.elapsedTime;
+    if (SHOUTS[kind]) {
+      const shout = player.group.userData.shout;
+      shout.material.map = shoutTexture(SHOUTS[kind]);
+      shout.material.needsUpdate = true;
+      shout.userData.until = t + (kind === 'push' ? 0.8 : 2.2);
+      shout.userData.from = t;
+    }
     player.expr = kind;
     player.exprUntil = t + (kind === 'push' ? 0.9 : 3.4);
     if (LOOK_BACK.has(kind)) {
@@ -920,6 +1007,7 @@ const World = {
       player.turnUntil = player.turnFrom + 1.6;
     }
     if (CLOSE_UP.has(kind) && !reduceMotion) cinema = { start: t, dur: 1.6 };
+    if (CLOSE_UP.has(kind)) pendingShot = { at: t + (reduceMotion ? 0.1 : 0.75), kind };
   },
 
   setBlush(v) {
@@ -947,7 +1035,7 @@ const World = {
     videoFace.visible = videoOverlay.visible = !!video;
     face.visible = !video;
     // Sweep the 3D hair back so it frames the forehead instead of covering the face
-    player.hair.rotation.x = video ? 0.8 : 0.25;
+    player.hair.rotation.x = video ? 1.15 : 0.25;
     player.faceKey = '';
   },
 
