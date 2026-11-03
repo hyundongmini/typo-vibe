@@ -165,14 +165,21 @@
 
   /* ---------- render ---------- */
 
+  // Transfer stops count as passed once you are past the gate before them
   function renderRoute() {
     els.route.innerHTML = '';
-    S.gates.forEach((g, i) => {
+    let lastGate = 0;
+    S.route.forEach(stop => {
+      const reachedAt = stop.gate ?? lastGate + 1;
+      if (stop.gate !== undefined) lastGate = stop.gate;
       const li = document.createElement('li');
       li.innerHTML = '<span class="dot"></span><span></span>';
-      li.lastChild.textContent = g.station;
-      if (i < state.gate || state.phase === 'end') li.className = 'done';
-      if (i === state.gate && state.phase !== 'end' && state.phase !== 'intro') li.setAttribute('aria-current', 'step');
+      li.lastChild.textContent = stop.via ? `${stop.name}(${stop.via})` : stop.name;
+      if (stop.via) li.classList.add('via');
+      const isCurrent = stop.gate === state.gate && state.phase !== 'end' && state.phase !== 'intro';
+      const isPassed = state.phase === 'end' || reachedAt < state.gate || (stop.via && reachedAt <= state.gate && state.gate > 0);
+      if (isPassed && !isCurrent) li.classList.add('done');
+      if (isCurrent) li.setAttribute('aria-current', 'step');
       els.route.appendChild(li);
     });
   }
@@ -195,7 +202,7 @@
     els.takeOut.hidden = !isWallet;
     els.takeOut.textContent = `${UI.takeOut} (+${S.penalty.takeOut}초)`;
     els.charge.hidden = !g.kiosk;
-    els.charge.textContent = `${UI.charge} (+${S.penalty.charge / 60}분)`;
+    els.charge.textContent = `${g.kind === 'exit' ? UI.settle : UI.charge} (+${S.penalty.charge / 60}분)`;
     els.charge.disabled = state.isCharged;
     const canAct = state.phase === 'gate';
     els.takeOut.disabled = !canAct;
@@ -398,7 +405,7 @@
     const g = gate();
     state.balance -= g.fare;
     state.phase = 'passing';
-    const key = g.kind === 'enter' ? 'enter' : g.kind === 'exit' ? 'exit' : g.fare ? 'transferFare' : 'transfer';
+    const key = g.kind === 'enter' ? 'enter' : g.kind === 'exit' ? (g.fare ? 'exitFare' : 'exit') : g.fare ? 'transferFare' : 'transfer';
     led(key, 'ok', { blink: true });
     setReader(g.reader, 'ok');
     World.react('ok');

@@ -1,9 +1,10 @@
-// Data for "다시 찍어 주세요": a morning commute through five ticket gates.
+// Data for "다시 찍어 주세요": a real morning commute, 길음 (Line 4) to 몽촌토성 (Line 8).
+// Line 4 → 2 → 8 transfers are all one operator, so there are only two gates: in and out.
 // Every failure is something that really happens at Seoul subway gates.
 window.STORY = {
-  startClock: 8 * 3600 + 40 * 60,
+  startClock: 8 * 3600 + 10 * 60,
   deadline: 9 * 3600,
-  startBalance: 2150,
+  startBalance: 1450,
   chargeAmount: 10000,
 
   // Seconds added to the clock
@@ -13,34 +14,30 @@ window.STORY = {
   // Ride photos kept per run
   maxPhotos: 8,
 
+  // Stops shown in the top bar; gate: index of the gate at that stop (transfers have none)
+  route: [
+    { name: '길음', gate: 0 },
+    { name: '동대문역사문화공원', via: '2호선 환승' },
+    { name: '잠실', via: '8호선 환승' },
+    { name: '몽촌토성', gate: 1 },
+  ],
+
   // travel: minutes walked/ridden before reaching this gate
   // reader: which gate body holds YOUR reader; scale: reader size; read: seconds the card must stay
   // push: crowd shoves while you hold the card ([minGap, maxGap] seconds, force as share of stage width)
+  // sign: station sign like the real ones (number, neighbors)
   gates: [
     {
-      station: '집 앞 역', line: '2', color: '#00a84d', kind: 'enter', fare: 1400, travel: 1,
-      reader: 'right', scale: 1, read: 0.45, push: null, queue: 1,
-      intro: '늘 타던 역. 내 통로 단말기를 꾹 누르고 있자. 노란 링이 다 차고 삑 소리가 날 때까지 떼면 안 된다.',
+      station: '길음', line: '4', color: '#00a5de', kind: 'enter', fare: 1400, travel: 3,
+      reader: 'right', scale: 1, read: 0.5, push: { gap: [1.6, 2.4], force: 0.015 }, queue: 3, wallet: true,
+      sign: { number: '417', prev: ['416', '미아사거리'], next: ['418', '성신여대입구'] },
+      intro: '길음역 개찰구. 급하게 나오느라 카드를 지갑째 들고 왔다. 지갑엔 카드가 두 장.',
     },
     {
-      station: '첫 환승역', line: '9', color: '#bdb092', kind: 'transfer', fare: 0, travel: 4,
-      reader: 'right', scale: 1, read: 0.5, push: null, queue: 2, wallet: true,
-      intro: '9호선으로 갈아탄다. 아침에 급하게 나오느라 카드를 지갑째 들고 왔다. 지갑엔 카드가 두 장.',
-    },
-    {
-      station: '환승 통로', line: '9', color: '#bdb092', kind: 'transfer', fare: 0, travel: 3,
-      reader: 'left', scale: 0.9, read: 0.55, push: { gap: [1.4, 2.2], force: 0.02 }, queue: 4,
-      intro: '사람이 몰리기 시작했다. 여기 개찰구는 단말기가 평소와 반대편에 붙어 있다. 단말기 옆 초록 화살표가 내 통로를 가리키는지 보자.',
-    },
-    {
-      station: '신분당선 환승', line: '신', color: '#d4003b', kind: 'transfer', fare: 1000, travel: 4,
-      reader: 'right', scale: 0.8, read: 0.6, push: { gap: [1.2, 2], force: 0.025 }, queue: 5, kiosk: true,
-      intro: '신분당선은 별도 운임 1,000원이 붙는다. 잔액부터 확인하자. 옆에 충전기가 있다.',
-    },
-    {
-      station: '회사 앞 역', line: '신', color: '#d4003b', kind: 'exit', fare: 0, travel: 4,
-      reader: 'right', scale: 0.68, read: 0.8, push: { gap: [0.7, 1.3], force: 0.035 }, queue: 7,
-      intro: '출근 피크. 단말기는 낡아서 인식이 느리고, 뒷사람이 바짝 붙었다.',
+      station: '몽촌토성', line: '8', color: '#e6186c', kind: 'exit', fare: 200, travel: 41,
+      reader: 'left', scale: 0.72, read: 0.75, push: { gap: [0.8, 1.4], force: 0.033 }, queue: 7, kiosk: true,
+      sign: { number: '813', sub: '평화의 문', prev: ['812', '강동구청'], next: ['814', '잠실'] },
+      intro: '동대문역사문화공원에서 2호선, 잠실에서 8호선으로 갈아타고 몽촌토성 도착. 나갈 때 거리만큼 추가 운임 200원이 붙는데, 잔액이 50원뿐이다. 옆에 정산기가 있다. 이 개찰구는 단말기가 평소와 반대편이고, 출근 피크라 뒤에서 민다.',
     },
   ],
 
@@ -51,6 +48,7 @@ window.STORY = {
     transfer: '환승입니다',
     transferFare: '환승 · 추가 1,000원',
     exit: '안녕히 가세요',
+    exitFare: '하차 · 추가 200원',
     retry: '다시 찍어 주세요',
     wallet: '카드를 한 장만 대 주세요',
     balance: '잔액이 부족합니다',
@@ -83,13 +81,18 @@ window.STORY = {
     retry: '다시 출근하기',
     takeOut: '카드 한 장 꺼내기',
     charge: '충전기로 가기',
+    settle: '정산기로 가기',
     holdingWallet: '손에 든 것: 지갑 (카드 2장)',
     holdingCard: '손에 든 것: 교통카드',
     queue: n => `뒤에 ${n}명`,
     balance: n => `잔액 ${n.toLocaleString('ko-KR')}원`,
     awkward: n => `머쓱 ${n}`,
     awkwardLabel: (total, here, max) => `머쓱 총 ${total}회, 이 개찰구 ${here}/${max}`,
-    fare: (kind, fare) => (kind === 'exit' ? '하차' : fare ? `운임 ${fare.toLocaleString('ko-KR')}원` : '환승 무료'),
+    fare: (kind, fare) => {
+      const won = n => `${n.toLocaleString('ko-KR')}원`;
+      if (kind === 'exit') return fare ? `하차 · 추가 운임 ${won(fare)}` : '하차';
+      return fare ? `운임 ${won(fare)}` : '환승 무료';
+    },
     stepAsideTitle: '머쓱',
     nextGate: '다음 개찰구',
     sound: '♪ 소리',
@@ -112,8 +115,8 @@ window.STORY = {
   intro: {
     title: '다시 찍어 주세요',
     text:
-      '오전 8시 40분. 9시까지 회사에 가야 한다.\n' +
-      '가는 길에 개찰구가 다섯 번. 카드를 찍고 지나가자.',
+      '오전 8시 10분, 길음역. 9시까지 몽촌토성에 있는 회사에 가야 한다.\n' +
+      '개찰구는 두 번. 카드를 찍고 지나가자.',
   },
 
   endings: {

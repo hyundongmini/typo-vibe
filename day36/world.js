@@ -72,25 +72,68 @@ function floorTexture() {
   return tex;
 }
 
+// Station sign in the style of the real ones: a band in the line color with the station
+// number, the name, and the neighboring stops on either side
 function drawSign(g, w, h, gate) {
-  g.fillStyle = '#1f2328';
-  g.fillRect(0, 0, w, h);
+  const sign = gate.sign || {};
   g.fillStyle = gate.color;
-  g.beginPath();
-  g.arc(h / 2, h / 2, h * 0.32, 0, Math.PI * 2);
-  g.fill();
+  g.fillRect(0, 0, w, h);
+  g.fillStyle = 'rgba(255, 255, 255, 0.9)';
+  g.fillRect(0, 0, w, h * 0.06);
+  g.fillRect(0, h * 0.94, w, h * 0.06);
+  g.textBaseline = 'middle';
+  const badge = (x, text, r) => {
+    g.fillStyle = '#fff';
+    g.beginPath();
+    g.arc(x, h / 2, r, 0, Math.PI * 2);
+    g.fill();
+    g.fillStyle = gate.color;
+    g.textAlign = 'center';
+    g.font = `800 ${r * 0.8}px Pretendard, sans-serif`;
+    g.fillText(text, x, h / 2 + 1);
+  };
+  const side = h * 0.26;
+  if (sign.prev) {
+    badge(h * 0.45, sign.prev[0], side);
+    g.fillStyle = '#fff';
+    g.textAlign = 'left';
+    g.font = `700 ${h * 0.24}px Pretendard, sans-serif`;
+    g.fillText(sign.prev[1], h * 0.8, h / 2 + 1);
+  }
+  if (sign.next) {
+    g.fillStyle = '#fff';
+    g.textAlign = 'right';
+    g.font = `700 ${h * 0.24}px Pretendard, sans-serif`;
+    g.fillText(sign.next[1], w - h * 0.8, h / 2 + 1);
+    badge(w - h * 0.45, sign.next[0], side);
+  }
+  // Center: arrow toward the previous stop, the station number and name
   g.fillStyle = '#fff';
   g.textAlign = 'center';
-  g.textBaseline = 'middle';
-  g.font = `900 ${h * 0.34}px Pretendard, sans-serif`;
-  g.fillText(gate.line, h / 2, h / 2 + 2);
-  g.textAlign = 'left';
-  g.font = `800 ${h * 0.42}px Pretendard, sans-serif`;
-  g.fillText(gate.station, h * 0.95, h / 2 + 2);
-  g.textAlign = 'right';
-  g.font = `600 ${h * 0.24}px Pretendard, sans-serif`;
-  g.fillStyle = '#cfd3d8';
-  g.fillText(gate.kind === 'exit' ? '나가는 곳' : gate.kind === 'enter' ? '타는 곳' : '갈아타는 곳', w - h * 0.3, h / 2 + 2);
+  g.font = `900 ${h * 0.44}px Pretendard, sans-serif`;
+  const name = gate.station;
+  const nameW = g.measureText(name).width;
+  g.font = `700 ${h * 0.24}px Pretendard, sans-serif`;
+  const subW = sign.sub ? g.measureText(`(${sign.sub})`).width + h * 0.1 : 0;
+  const cx = w / 2;
+  g.font = `900 ${h * 0.44}px Pretendard, sans-serif`;
+  g.fillText(name, cx - subW / 2, h / 2 + 2);
+  if (sign.sub) {
+    g.font = `700 ${h * 0.24}px Pretendard, sans-serif`;
+    g.textAlign = 'left';
+    g.fillText(`(${sign.sub})`, cx - subW / 2 + nameW / 2 + h * 0.1, h / 2 + 4);
+  }
+  const numberX = cx - subW / 2 - nameW / 2 - h * 0.45;
+  if (sign.number) badge(numberX, sign.number, side * 1.05);
+  if (sign.prev) {
+    // Arrow halfway between the previous stop's name and this station's number
+    g.font = `700 ${h * 0.24}px Pretendard, sans-serif`;
+    const prevEnd = h * 0.8 + g.measureText(sign.prev[1]).width;
+    g.fillStyle = '#fff';
+    g.textAlign = 'center';
+    g.font = `700 ${h * 0.4}px sans-serif`;
+    g.fillText('←', (prevEnd + numberX - side) / 2, h / 2);
+  }
 }
 
 function arrowTexture(text, bg = '#16181c', fg = '#45f08a') {
@@ -656,9 +699,9 @@ function buildStation() {
   stripe.rotation.y = Math.PI;
   scene.add(stripe);
 
-  signTex = canvasTexture(1024, 160, () => {});
+  signTex = canvasTexture(1600, 160, () => {});
   signMat = new THREE.MeshBasicMaterial({ map: signTex });
-  const sign = new THREE.Mesh(new THREE.PlaneGeometry(6.4, 1), signMat);
+  const sign = new THREE.Mesh(new THREE.PlaneGeometry(10, 1), signMat);
   sign.position.set(0, 3.2, 11.95);
   sign.rotation.y = Math.PI;
   scene.add(sign);

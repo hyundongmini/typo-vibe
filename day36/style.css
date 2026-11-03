@@ -49,6 +49,7 @@ button { font: inherit; color: inherit; }
 .route li + li::before { content: ''; width: 14px; height: 2px; background: currentColor; }
 .route li .dot { width: 10px; height: 10px; border-radius: 50%; border: 2px solid currentColor; }
 .route li.done { color: var(--ink); }
+.route li.via .dot { width: 6px; height: 6px; }
 .route li.done .dot { background: currentColor; }
 .route li[aria-current] { color: var(--ink); font-weight: 700; }
 .route li[aria-current] .dot { border-color: var(--line-color); background: var(--line-color); }
