@@ -110,6 +110,11 @@ window.Sound = (() => {
     // Leather wallet flipping open, and a card sliding out of its slot
     walletOpen: t => burst(t, 0.12, 'lowpass', 700, 0.3),
     cardOut: t => burst(t, 0.18, 'highpass', 3000, 0.12),
+    // Bill feeder pulling a note in
+    billIn: t => {
+      tone('sawtooth', 110, t, 0.35, 0.05);
+      burst(t, 0.35, 'bandpass', 1500, 0.1);
+    },
     // Camera shutter: a click and a short mechanical swish
     shutter: t => {
       burst(t, 0.03, 'highpass', 4000, 0.3);

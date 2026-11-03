@@ -2,13 +2,13 @@
 // Line 4 → 2 → 8 transfers are all one operator, so there are only two gates: in and out.
 // Every failure is something that really happens at Seoul subway gates.
 window.STORY = {
-  startClock: 8 * 3600 + 10 * 60,
-  deadline: 9 * 3600,
+  startClock: 9 * 3600 + 40 * 60,
+  deadline: 10 * 3600 + 30 * 60,
   startBalance: 1450,
   chargeAmount: 10000,
 
   // Seconds added to the clock
-  penalty: { fail: 15, stepAside: 60, takeOut: 5, charge: 60 },
+  penalty: { fail: 15, stepAside: 60, takeOut: 5, charge: 30 },
   // Failures at one gate before you give up and let the line pass
   maxAwkward: 3,
   // Ride photos kept per run
@@ -83,6 +83,16 @@ window.STORY = {
     walletHint: '교통카드를 위로 끌어 꺼내세요',
     walletWrong: '이건 신용카드다. 도로 넣자.',
     walletCards: { transit: '교통카드', credit: '신용카드' },
+    walletTip: '눌러서 열기',
+    kioskTitle: '교통카드 충전·정산기',
+    kioskCard: '교통카드',
+    kioskBill: n => `${n.toLocaleString('ko-KR')}원`,
+    kioskPlaceCard: '교통카드를 올려 주세요',
+    kioskShort: (balance, fare) => `잔액 ${balance.toLocaleString('ko-KR')}원\n부족 ${(fare - balance).toLocaleString('ko-KR')}원\n돈을 넣어 주세요`,
+    kioskDone: n => `충전 완료\n잔액 ${n.toLocaleString('ko-KR')}원`,
+    kioskHintCard: '카드를 화면 아래 패드로 끌어 놓으세요',
+    kioskHintBill: '지폐를 투입구로 끌어 넣으세요',
+    kioskCardFirst: '먼저 카드부터 올려야 한다',
     charge: '충전기로 가기',
     settle: '정산기로 가기',
     holdingWallet: '손에 든 것: 지갑 (카드 2장)',
@@ -118,7 +128,7 @@ window.STORY = {
   intro: {
     title: '다시 찍어 주세요',
     text:
-      '오전 8시 10분, 길음역. 9시까지 몽촌토성에 있는 회사에 가야 한다.\n' +
+      '오전 9시 40분, 길음역. 10시 반까지 몽촌토성에 있는 회사에 가야 한다.\n' +
       '개찰구는 두 번. 카드를 찍고 지나가자.',
   },
 

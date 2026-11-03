@@ -327,6 +327,99 @@ button { font: inherit; color: inherit; }
 }
 .wallet-hint { color: #fff; font-weight: 700; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6); }
 .card.away { visibility: hidden; }
+.card-tip { display: none; }
+.card.wallet .card-tip {
+  display: block;
+  position: absolute;
+  left: 50%;
+  top: 100%;
+  margin-top: 6px;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.7);
+  padding: 2px 8px;
+  border-radius: 10px;
+  animation: tip-bob 1.2s ease-in-out infinite;
+}
+.card.wallet.dragging .card-tip { display: none; }
+@keyframes tip-bob { 50% { transform: translate(-50%, 3px); } }
+/* Visible only while focused, so keyboard users still have a way in */
+.btn.focus-only:not(:focus-visible) { position: absolute; width: 1px; height: 1px; padding: 0; min-height: 0; overflow: hidden; clip-path: inset(50%); border: 0; }
+
+/* Ticket kiosk: lay the card on the pad, then feed a note into the slot */
+.kiosk-open {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  align-content: center;
+  gap: 12px 24px;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 4;
+  cursor: auto;
+}
+.kiosk-open[hidden] { display: none; }
+.kiosk {
+  position: relative;
+  width: min(34%, 240px);
+  aspect-ratio: 0.72;
+  border-radius: 12px;
+  background: linear-gradient(#d9dde2, #aeb4bb);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
+  animation: wallet-in 0.25s ease;
+}
+.kiosk-title { position: absolute; top: 3%; left: 0; right: 0; text-align: center; font-size: clamp(10px, 1.2vw, 13px); font-weight: 900; }
+.kiosk-screen {
+  position: absolute;
+  top: 11%;
+  left: 10%;
+  right: 10%;
+  height: 34%;
+  display: grid;
+  place-items: center;
+  padding: 6px;
+  border: 4px solid #2b2e33;
+  border-radius: 6px;
+  background: #12315e;
+  color: #fff;
+  text-align: center;
+  white-space: pre-line;
+  font-size: clamp(11px, 1.3vw, 14px);
+  font-weight: 700;
+  line-height: 1.4;
+}
+.kiosk-screen.done { background: #0f6b3a; }
+.kiosk-pad, .kiosk-slot { position: absolute; border-radius: 6px; }
+.kiosk-pad { left: 14%; top: 52%; width: 44%; aspect-ratio: 1.586; background: #3e6fc9; box-shadow: inset 0 0 0 3px #fff; }
+.kiosk-slot { right: 10%; top: 56%; width: 26%; height: 5%; background: #111; box-shadow: 0 0 0 4px #6b7078; }
+.kiosk-pad.target, .kiosk-slot.target { animation: target-glow 0.9s ease-in-out infinite; }
+@keyframes target-glow { 50% { box-shadow: 0 0 0 6px #ffb93a; } }
+.kiosk-hand { display: grid; gap: 14px; justify-items: center; }
+.kiosk-open .wallet-hint { flex-basis: 100%; text-align: center; }
+.kiosk-pad { display: grid; place-items: center; color: #fff; font-size: clamp(10px, 1.2vw, 13px); font-weight: 700; }
+.kiosk-pad:not(:empty) { background: linear-gradient(135deg, #2f6fe0, #1b3f8a); }
+.kiosk-item {
+  border: none;
+  border-radius: 6px;
+  color: #fff;
+  font-weight: 700;
+  font-size: clamp(11px, 1.3vw, 14px);
+  cursor: grab;
+  touch-action: none;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.35);
+}
+.kiosk-item:active { cursor: grabbing; }
+.kiosk-item[hidden] { display: none; }
+.kiosk-item.snap { transition: transform 0.22s ease; }
+.kiosk-item:focus-visible { outline: 3px solid #3a7bff; outline-offset: 2px; }
+.card-item { width: clamp(80px, 12vw, 120px); aspect-ratio: 1.586; background: linear-gradient(135deg, #2f6fe0, #1b3f8a); }
+.bill-item { width: clamp(110px, 16vw, 160px); aspect-ratio: 2.1; background: repeating-linear-gradient(90deg, #8fb77a 0 6px, #a2c78c 6px 12px); color: #213d14; border: 2px solid #5f8a4a; }
+.kiosk-pad .kiosk-item, .kiosk-slot .kiosk-item { pointer-events: none; }
 .hint { font-size: 12px; color: var(--muted); }
 .hint:empty { display: none; }
 
@@ -388,10 +481,11 @@ button { font: inherit; color: inherit; }
   .board { width: 92%; }
   .led { border-width: 4px; }
   .wallet-inside { width: 72%; }
+  .kiosk { width: 52%; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .bubble, .flash.on, .polaroid.on, .wallet-inside { animation: none; }
-  .slot-card.snap { transition: none; }
+  .bubble, .flash.on, .polaroid.on, .wallet-inside, .kiosk, .card-tip, .kiosk-pad.target, .kiosk-slot.target { animation: none; }
+  .slot-card.snap, .kiosk-item.snap { transition: none; }
   .fade, .card.returning { transition: none; }
 }

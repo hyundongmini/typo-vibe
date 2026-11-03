@@ -47,15 +47,31 @@
       <p class="wallet-hint" id="wallet-hint" aria-live="polite"></p>
     </div>
 
+    <div class="kiosk-open" id="kiosk-open" hidden>
+      <div class="kiosk">
+        <p class="kiosk-title" id="kiosk-title"></p>
+        <p class="kiosk-screen" id="kiosk-screen" aria-live="polite"></p>
+        <div class="kiosk-pad" id="kiosk-pad"></div>
+        <div class="kiosk-slot" id="kiosk-slot"></div>
+      </div>
+      <div class="kiosk-hand">
+        <button type="button" class="kiosk-item card-item" data-item="card"></button>
+        <button type="button" class="kiosk-item bill-item" data-item="bill"></button>
+      </div>
+      <p class="wallet-hint" id="kiosk-hint" aria-live="polite"></p>
+    </div>
+
     <div class="card" id="card" aria-hidden="true">
       <span class="card-face"></span><span class="card-face second"></span>
+      <span class="card-tip" id="card-tip"></span>
     </div>
   </section>
 
   <div class="controls">
     <p class="holding" id="holding"></p>
     <div class="actions">
-      <button type="button" class="btn" id="take-out"></button>
+      <!-- The wallet opens by clicking it on the stage; this stays as a keyboard path -->
+      <button type="button" class="btn focus-only" id="take-out"></button>
       <button type="button" class="btn" id="charge"></button>
       <button type="button" class="btn" id="turn-left" aria-label="카메라 왼쪽으로 돌리기">◀</button>
       <button type="button" class="btn" id="reset-view">↺ 시점 원래대로</button>

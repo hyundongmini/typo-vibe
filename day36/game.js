@@ -27,6 +27,14 @@
     walletOpen: $('#wallet-open'),
     walletHint: $('#wallet-hint'),
     slotCards: [...document.querySelectorAll('.slot-card')],
+    cardTip: $('#card-tip'),
+    kioskOpen: $('#kiosk-open'),
+    kioskTitle: $('#kiosk-title'),
+    kioskScreen: $('#kiosk-screen'),
+    kioskPad: $('#kiosk-pad'),
+    kioskSlot: $('#kiosk-slot'),
+    kioskHint: $('#kiosk-hint'),
+    kioskItems: [...document.querySelectorAll('.kiosk-item')],
     charge: $('#charge'),
     resetView: $('#reset-view'),
     turnLeft: $('#turn-left'),
@@ -202,15 +210,17 @@
     const g = gate();
     const isWallet = state.hand === 'wallet';
     els.card.classList.toggle('wallet', isWallet);
+    els.cardTip.textContent = UI.walletTip;
     els.holding.textContent = isWallet ? UI.holdingWallet : UI.holdingCard;
     els.takeOut.hidden = !isWallet;
     els.takeOut.textContent = `${UI.takeOut} (+${S.penalty.takeOut}초)`;
     els.charge.hidden = !g.kiosk;
-    els.charge.textContent = `${g.kind === 'exit' ? UI.settle : UI.charge} (+${S.penalty.charge / 60}분)`;
+    els.charge.textContent = `${g.kind === 'exit' ? UI.settle : UI.charge} (+${S.penalty.charge}초)`;
     els.charge.disabled = state.isCharged;
     const canAct = state.phase === 'gate';
     els.takeOut.disabled = !canAct;
     if (!isWallet || !canAct) closeWallet();
+    if (!canAct) closeKiosk();
     if (g.kiosk && !state.isCharged) els.charge.disabled = !canAct;
   }
 
@@ -267,6 +277,7 @@
 
   function setContact(side, now) {
     if (side === drag.contact) return;
+    if (side) drag.didTouch = true;
     const prev = drag.contact;
     if (prev) {
       setReader(prev, null);
@@ -341,6 +352,8 @@
     cardToPointer(e);
     drag.isActive = true;
     drag.pointerId = e.pointerId;
+    drag.downAt = performance.now();
+    drag.didTouch = false;
     drag.nextPush = performance.now() + (gate().push ? rand(...gate().push.gap) * 1000 : Infinity);
     els.card.classList.add('dragging');
   });
@@ -349,6 +362,9 @@
     if (!drag.isActive || e.pointerId !== drag.pointerId) return;
     setContact(null, performance.now());
     if (drag.isActive) endHold();
+    // A quick click that never touched a reader opens the wallet in your hand
+    const isClick = !drag.didTouch && performance.now() - drag.downAt < 350;
+    if (isClick && state.hand === 'wallet' && state.phase === 'gate') openWallet();
   };
   els.stage.addEventListener('pointerup', release);
   els.stage.addEventListener('pointercancel', release);
@@ -582,6 +598,124 @@
     renderHand();
     renderHud();
   }
+
+  /* ---------- kiosk ---------- */
+
+  const kiosk = { step: 'card', item: null, startX: 0, startY: 0 };
+
+  function openKiosk() {
+    if (state.phase !== 'gate' || state.isCharged || drag.isActive) return;
+    closeWallet();
+    kiosk.step = 'card';
+    els.kioskTitle.textContent = UI.kioskTitle;
+    els.kioskScreen.textContent = UI.kioskPlaceCard;
+    els.kioskScreen.classList.remove('done');
+    els.kioskHint.textContent = UI.kioskHintCard;
+    els.kioskItems.forEach(el => {
+      el.textContent = el.dataset.item === 'card' ? UI.kioskCard : UI.kioskBill(S.chargeAmount);
+      el.hidden = false;
+      el.classList.remove('snap');
+      el.style.transform = '';
+    });
+    els.kioskPad.classList.add('target');
+    els.kioskSlot.classList.remove('target');
+    els.kioskOpen.hidden = false;
+    els.card.classList.add('away');
+    els.kioskItems[0].focus();
+  }
+
+  function closeKiosk() {
+    if (els.kioskOpen.hidden) return;
+    els.kioskOpen.hidden = true;
+    els.card.classList.remove('away');
+    kiosk.item = null;
+  }
+
+  // Dropped an item: on its target it goes in, anywhere else it springs back
+  function kioskDrop(el, isOnTarget) {
+    const isCard = el.dataset.item === 'card';
+    if (!isCard && kiosk.step === 'card' && isOnTarget !== false) {
+      els.kioskHint.textContent = UI.kioskCardFirst;
+      isOnTarget = false;
+    }
+    if (!isOnTarget) {
+      el.classList.add('snap');
+      el.style.transform = '';
+      return;
+    }
+    el.hidden = true;
+    el.style.transform = '';
+    if (isCard) {
+      // The card now lies on the pad and the screen reads it
+      kiosk.step = 'bill';
+      els.kioskPad.textContent = UI.kioskCard;
+      els.kioskPad.classList.remove('target');
+      els.kioskSlot.classList.add('target');
+      els.kioskScreen.textContent = UI.kioskShort(state.balance, gate().fare);
+      els.kioskHint.textContent = UI.kioskHintBill;
+      Sound.sfx('ok');
+      els.kioskItems[1].focus();
+      return;
+    }
+    kiosk.step = 'done';
+    els.kioskSlot.classList.remove('target');
+    Sound.sfx('billIn');
+    setTimeout(() => {
+      els.kioskScreen.textContent = UI.kioskDone(state.balance + S.chargeAmount);
+      els.kioskScreen.classList.add('done');
+      els.kioskHint.textContent = '';
+    }, 500);
+    setTimeout(() => {
+      els.kioskPad.textContent = '';
+      closeKiosk();
+      charge();
+    }, 1500);
+  }
+
+  const kioskTarget = el => (el.dataset.item === 'card' ? els.kioskPad : els.kioskSlot);
+  const isInside = (e, box) => {
+    const r = box.getBoundingClientRect();
+    const pad = 16;
+    return e.clientX > r.left - pad && e.clientX < r.right + pad && e.clientY > r.top - pad && e.clientY < r.bottom + pad;
+  };
+
+  els.kioskOpen.addEventListener('pointerdown', e => {
+    // Keep the stage from treating this as a tap
+    e.stopPropagation();
+    if (e.target === els.kioskOpen && kiosk.step !== 'done') closeKiosk();
+  });
+  els.kioskOpen.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && kiosk.step !== 'done') closeKiosk();
+  });
+  els.kioskItems.forEach(el => {
+    el.addEventListener('pointerdown', e => {
+      if (kiosk.step === 'done') return;
+      e.preventDefault();
+      el.setPointerCapture(e.pointerId);
+      el.classList.remove('snap');
+      kiosk.item = el;
+      kiosk.startX = e.clientX;
+      kiosk.startY = e.clientY;
+    });
+    el.addEventListener('pointermove', e => {
+      if (kiosk.item !== el) return;
+      el.style.transform = `translate(${e.clientX - kiosk.startX}px, ${e.clientY - kiosk.startY}px) rotate(-4deg)`;
+    });
+    el.addEventListener('pointerup', e => {
+      if (kiosk.item !== el) return;
+      kiosk.item = null;
+      kioskDrop(el, isInside(e, kioskTarget(el)));
+    });
+    el.addEventListener('pointercancel', () => {
+      if (kiosk.item !== el) return;
+      kiosk.item = null;
+      kioskDrop(el, false);
+    });
+    // Keyboard (Enter/Space) puts the item in directly; pointer clicks have detail > 0
+    el.addEventListener('click', e => {
+      if (e.detail === 0 && kiosk.step !== 'done') kioskDrop(el, true);
+    });
+  });
 
   function charge() {
     if (state.phase !== 'gate' || state.isCharged) return;
@@ -830,7 +964,7 @@
   els.webcam.textContent = UI.webcamOn;
   els.webcam.addEventListener('click', toggleWebcam);
   els.turnRight.addEventListener('click', () => World.turnView(0.5));
-  els.charge.addEventListener('click', charge);
+  els.charge.addEventListener('click', openKiosk);
   els.sound.setAttribute('aria-pressed', String(Sound.isEnabled()));
   els.sound.addEventListener('click', () => els.sound.setAttribute('aria-pressed', String(Sound.toggle())));
   window.addEventListener('resize', () => {
