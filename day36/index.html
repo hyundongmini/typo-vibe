@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>다시 찍어 주세요 — typo-vibe</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/galmuri@2.39.3/dist/galmuri.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <a class="home" href="../index.html">← 홈</a>
+  <span class="title">다시 찍어 주세요</span>
+  <ol class="route" id="route" aria-label="출근길"></ol>
+  <span class="hud">
+    <span class="clock" id="clock" aria-label="현재 시각"></span>
+    <span id="balance"></span>
+    <span class="awkward" id="awkward"></span>
+  </span>
+  <button type="button" class="sound" id="sound" aria-pressed="true">♪ 소리</button>
+</header>
+
+<main class="wrap">
+  <section class="stage" id="stage" aria-label="개찰구">
+    <canvas class="led" id="led" role="img" aria-live="polite"></canvas>
+    <p class="fare" id="fare"></p>
+
+    <div class="gates" id="gates">
+      <div class="lane side" data-lane="left"><span class="flap l"></span><span class="flap r"></span><span class="person"></span></div>
+      <div class="body" data-body="left">
+        <span class="arrow" aria-hidden="true"></span>
+        <button type="button" class="reader" data-reader="left"></button>
+      </div>
+      <div class="lane mine" data-lane="mine"><span class="flap l"></span><span class="flap r"></span></div>
+      <div class="body" data-body="right">
+        <span class="arrow" aria-hidden="true"></span>
+        <button type="button" class="reader" data-reader="right"></button>
+      </div>
+      <div class="lane side" data-lane="right"><span class="flap l"></span><span class="flap r"></span><span class="person"></span></div>
+    </div>
+
+    <div class="reactions" id="reactions" aria-live="polite"></div>
+    <div class="queue" id="queue"><span class="heads" id="heads"></span><span id="queue-count"></span></div>
+
+    <div class="card" id="card" aria-hidden="true">
+      <span class="card-face"></span><span class="card-face second"></span>
+    </div>
+  </section>
+
+  <div class="controls">
+    <p class="holding" id="holding"></p>
+    <div class="actions">
+      <button type="button" class="btn" id="take-out"></button>
+      <button type="button" class="btn" id="charge"></button>
+    </div>
+    <p class="hint" id="hint"></p>
+  </div>
+</main>
+
+<dialog class="modal" id="modal" aria-labelledby="modal-title">
+  <div class="sign" id="modal-sign"><span class="sign-line" id="modal-line"></span><span id="modal-title"></span></div>
+  <div class="modal-body">
+    <p class="modal-text" id="modal-text"></p>
+    <ul class="modal-list" id="modal-list"></ul>
+    <button type="button" class="btn primary" id="modal-btn"></button>
+  </div>
+</dialog>
+
+<script src="story.js"></script>
+<script src="sound.js"></script>
+<script src="led.js"></script>
+<script src="game.js"></script>
+</body>
+</html>
