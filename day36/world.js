@@ -14,8 +14,9 @@ const QUEUE_GAP = 0.95;
 const WALK_SPEED = 1.6;
 const HIT_SCALE = 1.35; // touch targets a bit larger than the drawn reader
 
-const CAM_POS = { x: 3.4, y: 8.4, z: 8.2 };
-const CAM_LOOK = new THREE.Vector3(0, 0.3, 2.6);
+// Camera sits past the gates looking back at the line, so every face is visible
+const CAM_POS = { x: 1.8, y: 3.7, z: -2.3 };
+const CAM_LOOK = new THREE.Vector3(-0.1, 0.9, 2.2);
 
 // Left to right: B0 | L lane | B1 | mine | B2 | R lane | B3
 const LANE_X = { left: -(LANE_W + BODY_W), mine: 0, right: LANE_W + BODY_W };
@@ -251,7 +252,9 @@ function makePerson({ coat, isPlayer = false } = {}) {
   torso.add(body);
 
   const head = new THREE.Group();
-  head.position.y = 0.86;
+  head.position.y = 0.92;
+  // Slightly oversized heads keep expressions readable from the overview camera
+  head.scale.setScalar(1.35);
   torso.add(head);
   const skull = new THREE.Mesh(new THREE.SphereGeometry(0.14, 16, 12), skinMat);
   skull.castShadow = true;
@@ -311,7 +314,7 @@ function makePerson({ coat, isPlayer = false } = {}) {
       depthTest: false,
     }));
     tag.scale.set(0.5, 0.25, 1);
-    tag.position.y = 2.05;
+    tag.position.y = 2.25;
     tag.renderOrder = 10;
     group.add(tag);
     group.userData.tag = tag;
@@ -323,7 +326,7 @@ function makePerson({ coat, isPlayer = false } = {}) {
   moodMark.renderOrder = 9;
   moodMark.visible = false;
   torso.add(moodMark);
-  moodMark.position.y = 1.95 - hipY;
+  moodMark.position.y = 2.12 - hipY;
 
   group.traverse(o => { if (o.isMesh) o.receiveShadow = false; });
   scene.add(group);
@@ -379,9 +382,10 @@ function animatePerson(p, t, dt) {
       g.rotation.y += (want - g.rotation.y) * Math.min(1, dt * 10);
     }
   }
-  // Looking back at the line after a blunder; otherwise face the gates
-  const restYaw = p.turnFrom <= t && t < p.turnUntil && !p.reach ? -2.7 : 0;
-  if (!isWalking) g.rotation.y += (restYaw - g.rotation.y) * Math.min(1, dt * 6);
+  if (!isWalking) g.rotation.y += (0 - g.rotation.y) * Math.min(1, dt * 6);
+  // A sheepish glance back over the shoulder after a blunder; the face stays toward the camera
+  const glance = p.turnFrom <= t && t < p.turnUntil && !p.reach ? 0.55 : 0;
+  p.head.rotation.y += (glance - p.head.rotation.y) * Math.min(1, dt * 6);
 
   const faceName = p.isPlayer ? (p.exprUntil > t ? p.expr : 'neutral') : QUEUE_FACES[p.level];
   const faceKey = `${faceName}|${Math.round(p.blush * 4)}`;
@@ -413,7 +417,8 @@ function animatePerson(p, t, dt) {
     g.position.y = 0;
     const level = p.isPlayer ? 0 : p.level;
     if (p.isPlayer) {
-      headX = 0.1;
+      // Chin slightly up so the overview camera catches the face
+      headX = -0.2;
     } else if (level === 0) {
       // Calm: phone held in front of the chest, head down
       armRx = 0.75;
@@ -423,13 +428,13 @@ function animatePerson(p, t, dt) {
     } else if (level === 1) {
       // Foot tapping
       legR.rotation.x = -Math.max(0, Math.sin(s * 11)) * 0.35;
-      headX = 0.15;
+      headX = -0.1;
     } else if (level === 2) {
       // Checking the watch every couple of seconds
       const look = Math.sin(s * 1.6) > 0.2;
       armLx = look ? 1.5 : 0;
       armLz = look ? -0.6 : 0;
-      headX = look ? 0.5 : 0.1;
+      headX = look ? 0.5 : -0.1;
       headZ = look ? 0.25 : 0;
       legR.rotation.x = -Math.max(0, Math.sin(s * 13)) * 0.25;
     } else {
@@ -530,7 +535,7 @@ function setLaneOpen(name, isOpen, holdSec) {
 
 function buildStation() {
   scene.background = new THREE.Color(0xe9e7e2);
-  scene.fog = new THREE.Fog(0xe9e7e2, 16, 30);
+  scene.fog = new THREE.Fog(0xe9e7e2, 18, 34);
 
   const floor = new THREE.Mesh(new THREE.PlaneGeometry(30, 30), new THREE.MeshStandardMaterial({ map: floorTexture(), roughness: 0.9 }));
   floor.rotation.x = -Math.PI / 2;
@@ -538,21 +543,22 @@ function buildStation() {
   scene.add(floor);
 
   const wall = new THREE.Mesh(new THREE.PlaneGeometry(30, 6), mat(0xeeece7));
-  wall.position.set(0, 3, -3.2);
+  wall.position.set(0, 3, 12);
+  wall.rotation.y = Math.PI;
   scene.add(wall);
   stripeMat = mat(0x00a84d);
   const stripe = new THREE.Mesh(new THREE.PlaneGeometry(30, 0.28), stripeMat);
-  stripe.position.set(0, 1.6, -3.19);
+  stripe.position.set(0, 1.6, 11.99);
+  stripe.rotation.y = Math.PI;
   scene.add(stripe);
 
   signTex = canvasTexture(1024, 160, () => {});
   signMat = new THREE.MeshBasicMaterial({ map: signTex });
-  const sign = new THREE.Mesh(new THREE.PlaneGeometry(4.8, 0.75), signMat);
-  sign.position.set(0, 2.55, -1.2);
+  const sign = new THREE.Mesh(new THREE.PlaneGeometry(6.4, 1), signMat);
+  sign.position.set(0, 3.2, 11.95);
+  sign.rotation.y = Math.PI;
   scene.add(sign);
-  const rod = new THREE.Mesh(new THREE.BoxGeometry(4.9, 0.08, 0.08), mat(0x555a60));
-  rod.position.set(0, 2.97, -1.2);
-  scene.add(rod);
+
 
   BODY_X.forEach(makeBody);
 
@@ -625,7 +631,7 @@ function resize() {
   renderer.setSize(w, h, false);
   camera.aspect = w / h;
   // Portrait screens need to back off to keep all three lanes in view
-  camera.fov = w / h < 1 ? 50 : 42;
+  camera.fov = w / h < 1 ? 58 : 48;
   camera.updateProjectionMatrix();
 }
 
@@ -913,7 +919,7 @@ const World = {
     const p = typeof who === 'object' && who ? who : who === 'player' ? player : who === 'front' ? queue[0] : pick(queue.slice(0, 5));
     if (!p) return null;
     const v = p.group.position.clone();
-    v.y = 2.0;
+    v.y = 2.2;
     v.x += p.torso.position.x;
     return toScreen(v);
   },

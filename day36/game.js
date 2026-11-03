@@ -200,7 +200,7 @@
     const st = els.stage.getBoundingClientRect();
     const cw = els.card.offsetWidth, ch = els.card.offsetHeight;
     drag.x = st.width / 2 - cw / 2;
-    drag.y = st.height * 0.83 - ch / 2;
+    drag.y = st.height * 0.9 - ch / 2;
     drag.pushX = drag.pushY = 0;
     applyCard();
   }

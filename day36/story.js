@@ -28,7 +28,7 @@ window.STORY = {
     {
       station: '환승 통로', line: '9', color: '#bdb092', kind: 'transfer', fare: 0, travel: 3,
       reader: 'left', scale: 0.9, read: 0.55, push: { gap: [1.4, 2.2], force: 0.02 }, queue: 4,
-      intro: '사람이 몰리기 시작했다. 여기 개찰구는 단말기가 왼쪽에 붙어 있다. 내 쪽을 가리키는 화살표를 보자.',
+      intro: '사람이 몰리기 시작했다. 여기 개찰구는 단말기가 평소와 반대편에 붙어 있다. 단말기 옆 초록 화살표가 내 통로를 가리키는지 보자.',
     },
     {
       station: '신분당선 환승', line: '신', color: '#d4003b', kind: 'transfer', fare: 1000, travel: 4,
@@ -93,7 +93,8 @@ window.STORY = {
     nextGate: '다음 개찰구',
     sound: '♪ 소리',
     no3d: '이 브라우저에서는 3D 화면을 열 수 없습니다. 다른 브라우저로 열어 주세요.',
-    readerLabel: (side, isMine) => `${side === 'left' ? '왼쪽' : '오른쪽'} 단말기${isMine ? '' : ' (옆 통로)'}`,
+    // The camera faces the player, so the player's left-hand reader shows on the right of the screen
+    readerLabel: (side, isMine) => `화면 ${side === 'left' ? '오른쪽' : '왼쪽'} 단말기${isMine ? ' (내 통로)' : ' (옆 통로)'}`,
   },
 
   intro: {
