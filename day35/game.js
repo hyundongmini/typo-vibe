@@ -484,6 +484,7 @@
     const ending = S.endings[kind];
     const score = S.endings.score(state.results.filter(Boolean).length, S.nights.length);
     say(`— ${ending.title} —`, 'heading');
+    Sound.start(kind, 1.2);
     renderStatus();
 
     const showModal = () => modal({

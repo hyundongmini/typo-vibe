@@ -1,25 +1,62 @@
 // Procedural chiptune BGM + SFX with Web Audio (no audio files).
-// Melody uses D Hijaz (D Eb F# G A Bb C) over a maqsum darbuka pattern.
+// The night theme loops during play; each ending switches to its own track.
 window.Sound = (() => {
-  const BPM = 78;
-  const STEP = 60 / BPM / 4;
   const LOOKAHEAD = 0.12;
   const STORAGE_KEY = 'typo-vibe-s2-day01-sound';
 
-  // 0 = rest; MIDI note numbers, 16 steps per bar, 4 bars
-  const MELODY = [
-    62, 0, 63, 0, 66, 0, 67, 66, 63, 0, 62, 0, 0, 0, 0, 0,
-    69, 0, 70, 69, 67, 0, 66, 0, 67, 66, 63, 0, 62, 0, 0, 0,
-    74, 0, 72, 70, 69, 0, 70, 69, 67, 0, 66, 67, 69, 0, 0, 0,
-    70, 69, 67, 66, 63, 0, 66, 63, 62, 0, 0, 0, 57, 0, 0, 0,
-  ];
-  const BASS = [38, 38, 43, 45];
-  const DUM = new Set([0, 8]);
-  const TEK = new Set([2, 6, 12]);
+  // MIDI notes (0 = rest), 16 steps per bar, 4 bars per loop; bass is one note per bar
+  const TRACKS = {
+    // Night: D Hijaz (D Eb F# G A Bb C) over a maqsum darbuka pattern
+    main: {
+      bpm: 78, lead: 'square', leadVol: 0.045,
+      melody: [
+        62, 0, 63, 0, 66, 0, 67, 66, 63, 0, 62, 0, 0, 0, 0, 0,
+        69, 0, 70, 69, 67, 0, 66, 0, 67, 66, 63, 0, 62, 0, 0, 0,
+        74, 0, 72, 70, 69, 0, 70, 69, 67, 0, 66, 67, 69, 0, 0, 0,
+        70, 69, 67, 66, 63, 0, 66, 63, 62, 0, 0, 0, 57, 0, 0, 0,
+      ],
+      bass: [38, 38, 43, 45], dum: [0, 8], tek: [2, 6, 12],
+    },
+    // Under the white mulberry: the scale finally opens into D major, rising arpeggios
+    true: {
+      bpm: 66, lead: 'triangle', leadVol: 0.09,
+      melody: [
+        62, 0, 66, 0, 69, 0, 74, 0, 73, 0, 69, 0, 66, 0, 0, 0,
+        67, 0, 71, 0, 74, 0, 76, 0, 74, 0, 71, 0, 69, 0, 0, 0,
+        66, 0, 69, 0, 74, 0, 78, 0, 76, 0, 74, 0, 73, 0, 71, 0,
+        69, 0, 0, 0, 66, 0, 0, 0, 62, 0, 0, 0, 0, 0, 0, 0,
+      ],
+      bass: [38, 43, 42, 45], dum: [0], tek: [],
+    },
+    // Missed promise: sparse D minor, no drums, long silences
+    silent: {
+      bpm: 54, lead: 'square', leadVol: 0.035,
+      melody: [
+        69, 0, 0, 0, 0, 0, 67, 0, 65, 0, 0, 0, 0, 0, 0, 0,
+        64, 0, 0, 0, 65, 0, 0, 0, 62, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 69, 0, 0, 0, 70, 0, 69, 0, 67, 0, 0, 0,
+        65, 0, 0, 0, 64, 0, 0, 0, 62, 0, 0, 0, 0, 0, 0, 0,
+      ],
+      bass: [38, 34, 41, 33], dum: [], tek: [],
+    },
+    // The hole is sealed: the night theme dropped an octave, slow and heavy
+    sealed: {
+      bpm: 60, lead: 'square', leadVol: 0.05,
+      melody: [
+        50, 0, 0, 0, 51, 0, 0, 0, 50, 0, 0, 0, 0, 0, 0, 0,
+        54, 0, 51, 0, 50, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        57, 0, 0, 0, 58, 0, 57, 0, 55, 0, 54, 0, 51, 0, 0, 0,
+        50, 0, 0, 0, 0, 0, 0, 0, 45, 0, 0, 0, 0, 0, 0, 0,
+      ],
+      bass: [26, 26, 31, 26], dum: [0, 10], tek: [],
+    },
+  };
 
   let ac = null, master = null, echo = null, noise = null;
   let enabled = readPref();
   let running = false, timer = null, step = 0, nextTime = 0;
+  let track = TRACKS.main, trackName = 'main';
+  const stepLen = () => 60 / track.bpm / 4;
 
   function readPref() {
     try {
@@ -48,7 +85,7 @@ window.Sound = (() => {
 
     // Feedback delay for a cavernous, behind-the-wall feel
     echo = ac.createDelay(1);
-    echo.delayTime.value = STEP * 3;
+    echo.delayTime.value = stepLen() * 3;
     const fb = ac.createGain();
     fb.gain.value = 0.32;
     const wet = ac.createGain();
@@ -106,30 +143,35 @@ window.Sound = (() => {
 
   function scheduleStep(i, t) {
     const inBar = i % 16;
-    const note = MELODY[i % MELODY.length];
-    if (note) tone('square', freq(note), t, STEP * 1.8, 0.045, true);
-    if (inBar === 0) tone('triangle', freq(BASS[Math.floor(i / 16) % BASS.length]), t, STEP * 14, 0.12);
-    if (DUM.has(inBar)) dum(t);
-    if (TEK.has(inBar)) tek(t);
+    const len = stepLen();
+    const note = track.melody[i % track.melody.length];
+    if (note) tone(track.lead, freq(note), t, len * 1.8, track.leadVol, true);
+    if (inBar === 0) tone('triangle', freq(track.bass[Math.floor(i / 16) % track.bass.length]), t, len * 14, 0.12);
+    if (track.dum.includes(inBar)) dum(t);
+    if (track.tek.includes(inBar)) tek(t);
   }
 
   function tick() {
     while (nextTime < ac.currentTime + LOOKAHEAD) {
       scheduleStep(step, nextTime);
       step++;
-      nextTime += STEP;
+      nextTime += stepLen();
     }
   }
 
-  function start() {
-    if (!enabled) return;
+  // name: key of TRACKS; delay lets a result sting finish before the new track
+  function start(name = 'main', delay = 0.05) {
+    const isSame = running && name === trackName;
+    trackName = name;
+    track = TRACKS[name];
+    if (!enabled || isSame) return;
     ensureContext();
     if (ac.state === 'suspended') ac.resume();
-    if (running) return;
-    running = true;
+    echo.delayTime.value = stepLen() * 3;
     step = 0;
-    nextTime = ac.currentTime + 0.05;
-    timer = setInterval(tick, 25);
+    nextTime = ac.currentTime + delay;
+    if (!running) timer = setInterval(tick, 25);
+    running = true;
   }
 
   function stop() {
@@ -186,7 +228,7 @@ window.Sound = (() => {
   function toggle() {
     enabled = !enabled;
     writePref();
-    enabled ? start() : stop();
+    enabled ? start(trackName) : stop();
     return enabled;
   }
 
