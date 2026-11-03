@@ -115,6 +115,8 @@ window.STORY = {
     photoSticker: '머쓱!',
     savePhoto: '사진 저장',
     photoAlt: info => `머쓱 사진 ${info.number}: ${info.station} ${info.time}, ${info.what}`,
+    outfits: { catTote: '👕 고양이 티 + 에코백', catBackpack: '👕 고양이 티 + 백팩', coat: '🧥 노란 코트' },
+    outfitLabel: name => `옷 바꾸기, 지금: ${name}`,
     webcamOn: '📷 내 얼굴로',
     webcamOff: '📷 얼굴 끄기',
     webcamDenied: '카메라 권한이 거부되어 그림 얼굴로 진행합니다. 주소창의 카메라 권한을 허용하면 다시 쓸 수 있습니다.',

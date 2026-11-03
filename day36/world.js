@@ -15,8 +15,9 @@ const WALK_SPEED = 1.6;
 const HIT_SCALE = 1.35; // touch targets a bit larger than the drawn reader
 
 // Camera sits past the gates looking back at the line, so every face is visible
-const CAM_POS = { x: 0.5, y: 3.5, z: -2.7 };
-const CAM_LOOK = new THREE.Vector3(0, 1.0, 2.4);
+const CAM_POS = { x: 0.5, y: 3.0, z: -2.9 };
+const PLAYER_HAIR = 0.6;
+const CAM_LOOK = new THREE.Vector3(0, 1.15, 2.4);
 
 // Left to right: B0 | L lane | B1 | mine | B2 | R lane | B3
 const LANE_X = { left: -(LANE_W + BODY_W), mine: 0, right: LANE_W + BODY_W };
@@ -290,6 +291,46 @@ function drawFace(g, f, blush) {
 }
 
 // Soft oval alpha so the webcam face fades into the head's skin at the edges
+// Your t-shirt print: a black cat face, drawn once
+function catPrintTexture() {
+  return canvasTexture(256, 256, (g, w) => {
+    const cx = w / 2, cy = 140;
+    g.fillStyle = '#1b1b1b';
+    [-1, 1].forEach(side => {
+      g.beginPath();
+      g.moveTo(cx + side * 30, cy - 50);
+      g.lineTo(cx + side * 70, cy - 105);
+      g.lineTo(cx + side * 80, cy - 20);
+      g.fill();
+    });
+    g.beginPath();
+    g.ellipse(cx, cy, 82, 70, 0, 0, Math.PI * 2);
+    g.fill();
+    [-1, 1].forEach(side => {
+      g.fillStyle = '#ffd23f';
+      g.beginPath();
+      g.ellipse(cx + side * 32, cy - 8, 16, 19, 0, 0, Math.PI * 2);
+      g.fill();
+      g.fillStyle = '#1b1b1b';
+      g.beginPath();
+      g.ellipse(cx + side * 32, cy - 8, 5, 15, 0, 0, Math.PI * 2);
+      g.fill();
+    });
+    g.fillStyle = '#f29bb0';
+    g.beginPath();
+    g.moveTo(cx - 8, cy + 18); g.lineTo(cx + 8, cy + 18); g.lineTo(cx, cy + 27);
+    g.fill();
+    g.strokeStyle = '#f4f4f2';
+    g.lineWidth = 3;
+    [-1, 1].forEach(side => [-8, 4].forEach(dy => {
+      g.beginPath();
+      g.moveTo(cx + side * 22, cy + 26 + dy / 2);
+      g.lineTo(cx + side * 68, cy + 20 + dy);
+      g.stroke();
+    }));
+  });
+}
+
 function faceMask() {
   const tex = canvasTexture(256, 256, (g, w, h) => {
     g.fillStyle = '#000';
@@ -394,7 +435,8 @@ function makePerson({ coat, isPlayer = false } = {}) {
     head.add(videoFace, videoOverlay);
   }
   const hair = new THREE.Mesh(new THREE.SphereGeometry(0.147, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.55), mat(pick(HAIR)));
-  hair.rotation.x = 0.25;
+  // Your bangs sit higher so more of the face shows
+  hair.rotation.x = isPlayer ? PLAYER_HAIR : 0.25;
   head.add(hair);
 
   const arms = [-1, 1].map(side => {
@@ -415,6 +457,55 @@ function makePerson({ coat, isPlayer = false } = {}) {
   const phone = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.12, 0.015), mat(0x111111, { emissive: 0x223355, emissiveIntensity: 0.6 }));
   phone.position.set(0, -0.58, -0.05);
   arms[1].add(phone);
+
+  // Player only: the outfit pieces; dressPlayer() picks which are worn
+  let outfit = null;
+  if (isPlayer) {
+    const shirtMat = mat(0xf5f5f2);
+    const armSkin = skinMat.clone();
+    const sleeves = arms.map(pivot => {
+      const sleeve = new THREE.Mesh(new THREE.CapsuleGeometry(0.062, 0.1, 4, 8), shirtMat);
+      sleeve.position.y = -0.08;
+      pivot.add(sleeve);
+      return sleeve;
+    });
+    // Model faces -z, so the print sits on the -z side of the chest, turned to face out
+    const catPrint = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 0.3), new THREE.MeshStandardMaterial({ map: catPrintTexture(), transparent: true, roughness: 0.9 }));
+    catPrint.position.set(0, 0.38, -0.143);
+    catPrint.rotation.y = Math.PI;
+    torso.add(catPrint);
+
+    // Eco bag on the left shoulder, strap over the shoulder front and back
+    const toteMat = mat(0xe8dcc0);
+    const tote = new THREE.Group();
+    const toteBody = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.3, 0.27), toteMat);
+    toteBody.position.set(-0.34, 0.18, 0.02);
+    toteBody.castShadow = true;
+    tote.add(toteBody);
+    [-0.06, 0.08].forEach(z => {
+      const strap = new THREE.Mesh(new THREE.BoxGeometry(0.018, 0.38, 0.03), toteMat);
+      strap.position.set(-0.27, 0.5, z);
+      strap.rotation.z = -0.38;
+      tote.add(strap);
+    });
+    torso.add(tote);
+
+    // Backpack, with its straps on the chest either side of the print
+    const packMat = mat(0x3a4a5e);
+    const backpack = new THREE.Group();
+    const pack = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.36, 0.14), packMat);
+    pack.position.set(0, 0.42, 0.2);
+    pack.castShadow = true;
+    backpack.add(pack);
+    [-0.15, 0.15].forEach(x => {
+      const strap = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.42, 0.02), packMat);
+      strap.position.set(x, 0.42, -0.1);
+      backpack.add(strap);
+    });
+    torso.add(backpack);
+
+    outfit = { body, coatMat, shirtMat, armSkin, sleeves, catPrint, tote, backpack, armMeshes: arms.map(a => a.children[0]) };
+  }
 
   if (!isPlayer && Math.random() < 0.5) {
     const bag = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.34, 0.14), mat(pick([0x222222, 0x5a3d2b, 0x2d3f5a])));
@@ -466,7 +557,7 @@ function makePerson({ coat, isPlayer = false } = {}) {
   scene.add(group);
 
   return {
-    group, legs, torso, head, arms, phone, moodMark, face, hair, skinMat, videoFace, videoOverlay,
+    group, legs, torso, head, arms, phone, moodMark, face, hair, skinMat, videoFace, videoOverlay, outfit,
     baseSkin: skinMat.color.clone(),
     expr: 'neutral', exprUntil: 0, turnFrom: 0, turnUntil: 0, blush: 0, blushNow: 0, blushShown: -1, faceKey: '',
     seed: Math.random() * 100,
@@ -795,7 +886,7 @@ function resize() {
   renderer.setSize(w, h, false);
   camera.aspect = w / h;
   // Portrait screens need to back off to keep all three lanes in view
-  camera.fov = w / h < 1 ? 58 : 48;
+  camera.fov = w / h < 1 ? 52 : 42;
   camera.updateProjectionMatrix();
 }
 
@@ -1092,7 +1183,7 @@ const World = {
     videoFace.visible = videoOverlay.visible = !!video;
     face.visible = !video;
     // Sweep the 3D hair back so it frames the forehead instead of covering the face
-    player.hair.rotation.x = video ? 1.15 : 0.25;
+    player.hair.rotation.x = video ? 1.15 : PLAYER_HAIR;
     player.faceKey = '';
   },
 
@@ -1126,6 +1217,18 @@ const World = {
     else if (e < cinema.dur) cinema.dur = Math.min(cinema.dur, e + 0.4);
     player.turnFrom = Math.min(player.turnFrom, clock.elapsedTime + 0.4);
     player.turnUntil = player.turnFrom + 1.2;
+  },
+
+  // name: 'catTote' | 'catBackpack' | 'coat'
+  setOutfit(name) {
+    const o = player.outfit;
+    const isTee = name !== 'coat';
+    o.body.material = isTee ? o.shirtMat : o.coatMat;
+    o.armMeshes.forEach(m => { m.material = isTee ? o.armSkin : o.coatMat; });
+    o.sleeves.forEach(s => { s.visible = isTee; });
+    o.catPrint.visible = isTee;
+    o.tote.visible = name === 'catTote';
+    o.backpack.visible = name === 'catBackpack';
   },
 
   resetView() {

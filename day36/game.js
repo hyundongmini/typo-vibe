@@ -39,6 +39,7 @@
     resetView: $('#reset-view'),
     turnLeft: $('#turn-left'),
     webcam: $('#webcam'),
+    outfit: $('#outfit'),
     webcamNote: $('#webcam-note'),
     turnRight: $('#turn-right'),
     hint: $('#hint'),
@@ -976,9 +977,39 @@
     }
   }
 
+  /* ---------- outfit ---------- */
+
+  const OUTFITS = ['catTote', 'catBackpack', 'coat'];
+  const OUTFIT_KEY = 'typo-vibe-day36-outfit';
+  let outfit = OUTFITS[0];
+
+  function setOutfit(name) {
+    outfit = OUTFITS.includes(name) ? name : OUTFITS[0];
+    World.setOutfit(outfit);
+    els.outfit.textContent = UI.outfits[outfit];
+    els.outfit.setAttribute('aria-label', UI.outfitLabel(UI.outfits[outfit]));
+    try {
+      localStorage.setItem(OUTFIT_KEY, outfit);
+    } catch {
+      // Storage may be blocked (private mode); the outfit still applies for this visit
+    }
+  }
+
+  function savedOutfit() {
+    try {
+      return localStorage.getItem(OUTFIT_KEY);
+    } catch {
+      return null;
+    }
+  }
+
   /* ---------- wiring ---------- */
 
   els.takeOut.addEventListener('click', openWallet);
+  els.outfit.addEventListener('click', () => {
+    const i = OUTFITS.indexOf(outfit);
+    setOutfit(OUTFITS[(i + 1) % OUTFITS.length]);
+  });
   els.resetView.addEventListener('click', () => World.resetView());
   els.turnLeft.addEventListener('click', () => World.turnView(-0.5));
   els.webcam.textContent = UI.webcamOn;
@@ -1010,6 +1041,7 @@
     }
     World.bindReaders(els.readers);
     World.onPhoto = onPhoto;
+    setOutfit(savedOutfit());
     Led.init(els.led);
 
     renderGate();
