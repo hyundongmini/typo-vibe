@@ -13,10 +13,11 @@ const QUEUE_Z = 2.35;
 const QUEUE_GAP = 1.05;
 const WALK_SPEED = 1.6;
 const HIT_SCALE = 1.35; // touch targets a bit larger than the drawn reader
+const FACE_CARD_R = 0.31; // radius of the round webcam face
 
 // Camera sits past the gates looking back at the line, so every face is visible
-const CAM_POS = { x: 2.9, y: 3.9, z: -2.0 };
-const CAM_LOOK = new THREE.Vector3(-0.3, 0.9, 2.6);
+const CAM_POS = { x: 0.5, y: 3.5, z: -2.7 };
+const CAM_LOOK = new THREE.Vector3(0, 1.0, 2.4);
 
 // Left to right: B0 | L lane | B1 | mine | B2 | R lane | B3
 const LANE_X = { left: -(LANE_W + BODY_W), mine: 0, right: LANE_W + BODY_W };
@@ -269,14 +270,19 @@ function makePerson({ coat, isPlayer = false } = {}) {
   );
   head.add(face);
 
-  // Player only: a wider patch for the live webcam face, plus a layer for blush and sweat on top
-  let videoFace = null, videoOverlay = null;
+  // Player only: a round webcam "face sticker" that always turns to the camera,
+  // with a layer on top for blush and sweat
+  let faceCard = null, videoFace = null, videoOverlay = null;
   if (isPlayer) {
-    const patch = r => new THREE.SphereGeometry(r, 32, 20, Math.PI * 1.5 - 1.2, 2.4, Math.PI / 2 - 1.0, 2.0);
-    videoFace = new THREE.Mesh(patch(0.1425), new THREE.MeshBasicMaterial({ color: 0xffffff }));
-    videoOverlay = new THREE.Mesh(patch(0.1435), new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false }));
-    videoFace.visible = videoOverlay.visible = false;
-    head.add(videoFace, videoOverlay);
+    faceCard = new THREE.Group();
+    const rim = new THREE.Mesh(new THREE.CircleGeometry(FACE_CARD_R + 0.025, 48), new THREE.MeshBasicMaterial({ color: 0xffd400 }));
+    videoFace = new THREE.Mesh(new THREE.CircleGeometry(FACE_CARD_R, 48), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+    videoFace.position.z = 0.002;
+    videoOverlay = new THREE.Mesh(new THREE.CircleGeometry(FACE_CARD_R, 48), new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false }));
+    videoOverlay.position.z = 0.004;
+    faceCard.add(rim, videoFace, videoOverlay);
+    faceCard.visible = false;
+    scene.add(faceCard);
   }
   const hair = new THREE.Mesh(new THREE.SphereGeometry(0.147, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.55), mat(pick(HAIR)));
   hair.rotation.x = 0.25;
@@ -345,7 +351,7 @@ function makePerson({ coat, isPlayer = false } = {}) {
   scene.add(group);
 
   return {
-    group, legs, torso, head, arms, phone, moodMark, face, hair, skinMat, videoFace, videoOverlay,
+    group, legs, torso, head, arms, phone, moodMark, face, hair, skinMat, faceCard, videoFace, videoOverlay,
     baseSkin: skinMat.color.clone(),
     expr: 'neutral', exprUntil: 0, turnFrom: 0, turnUntil: 0, blush: 0, blushShown: -1, faceKey: '',
     seed: Math.random() * 100,
@@ -401,7 +407,7 @@ function animatePerson(p, t, dt) {
   p.head.rotation.y += (glance - p.head.rotation.y) * Math.min(1, dt * 6);
 
   const faceName = p.isPlayer ? (p.exprUntil > t ? p.expr : 'neutral') : QUEUE_FACES[p.level];
-  const isLive = !!(p.videoFace && p.videoFace.visible);
+  const isLive = !!(p.faceCard && p.faceCard.visible);
   // With a live face the real expression does the acting; only blush and sweat are drawn on top
   const drawn = isLive ? (FACES[faceName].sweat ? 'overlaySweat' : 'overlay') : faceName;
   const faceKey = `${drawn}|${Math.round(p.blush * 4)}`;
@@ -413,6 +419,8 @@ function animatePerson(p, t, dt) {
   }
   if (p.blushShown !== p.blush) {
     p.blushShown = p.blush;
+    // Embarrassment filter: the live face itself turns red
+    if (p.videoFace) p.videoFace.material.color.setRGB(1, 1 - p.blush * 0.42, 1 - p.blush * 0.48);
     p.skinMat.color.copy(p.baseSkin).lerp(new THREE.Color(0xe2584a), p.blush * 0.55);
   }
 
@@ -700,7 +708,7 @@ function updateCamera(dt) {
   const normalPos = new THREE.Vector3().setFromSpherical(sph).add(CAM_LOOK);
 
   const head = player.head.getWorldPosition(new THREE.Vector3());
-  const closePos = head.clone().add(new THREE.Vector3(0.42, 0.28, -1.2));
+  const closePos = head.clone().add(new THREE.Vector3(0.3, 0.3, -1.55));
   const w = cinemaWeight();
   player.group.userData.tag.visible = w < 0.2;
   camPos.copy(normalPos).lerp(closePos, w);
@@ -713,6 +721,17 @@ function updateCamera(dt) {
 }
 
 // Right-button drag turns the camera; the left button belongs to the card
+// Keep the webcam face just in front of the head, facing the camera
+const faceDir = new THREE.Vector3();
+function placeFaceCard() {
+  const card = player.faceCard;
+  if (!card || !card.visible) return;
+  const head = player.head.getWorldPosition(new THREE.Vector3());
+  faceDir.copy(camera.position).sub(head).normalize();
+  card.position.copy(head).addScaledVector(faceDir, 0.2);
+  card.quaternion.copy(camera.quaternion);
+}
+
 function bindOrbit(el) {
   el.addEventListener('contextmenu', e => e.preventDefault());
   el.addEventListener('pointerdown', e => {
@@ -755,6 +774,7 @@ function tick() {
   }
 
   updateCamera(dt);
+  placeFaceCard();
 
   renderer.render(scene, camera);
   placeReaderButtons();
@@ -876,7 +896,7 @@ const World = {
 
   // video: a playing <video> of the webcam, or null to go back to the drawn face
   setPlayerVideo(video) {
-    const { videoFace, videoOverlay, face } = player;
+    const { videoFace, faceCard, face } = player;
     if (!videoFace) return;
     if (videoFace.material.map) videoFace.material.map.dispose();
     if (video) {
@@ -892,7 +912,7 @@ const World = {
       videoFace.material.map = null;
     }
     videoFace.material.needsUpdate = true;
-    videoFace.visible = videoOverlay.visible = !!video;
+    faceCard.visible = !!video;
     // The webcam frame already shows your own hair
     face.visible = player.hair.visible = !video;
     player.faceKey = '';

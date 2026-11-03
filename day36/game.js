@@ -493,6 +493,11 @@
       log: [],
     });
     Sound.startAmbience();
+    // Your own face is the default; the first game asks for the camera, later ones keep your choice
+    if (!hasAskedCamera) {
+      hasAskedCamera = true;
+      startWebcam();
+    }
     showSign();
   }
 
@@ -580,16 +585,20 @@
   /* ---------- webcam face ---------- */
 
   let webcamStream = null;
+  let hasAskedCamera = false;
 
-  async function toggleWebcam() {
-    if (webcamStream) {
-      webcamStream.getTracks().forEach(t => t.stop());
-      webcamStream = null;
-      World.setPlayerVideo(null);
-      els.webcam.textContent = UI.webcamOn;
-      els.webcam.setAttribute('aria-pressed', 'false');
-      return;
-    }
+  function toggleWebcam() {
+    if (!webcamStream) return startWebcam();
+    webcamStream.getTracks().forEach(t => t.stop());
+    webcamStream = null;
+    World.setPlayerVideo(null);
+    els.webcam.textContent = UI.webcamOn;
+    els.webcam.setAttribute('aria-pressed', 'false');
+    els.webcamNote.textContent = '';
+  }
+
+  async function startWebcam() {
+    if (webcamStream) return;
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       els.webcamNote.textContent = UI.webcamUnsupported;
       return;
