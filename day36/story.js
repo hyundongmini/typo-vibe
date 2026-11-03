@@ -88,7 +88,7 @@ window.STORY = {
     awkward: n => `머쓱 ${n}`,
     awkwardLabel: (total, here, max) => `머쓱 총 ${total}회, 이 개찰구 ${here}/${max}`,
     fare: (kind, fare) => (kind === 'exit' ? '하차' : fare ? `운임 ${fare.toLocaleString('ko-KR')}원` : '환승 무료'),
-    hint: '카드를 끌어 단말기에 올리고, 삑 할 때까지 그대로. 키보드: 단말기에서 Space를 꾹.',
+    hint: '카드를 끌어 단말기에 올리고, 삑 할 때까지 그대로. 빈 곳을 끌면 카메라가 돌아간다. 키보드: 단말기에서 Space를 꾹.',
     stepAsideTitle: '머쓱',
     nextGate: '다음 개찰구',
     sound: '♪ 소리',

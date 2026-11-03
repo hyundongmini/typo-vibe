@@ -35,6 +35,10 @@ let renderer, scene, camera, container, clock;
 let player, queue = [], sideQueues = { left: [], right: [] };
 let lanes = {}, readers = {}, signTex, signMat, stripeMat, guideMat;
 let readerEls = null, mood = 0, nextAmbient = 0, shake = 0;
+// User orbit offsets and the close-up "awkward cam" envelope
+const view = { yaw: 0, pitch: 0, dragging: false, lastX: 0, lastY: 0 };
+let cinema = { start: -10, dur: 0 };
+const camPos = new THREE.Vector3(), camLook = new THREE.Vector3();
 
 /* ---------- textures ---------- */
 
@@ -131,6 +135,92 @@ function moodTexture(level) {
   return moodTextures[level - 1];
 }
 
+/* ---------- faces ---------- */
+
+// eyes: dot | down | half | wide | squeeze | happy; brows: none | flat | raised | worried | angry
+// mouth: flat | smile | frown | grit | grin | o | wavy
+const FACES = {
+  neutral: { eyes: 'dot', brows: 'none', mouth: 'flat' },
+  phone: { eyes: 'down', brows: 'none', mouth: 'flat' },
+  annoyed: { eyes: 'half', brows: 'flat', mouth: 'flat' },
+  angry: { eyes: 'dot', brows: 'angry', mouth: 'frown' },
+  fuming: { eyes: 'half', brows: 'angry', mouth: 'grit' },
+  retry: { eyes: 'dot', brows: 'worried', mouth: 'grin', sweat: true },
+  wallet: { eyes: 'wide', brows: 'raised', mouth: 'o' },
+  neighbor: { eyes: 'wide', brows: 'raised', mouth: 'wavy', sweat: true },
+  balance: { eyes: 'down', brows: 'worried', mouth: 'wavy', sweat: true },
+  push: { eyes: 'squeeze', brows: 'worried', mouth: 'flat' },
+  aside: { eyes: 'happy', brows: 'worried', mouth: 'grin', sweat: true },
+  ok: { eyes: 'happy', brows: 'none', mouth: 'smile' },
+};
+const QUEUE_FACES = ['phone', 'annoyed', 'angry', 'fuming'];
+// Reactions that get the close-up camera, and the ones where you turn back to face the line
+const CLOSE_UP = new Set(['retry', 'wallet', 'neighbor', 'balance']);
+const LOOK_BACK = new Set(['retry', 'wallet', 'neighbor', 'balance', 'aside']);
+const faceCache = new Map();
+
+function drawFace(g, f, blush) {
+  const ink = '#2a1a12';
+  g.clearRect(0, 0, 128, 128);
+  g.lineCap = 'round';
+  g.lineJoin = 'round';
+  if (blush > 0) {
+    g.fillStyle = `rgba(235, 60, 60, ${0.25 + blush * 0.55})`;
+    [30, 98].forEach(x => { g.beginPath(); g.ellipse(x, 78, 14 + blush * 4, 8 + blush * 2, 0, 0, Math.PI * 2); g.fill(); });
+    // Embarrassment hatching on the cheeks once it gets bad
+    if (blush > 0.5) {
+      g.strokeStyle = 'rgba(200, 30, 30, 0.8)';
+      g.lineWidth = 2.5;
+      [30, 98].forEach(x => [-6, 0, 6].forEach(d => { g.beginPath(); g.moveTo(x + d - 3, 82); g.lineTo(x + d + 3, 74); g.stroke(); }));
+    }
+  }
+  g.strokeStyle = ink;
+  g.fillStyle = ink;
+  g.lineWidth = 5;
+  [[42, 1], [86, -1]].forEach(([x, side]) => {
+    const y = 56;
+    g.beginPath();
+    if (f.eyes === 'dot') g.arc(x, y, 5.5, 0, Math.PI * 2), g.fill();
+    else if (f.eyes === 'down') g.arc(x, y + 4, 5, 0, Math.PI * 2), g.fill();
+    else if (f.eyes === 'half') { g.moveTo(x - 8, y); g.lineTo(x + 8, y); g.stroke(); g.beginPath(); g.arc(x, y + 2, 4, 0, Math.PI); g.fill(); }
+    else if (f.eyes === 'wide') { g.fillStyle = '#fff'; g.arc(x, y, 10, 0, Math.PI * 2); g.fill(); g.stroke(); g.fillStyle = ink; g.beginPath(); g.arc(x, y, 3.5, 0, Math.PI * 2); g.fill(); }
+    else if (f.eyes === 'squeeze') { g.moveTo(x - 8 * side, y - 6); g.lineTo(x + 6 * side, y); g.lineTo(x - 8 * side, y + 6); g.stroke(); }
+    else if (f.eyes === 'happy') { g.arc(x, y + 4, 8, Math.PI * 1.1, Math.PI * 1.9); g.stroke(); }
+    g.beginPath();
+    const by = 38;
+    if (f.brows === 'flat') { g.moveTo(x - 10, by); g.lineTo(x + 10, by); g.stroke(); }
+    else if (f.brows === 'raised') { g.arc(x, by + 4, 11, Math.PI * 1.15, Math.PI * 1.85); g.stroke(); }
+    else if (f.brows === 'worried') { g.moveTo(x - 10 * side, by + 2); g.lineTo(x + 9 * side, by - 6); g.stroke(); }
+    else if (f.brows === 'angry') { g.moveTo(x - 10 * side, by - 6); g.lineTo(x + 9 * side, by + 3); g.stroke(); }
+  });
+  g.beginPath();
+  const my = 92;
+  if (f.mouth === 'flat') { g.moveTo(54, my); g.lineTo(74, my); g.stroke(); }
+  else if (f.mouth === 'smile') { g.arc(64, my - 8, 13, Math.PI * 0.2, Math.PI * 0.8); g.stroke(); }
+  else if (f.mouth === 'frown') { g.arc(64, my + 10, 11, Math.PI * 1.2, Math.PI * 1.8); g.stroke(); }
+  else if (f.mouth === 'grit') { g.fillStyle = '#fff'; g.fillRect(50, my - 6, 28, 12); g.strokeRect(50, my - 6, 28, 12); g.moveTo(50, my); g.lineTo(78, my); g.stroke(); }
+  else if (f.mouth === 'grin') {
+    // The awkward "heh" smile: wide, teeth showing, corners pulled
+    g.fillStyle = '#fff';
+    g.beginPath(); g.moveTo(46, my - 4); g.quadraticCurveTo(64, my + 12, 82, my - 4); g.closePath(); g.fill(); g.stroke();
+  }
+  else if (f.mouth === 'o') { g.arc(64, my, 7, 0, Math.PI * 2); g.stroke(); }
+  else if (f.mouth === 'wavy') { g.moveTo(48, my); g.quadraticCurveTo(54, my - 7, 60, my); g.quadraticCurveTo(66, my + 7, 72, my); g.quadraticCurveTo(76, my - 5, 80, my); g.stroke(); }
+  if (f.sweat) {
+    g.fillStyle = '#7cc6ff';
+    g.strokeStyle = '#2f7fc0';
+    g.lineWidth = 2;
+    g.beginPath(); g.moveTo(108, 20); g.quadraticCurveTo(118, 38, 108, 44); g.quadraticCurveTo(98, 38, 108, 20); g.fill(); g.stroke();
+  }
+}
+
+function faceTexture(name, blush) {
+  const step = Math.round(clamp(blush, 0, 1) * 4);
+  const key = `${name}|${step}`;
+  if (!faceCache.has(key)) faceCache.set(key, canvasTexture(128, 128, g => drawFace(g, FACES[name], step / 4)));
+  return faceCache.get(key);
+}
+
 /* ---------- people ---------- */
 
 function makePerson({ coat, isPlayer = false } = {}) {
@@ -163,8 +253,14 @@ function makePerson({ coat, isPlayer = false } = {}) {
   const head = new THREE.Group();
   head.position.y = 0.86;
   torso.add(head);
-  const face = new THREE.Mesh(new THREE.SphereGeometry(0.14, 16, 12), skinMat);
-  face.castShadow = true;
+  const skull = new THREE.Mesh(new THREE.SphereGeometry(0.14, 16, 12), skinMat);
+  skull.castShadow = true;
+  head.add(skull);
+  // Front patch of a slightly larger sphere carries the drawn expression (model faces -z)
+  const face = new THREE.Mesh(
+    new THREE.SphereGeometry(0.1415, 24, 16, Math.PI * 1.5 - 0.95, 1.9, Math.PI / 2 - 0.8, 1.6),
+    new THREE.MeshStandardMaterial({ map: faceTexture('neutral', 0), transparent: true, roughness: 0.8 }),
+  );
   head.add(face);
   const hair = new THREE.Mesh(new THREE.SphereGeometry(0.147, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.55), mat(pick(HAIR)));
   hair.rotation.x = 0.25;
@@ -218,6 +314,7 @@ function makePerson({ coat, isPlayer = false } = {}) {
     tag.position.y = 2.05;
     tag.renderOrder = 10;
     group.add(tag);
+    group.userData.tag = tag;
   }
 
   const moodMark = new THREE.Sprite(new THREE.SpriteMaterial({ depthTest: false, transparent: true }));
@@ -232,7 +329,9 @@ function makePerson({ coat, isPlayer = false } = {}) {
   scene.add(group);
 
   return {
-    group, legs, torso, head, arms, phone, moodMark,
+    group, legs, torso, head, arms, phone, moodMark, face, skinMat,
+    baseSkin: skinMat.color.clone(),
+    expr: 'neutral', exprUntil: 0, turnFrom: 0, turnUntil: 0, blush: 0, blushShown: -1, faceKey: '',
     seed: Math.random() * 100,
     target: null,
     onArrive: null,
@@ -280,7 +379,21 @@ function animatePerson(p, t, dt) {
       g.rotation.y += (want - g.rotation.y) * Math.min(1, dt * 10);
     }
   }
-  if (!isWalking) g.rotation.y += (0 - g.rotation.y) * Math.min(1, dt * 6);
+  // Looking back at the line after a blunder; otherwise face the gates
+  const restYaw = p.turnFrom <= t && t < p.turnUntil && !p.reach ? -2.7 : 0;
+  if (!isWalking) g.rotation.y += (restYaw - g.rotation.y) * Math.min(1, dt * 6);
+
+  const faceName = p.isPlayer ? (p.exprUntil > t ? p.expr : 'neutral') : QUEUE_FACES[p.level];
+  const faceKey = `${faceName}|${Math.round(p.blush * 4)}`;
+  if (faceKey !== p.faceKey) {
+    p.faceKey = faceKey;
+    p.face.material.map = faceTexture(faceName, p.blush);
+    p.face.material.needsUpdate = true;
+  }
+  if (p.blushShown !== p.blush) {
+    p.blushShown = p.blush;
+    p.skinMat.color.copy(p.baseSkin).lerp(new THREE.Color(0xe2584a), p.blush * 0.55);
+  }
 
   const [legL, legR] = p.legs;
   const [armL, armR] = p.arms;
@@ -539,6 +652,58 @@ function placeReaderButtons() {
   });
 }
 
+function cinemaWeight() {
+  const e = clock.elapsedTime - cinema.start;
+  if (e < 0 || e > cinema.dur) return 0;
+  const easeIn = clamp(e / 0.3, 0, 1), easeOut = clamp((cinema.dur - e) / 0.4, 0, 1);
+  const k = Math.min(easeIn, easeOut);
+  return k * k * (3 - 2 * k);
+}
+
+const sph = new THREE.Spherical();
+function updateCamera(dt) {
+  if (!view.dragging) {
+    // Drift back to the default framing after the player lets go
+    view.yaw *= Math.exp(-dt * 0.6);
+    view.pitch *= Math.exp(-dt * 0.6);
+  }
+  sph.setFromVector3(new THREE.Vector3(CAM_POS.x, CAM_POS.y, CAM_POS.z).sub(CAM_LOOK));
+  sph.theta += view.yaw;
+  sph.phi = clamp(sph.phi + view.pitch, 0.2, 1.4);
+  const normalPos = new THREE.Vector3().setFromSpherical(sph).add(CAM_LOOK);
+
+  const head = player.head.getWorldPosition(new THREE.Vector3());
+  const closePos = head.clone().add(new THREE.Vector3(0.42, 0.28, -1.2));
+  const w = cinemaWeight();
+  player.group.userData.tag.visible = w < 0.2;
+  camPos.copy(normalPos).lerp(closePos, w);
+  camLook.copy(CAM_LOOK).lerp(head, w);
+
+  shake *= Math.exp(-dt * 8);
+  camera.position.copy(camPos);
+  camera.position.x += (Math.random() - 0.5) * shake;
+  camera.lookAt(camLook);
+}
+
+function bindOrbit(el) {
+  el.addEventListener('pointerdown', e => {
+    view.dragging = true;
+    view.lastX = e.clientX;
+    view.lastY = e.clientY;
+    el.setPointerCapture(e.pointerId);
+  });
+  el.addEventListener('pointermove', e => {
+    if (!view.dragging) return;
+    view.yaw = clamp(view.yaw - (e.clientX - view.lastX) * 0.008, -2.6, 2.6);
+    view.pitch = clamp(view.pitch - (e.clientY - view.lastY) * 0.005, -0.8, 0.5);
+    view.lastX = e.clientX;
+    view.lastY = e.clientY;
+  });
+  const stop = () => { view.dragging = false; };
+  el.addEventListener('pointerup', stop);
+  el.addEventListener('pointercancel', stop);
+}
+
 function tick() {
   const dt = Math.min(clock.getDelta(), 0.05);
   const t = reduceMotion ? 0 : clock.elapsedTime;
@@ -559,10 +724,7 @@ function tick() {
     nextAmbient = clock.elapsedTime + 2.2 + Math.random() * 2.5;
   }
 
-  // Bump shake on failure
-  shake *= Math.exp(-dt * 8);
-  camera.position.set(CAM_POS.x + (Math.random() - 0.5) * shake, CAM_POS.y, CAM_POS.z);
-  camera.lookAt(CAM_LOOK);
+  updateCamera(dt);
 
   renderer.render(scene, camera);
   placeReaderButtons();
@@ -585,6 +747,7 @@ const World = {
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     container.appendChild(renderer.domElement);
+    bindOrbit(renderer.domElement);
     scene = new THREE.Scene();
     camera = new THREE.PerspectiveCamera(34, 1, 0.1, 60);
     clock = new THREE.Clock();
@@ -662,6 +825,42 @@ const World = {
 
   reach(side) {
     player.reach = side;
+  },
+
+  // Player's face for a situation: close-up camera first, then a sheepish look back at the line
+  react(kind) {
+    const t = clock.elapsedTime;
+    player.expr = kind;
+    player.exprUntil = t + (kind === 'push' ? 0.9 : 3.4);
+    if (LOOK_BACK.has(kind)) {
+      // Turn around only after the close-up, so the camera sees the face first
+      player.turnFrom = t + (CLOSE_UP.has(kind) ? 1.7 : 0);
+      player.turnUntil = player.turnFrom + 1.6;
+    }
+    if (CLOSE_UP.has(kind) && !reduceMotion) cinema = { start: t, dur: 1.6 };
+  },
+
+  setBlush(v) {
+    player.blush = clamp(v, 0, 1);
+  },
+
+  // True for the whole close-up, including its first frame when the blend is still 0
+  isCinematic() {
+    const e = clock.elapsedTime - cinema.start;
+    return e >= 0 && e < cinema.dur;
+  },
+
+  // Cut the close-up short (fade out from now)
+  skipCinematic() {
+    const e = clock.elapsedTime - cinema.start;
+    if (e >= 0 && e < cinema.dur) cinema.dur = Math.min(cinema.dur, e + 0.4);
+    player.turnFrom = Math.min(player.turnFrom, clock.elapsedTime + 0.4);
+    player.turnUntil = player.turnFrom + 1.2;
+  },
+
+  resetView() {
+    view.yaw = 0;
+    view.pitch = 0;
   },
 
   bump() {

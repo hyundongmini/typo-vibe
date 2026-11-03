@@ -25,6 +25,7 @@
     holding: $('#holding'),
     takeOut: $('#take-out'),
     charge: $('#charge'),
+    resetView: $('#reset-view'),
     hint: $('#hint'),
     modal: $('#modal'),
     modalLine: $('#modal-line'),
@@ -263,6 +264,7 @@
   }
 
   els.card.addEventListener('pointerdown', e => {
+    if (World.isCinematic()) return World.skipCinematic();
     if (state.phase !== 'gate') return;
     e.preventDefault();
     els.card.setPointerCapture(e.pointerId);
@@ -297,7 +299,7 @@
     r.addEventListener('keydown', e => {
       if (e.key !== ' ' && e.key !== 'Enter') return;
       e.preventDefault();
-      if (e.repeat || state.phase !== 'gate' || drag.isActive) return;
+      if (e.repeat || state.phase !== 'gate' || drag.isActive || World.isCinematic()) return;
       drag.isActive = true;
       drag.keySide = side;
       const st = els.stage.getBoundingClientRect();
@@ -326,6 +328,7 @@
     drag.nextPush = now + rand(...push.gap) * 1000;
     Sound.sfx('push');
     World.shove();
+    World.react('push');
     if (Math.random() < 0.35) bubble(pick(S.reactions.push), 'player');
   }
 
@@ -347,6 +350,7 @@
     const key = g.kind === 'enter' ? 'enter' : g.kind === 'exit' ? 'exit' : g.fare ? 'transferFare' : 'transfer';
     led(key, 'ok', { blink: true });
     setReader(g.reader, 'ok');
+    World.react('ok');
     Sound.sfx('ok');
     Sound.sfx('flapOpen');
     renderHud();
@@ -381,6 +385,8 @@
     }
     bubble(pick(S.reactions[kind]), kind === 'neighbor' ? 'player' : undefined);
     World.setMood(state.awkwardHere);
+    World.react(kind);
+    World.setBlush(blushLevel());
     renderHud();
     renderQueue();
     // From the second miss on, someone at the back gives up on your lane
@@ -398,8 +404,12 @@
     state.phase = 'aside';
     state.awkwardHere = 0;
     state.clock += S.penalty.stepAside;
-    bubble(S.reactions.stepAside, 'player', true);
-    World.stepAside(2);
+    // Let the close-up of the last blunder finish before walking out of line
+    setTimeout(() => {
+      bubble(S.reactions.stepAside, 'player', true);
+      World.react('aside');
+      World.stepAside(2);
+    }, World.isCinematic() ? 1500 : 0);
     state.queue = Math.max(0, state.queue - 2);
     els.queueCount.textContent = UI.queue(state.queue);
     setTimeout(() => {
@@ -407,14 +417,17 @@
       World.setMood(0);
       renderQueue();
       renderHud();
-    }, 2200);
+    }, 3700);
     setTimeout(() => {
       state.phase = 'gate';
       led('idle', 'info');
       renderHand();
-    }, 2600);
+    }, 4100);
     renderHand();
   }
+
+  // Redness builds within a gate and a little carries over from earlier ones
+  const blushLevel = () => Math.min(1, state.awkwardHere * 0.3 + state.awkwardTotal * 0.06);
 
   function takeOut() {
     if (state.phase !== 'gate' || state.hand !== 'wallet') return;
@@ -460,6 +473,7 @@
     if (g.wallet) state.hand = 'wallet';
     els.stage.classList.remove('fading');
     renderGate();
+    World.setBlush(blushLevel());
     renderRoute();
     renderHud();
     placeCardHome();
@@ -509,7 +523,8 @@
   function tick(now) {
     const dt = Math.min((now - last) / 1000, 0.1);
     last = now;
-    if (state.phase === 'gate' || state.phase === 'aside') {
+    // The close-up is a replay for the player, so the clock waits
+    if ((state.phase === 'gate' || state.phase === 'aside') && !World.isCinematic()) {
       state.clock += dt;
       renderHud();
     }
@@ -529,6 +544,7 @@
   /* ---------- wiring ---------- */
 
   els.takeOut.addEventListener('click', takeOut);
+  els.resetView.addEventListener('click', () => World.resetView());
   els.charge.addEventListener('click', charge);
   els.sound.setAttribute('aria-pressed', String(Sound.isEnabled()));
   els.sound.addEventListener('click', () => els.sound.setAttribute('aria-pressed', String(Sound.toggle())));
