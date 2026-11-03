@@ -433,7 +433,7 @@
 
     if (kind === 'neighbor') {
       // Your tap opened the next lane and a stranger walked through
-      World.neighborPass(side);
+      World.neighborPass(side, p => bubble(pick(S.reactions.neighbor), p));
       Sound.sfx('flapOpen');
       led('idle', 'error', { blink: true });
     } else {
@@ -441,7 +441,7 @@
       World.bump();
       Sound.sfx('flapBump');
     }
-    bubble(pick(S.reactions[kind]), kind === 'neighbor' ? 'player' : undefined);
+    if (kind !== 'neighbor') bubble(pick(S.reactions[kind]));
     World.setMood(state.awkwardHere);
     World.react(kind);
     World.setBlush(blushLevel());
@@ -467,7 +467,7 @@
       bubble(S.reactions.stepAside, 'player', true);
       World.react('aside');
       World.stepAside(2);
-    }, World.isCinematic() ? 1500 : 0);
+    }, World.cinemaRemaining() * 1000);
     state.queue = Math.max(0, state.queue - 2);
     els.queueCount.textContent = UI.queue(state.queue);
     setTimeout(() => {

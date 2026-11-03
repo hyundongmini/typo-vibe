@@ -34,6 +34,8 @@ const mat = (color, extra = {}) => new THREE.MeshStandardMaterial({ color, rough
 
 let renderer, scene, camera, container, clock;
 let player, queue = [], sideQueues = { left: [], right: [] };
+// People who left a side queue and are walking through; still animated until they're gone
+let passers = [];
 let lanes = {}, readers = {}, signTex, signMat, stripeMat, guideMat;
 let readerEls = null, mood = 0, nextAmbient = 0, shake = 0;
 // User orbit offsets and the close-up "awkward cam" envelope
@@ -210,6 +212,8 @@ const GLOOMY = new Set(['retry', 'balance', 'aside']);
 const SHOUTS = { retry: '삑삑…', wallet: '앗', neighbor: '어…?', balance: '헉', aside: '머쓱…', push: '읏' };
 // Reactions that get the close-up camera, and the ones where you turn back to face the line
 const CLOSE_UP = new Set(['retry', 'wallet', 'neighbor', 'balance']);
+// The neighbor's walk-through plays in the wide view first; the close-up waits for it
+const CLOSE_UP_DELAY = { neighbor: 2.2 };
 const LOOK_BACK = new Set(['retry', 'wallet', 'neighbor', 'balance', 'aside']);
 const faceCache = new Map();
 
@@ -473,6 +477,7 @@ function makePerson({ coat, isPlayer = false } = {}) {
 }
 
 function removePerson(p) {
+  passers = passers.filter(x => x !== p);
   scene.remove(p.group);
   p.group.traverse(o => {
     if (o.isMesh) o.geometry.dispose();
@@ -509,12 +514,12 @@ function animatePerson(p, t, dt) {
       g.rotation.y += (want - g.rotation.y) * Math.min(1, dt * 10);
     }
   }
-  if (!isWalking) g.rotation.y += (0 - g.rotation.y) * Math.min(1, dt * 6);
+  if (!isWalking) g.rotation.y += ((p.faceY || 0) - g.rotation.y) * Math.min(1, dt * 6);
   // A sheepish glance back over the shoulder after a blunder; the face stays toward the camera
   const glance = p.turnFrom <= t && t < p.turnUntil && !p.reach ? 0.55 : 0;
   p.head.rotation.y += (glance - p.head.rotation.y) * Math.min(1, dt * 6);
 
-  const faceName = p.isPlayer ? (p.exprUntil > t ? p.expr : 'neutral') : QUEUE_FACES[p.level];
+  const faceName = p.isPlayer ? (p.exprUntil > t ? p.expr : 'neutral') : p.happy ? 'ok' : QUEUE_FACES[p.level];
   const isLive = !!(p.videoFace && p.videoFace.visible);
   // With a live face the real expression does the acting; only blush and sweat are drawn on top
   const drawn = isLive ? (GLOOMY.has(faceName) ? 'overlayGloom' : FACES[faceName].sweat ? 'overlaySweat' : 'overlay') : faceName;
@@ -610,7 +615,7 @@ function animatePerson(p, t, dt) {
   }
   if (markLevel === 3) p.moodMark.scale.setScalar(0.34 + Math.max(0, Math.sin(s * 6)) * 0.08);
 
-  p.lean += (0 - p.lean) * Math.min(1, dt * 4);
+  p.lean += ((p.bowUntil > t ? p.bow : 0) - p.lean) * Math.min(1, dt * 4);
   p.torso.rotation.x = p.lean;
   p.torso.position.x += (offX - p.torso.position.x) * Math.min(1, dt * 4);
   p.torso.scale.y = bodyScale;
@@ -764,6 +769,7 @@ function sidePass(name) {
   const list = sideQueues[name];
   const p = list.shift();
   if (!p) return;
+  passers.push(p);
   setLaneOpen(name, true, 1.4);
   walkTo(p, LANE_X[name], -4, () => removePerson(p));
   reflowSide(name);
@@ -903,7 +909,7 @@ function tick() {
     lane.flaps.forEach(f => { f.scale.x = 1 - lane.open * 0.9; });
   });
 
-  [player, ...queue, ...sideQueues.left, ...sideQueues.right].forEach(p => p && animatePerson(p, t, dt));
+  [player, ...queue, ...sideQueues.left, ...sideQueues.right, ...passers].forEach(p => p && animatePerson(p, t, dt));
 
   if (!reduceMotion && clock.elapsedTime > nextAmbient) {
     sidePass(Math.random() < 0.5 ? 'left' : 'right');
@@ -991,6 +997,7 @@ const World = {
     player.reach = null;
     queue.forEach(removePerson);
     queue = [];
+    [...passers].forEach(removePerson);
     World.setQueue(queueSize, true);
   },
 
@@ -1044,13 +1051,14 @@ const World = {
     }
     player.expr = kind;
     player.exprUntil = t + (kind === 'push' ? 0.9 : 3.4);
+    const delay = CLOSE_UP_DELAY[kind] || 0;
     if (LOOK_BACK.has(kind)) {
       // Turn around only after the close-up, so the camera sees the face first
-      player.turnFrom = t + (CLOSE_UP.has(kind) ? 1.7 : 0);
+      player.turnFrom = t + delay + (CLOSE_UP.has(kind) ? 1.7 : 0);
       player.turnUntil = player.turnFrom + 1.6;
     }
-    if (CLOSE_UP.has(kind) && !reduceMotion) cinema = { start: t, dur: 1.6 };
-    if (CLOSE_UP.has(kind)) pendingShot = { at: t + (reduceMotion ? 0.1 : 0.75), kind };
+    if (CLOSE_UP.has(kind) && !reduceMotion) cinema = { start: t + delay, dur: 1.6 };
+    if (CLOSE_UP.has(kind)) pendingShot = { at: t + delay + (reduceMotion ? 0.1 : 0.75), kind };
   },
 
   setBlush(v) {
@@ -1095,16 +1103,21 @@ const World = {
     faceCrop.lastSeen = clock.elapsedTime;
   },
 
-  // True for the whole close-up, including its first frame when the blend is still 0
+  // True for the whole close-up, including its first frame and the wait before a delayed one
   isCinematic() {
-    const e = clock.elapsedTime - cinema.start;
-    return e >= 0 && e < cinema.dur;
+    return clock.elapsedTime - cinema.start < cinema.dur;
   },
 
-  // Cut the close-up short (fade out from now)
+  // Seconds until the close-up (and any wait before it) is over
+  cinemaRemaining() {
+    return Math.max(0, cinema.start + cinema.dur - clock.elapsedTime);
+  },
+
+  // Cut the close-up short (fade out from now); a close-up still waiting is dropped
   skipCinematic() {
     const e = clock.elapsedTime - cinema.start;
-    if (e >= 0 && e < cinema.dur) cinema.dur = Math.min(cinema.dur, e + 0.4);
+    if (e < 0) cinema.dur = 0;
+    else if (e < cinema.dur) cinema.dur = Math.min(cinema.dur, e + 0.4);
     player.turnFrom = Math.min(player.turnFrom, clock.elapsedTime + 0.4);
     player.turnUntil = player.turnFrom + 1.2;
   },
@@ -1129,12 +1142,33 @@ const World = {
     if (queue[0]) queue[0].lean = 0.35;
   },
 
-  // Your tap opened the side lane: its front person bows and walks through
-  neighborPass(side) {
+  // Your tap opened the side lane: its front person steps up to the open flaps, turns to
+  // bow to you (in view, before the gate), then walks through. onBow(person) fires at the bow.
+  neighborPass(side, onBow) {
     const name = side === 'left' ? 'left' : 'right';
-    const p = sideQueues[name][0];
-    if (p) p.lean = 0.4;
-    setTimeout(() => sidePass(name), 250);
+    const list = sideQueues[name];
+    const p = list.shift();
+    if (!p) return;
+    passers.push(p);
+    p.happy = true;
+    p.head.rotation.y = 0;
+    setLaneOpen(name, true, 3.2);
+    setTimeout(() => walkTo(p, LANE_X[name], 0.5, () => {
+      // Side-on toward your lane so the bow reads from the front camera
+      p.faceY = name === 'left' ? -Math.PI / 2 : Math.PI / 2;
+      setTimeout(() => {
+        // Negative lean tips the torso forward (rotation.x > 0 leans back)
+        p.bow = -0.7;
+        p.bowUntil = clock.elapsedTime + 0.7;
+        if (onBow) onBow(p);
+      }, 250);
+      setTimeout(() => {
+        p.faceY = 0;
+        walkTo(p, LANE_X[name] * 1.6, -4.5, () => removePerson(p));
+      }, 1100);
+    }), 200);
+    reflowSide(name);
+    setTimeout(() => fillSideQueue(name), 1200);
   },
 
   passMine(onDone) {
