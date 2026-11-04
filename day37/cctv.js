@@ -1,5 +1,5 @@
 // Fridge CCTV wall: runs the fast-forwarded fridge clock, decides what each camera shows,
-// and handles the surveillance events (tracking, auto zoom, door, disposal, log).
+// and handles the surveillance events (tracking, door, disposal, log).
 // render.js draws the feeds; sound.js makes the noises.
 (() => {
   const F = window.FRIDGE;
@@ -46,8 +46,6 @@
     anchor: { sim: 0, real: Date.now() },
     restockUntil: 0,
     open: -1,
-    auto: null, // { i, until } while a feed is zoomed in by itself
-    autoQueue: [],
     door: null, // { from, until }
     nextDoor: performance.now() + 12000,
     lastFrame: 0,
@@ -156,29 +154,29 @@
     for (let i = 0; i < cols * rows; i++) {
       const cam = cams[i];
       const n = pad(i + 1);
-      const cell = document.createElement(cam ? 'button' : 'div');
-      cell.className = 'cell' + (cam ? '' : ' offline');
+      if (!cam) {
+        // A spare bay on the wall once your camera makes it 4 x 4: nothing mounted there
+        const empty = document.createElement('div');
+        empty.className = 'cell empty';
+        empty.setAttribute('aria-hidden', 'true');
+        els.cells.appendChild(empty);
+        continue;
+      }
+      const cell = document.createElement('button');
+      cell.className = 'cell';
       cell.innerHTML = `
         <span class="osd-label"><span>${UI.camera(n)}</span><span>${n}</span></span>
         <span class="osd-rec">${UI.rec}</span>
-        <span class="osd-auto">${UI.autoTrack}</span>
         <span class="track" hidden><span class="track-tag"></span></span>
         <span class="osd-center"></span>
         <span class="osd-door">${UI.doorOpen}</span>
         <span class="osd-time"></span>
         <span class="osd-extra"></span>`;
-      if (!cam) {
-        cell.setAttribute('role', 'img');
-        cell.setAttribute('aria-label', UI.offlineLabel(n));
-        cell.querySelector('.osd-center').textContent = UI.noSignal;
-        els.cells.appendChild(cell);
-        continue;
-      }
       cell.type = 'button';
       cell.addEventListener('click', () => {
         if (cam.disposed || cam.offAt) return;
         if (state.open === i) closeCam(true);
-        else openCam(i, false);
+        else openCam(i);
       });
       els.cells.appendChild(cell);
       cam.el = {
@@ -224,7 +222,6 @@
     // REC blinks; a dead feed stops recording
     const recOn = !cam.disposed && (reduceMotion || Math.floor(t * 1.2) % 2 === 0);
     cam.el.rec.style.visibility = recOn ? 'visible' : 'hidden';
-    cell.classList.toggle('is-auto', !!state.auto && state.auto.i === i);
     cell.classList.toggle('dead', isDead);
     if (cam.overview) {
       const all = cams.map(statusOf);
@@ -240,7 +237,7 @@
     }
   }
 
-  // Status changes become log lines; passing the date sets off the alarm and the auto zoom
+  // Status changes become log lines; passing the date sets off the alarm
   function checkEvents(cam, i) {
     if (cam.disposed || cam.offAt || state.restockUntil) return;
     const status = statusOf(cam);
@@ -249,7 +246,6 @@
       if (status === 'expired') {
         camLog(cam, UI.log.expired, true);
         Sound.sfx('alarm');
-        if (!state.autoQueue.includes(i)) state.autoQueue.push(i);
       }
       if (status === 'rotten') camLog(cam, UI.log.rotten, true);
     }
@@ -287,8 +283,7 @@
     els.dispose.disabled = cam.disposed || cam.offAt > 0;
   }
 
-  function openCam(i, isAuto) {
-    if (!isAuto) state.auto = null;
+  function openCam(i) {
     state.open = i;
     els.stage.classList.add('has-open');
     cams.forEach((c, j) => c.el.cell.classList.toggle('is-open', j === i));
@@ -300,7 +295,6 @@
   function closeCam(shouldFocus) {
     const was = state.open;
     state.open = -1;
-    state.auto = null;
     els.stage.classList.remove('has-open');
     cams.forEach(c => c.el.cell.classList.remove('is-open'));
     els.info.hidden = true;
@@ -313,7 +307,6 @@
     const i = state.open;
     const cam = cams[i];
     if (!cam || cam.disposed || cam.offAt) return;
-    state.auto = null;
     cam.offAt = performance.now();
     els.dispose.disabled = true;
     Sound.sfx('off');
@@ -321,7 +314,6 @@
     setTimeout(() => {
       cam.offAt = 0;
       cam.disposed = true;
-      state.autoQueue = state.autoQueue.filter(q => q !== i);
       if (state.open === i) closeCam(true);
       save();
     }, OFF_SECONDS * 1000 + 300);
@@ -494,6 +486,8 @@
 
   // Door light: a white flash, then the picture stays blown out until it shuts
   function exposure(now) {
+    // Restocking: the door stands open while the shopping goes in
+    if (state.restockUntil > 0) return 1.6;
     if (!state.door) return 1;
     const e = (now - state.door.from) / 1000;
     if (e < 0.12) return 1.8;
@@ -502,13 +496,7 @@
 
   function drawFeed(cam, now, t, x, y, dw, dh, size) {
     const [w, h] = size;
-    const isRestocking = state.restockUntil > 0;
-    if (!cam || isRestocking) {
-      R.staticNoise(w >> 2, h >> 2);
-      screen.drawImage(R.buf, x, y, dw, dh);
-      return;
-    }
-    if (cam.disposed) return;
+    if (!cam || cam.disposed) return;
     if (cam.offAt) {
       const e = (now - cam.offAt) / 1000;
       if (e < 0.3) {
@@ -560,9 +548,8 @@
 
   function restock(now) {
     state.restockUntil = now + F.restockSeconds * 1000;
-    state.autoQueue = [];
     if (state.open >= 0) closeCam(false);
-    els.signalTitle.textContent = UI.noSignal;
+    els.signalTitle.textContent = UI.restockTitle;
     els.signalSub.textContent = UI.restock;
     els.signal.hidden = false;
   }
@@ -600,24 +587,6 @@
     }
   }
 
-  function autoZoom(now) {
-    if (state.auto && now >= state.auto.until) {
-      if (state.open === state.auto.i) closeCam(false);
-      state.auto = null;
-      // Let the whole wall show for a moment before the next one zooms in
-      state.autoRestUntil = now + F.autoRestSeconds * 1000;
-    }
-    const isResting = now < (state.autoRestUntil || 0);
-    if (!state.auto && !isResting && state.open < 0 && state.autoQueue.length && !state.restockUntil) {
-      const i = state.autoQueue.shift();
-      const cam = cams[i];
-      if (cam && !cam.disposed && !cam.offAt) {
-        openCam(i, true);
-        state.auto = { i, until: now + F.autoZoomSeconds * 1000 };
-      }
-    }
-  }
-
   function tick(now) {
     const dt = Math.min((now - state.lastTick) / 1000, 0.25);
     state.lastTick = now;
@@ -636,7 +605,6 @@
     if (now - state.lastFrame >= 1000 / F.fps) {
       state.lastFrame = now;
       cams.forEach(checkEvents);
-      autoZoom(now);
       draw(now, t);
       cams.forEach((c, i) => updateOverlay(c, i, t));
       if (state.open >= 0) renderInfo();
@@ -687,7 +655,7 @@
   renderSpeed();
   renderSound();
   renderMineButton();
-  els.signalTitle.textContent = UI.noSignal;
+  els.signalTitle.textContent = UI.loadingTitle;
   els.signalSub.textContent = UI.loading;
   els.signal.hidden = false;
   fitScreen();

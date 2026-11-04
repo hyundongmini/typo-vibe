@@ -16,9 +16,6 @@ window.FRIDGE = {
   // Real seconds between the door opening, and how long it stays open
   doorEvery: [25, 50],
   doorSeconds: 2.4,
-  // A feed that just passed its date zooms in by itself for this long
-  autoZoomSeconds: 3,
-  autoRestSeconds: 4,
   maxLog: 80,
   // Your own photo: the watched spot defaults to the middle of the frame
   userBox: [0.3, 0.28, 0.4, 0.44],
@@ -51,7 +48,8 @@ window.FRIDGE = {
     title: '유통기한 감시 중',
     camera: n => `CAMERA ${n}`,
     rec: '● REC',
-    noSignal: 'NO SIGNAL',
+    restockTitle: 'RESTOCK',
+    loadingTitle: 'LOADING',
     restock: '장 보고 오는 중…',
     loading: '카메라 연결 중…',
     loadFailed: '카메라 연결 실패',
@@ -62,9 +60,7 @@ window.FRIDGE = {
     tagUnknown: code => `${code} D-??`,
     overview: (watch, expired) => `WATCH ${watch} / EXPIRED ${expired}`,
     cellLabel: (n, name, status) => `카메라 ${n}, ${name}, ${status}. 눌러서 크게 보기`,
-    offlineLabel: n => `카메라 ${n}, 연결 없음`,
     noTarget: 'NO TARGET',
-    autoTrack: 'AUTO TRACK',
     doorOpen: 'DOOR OPEN',
     dispose: '버리기 (DISPOSE)',
     disposedStatus: '버림',

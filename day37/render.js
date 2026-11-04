@@ -151,7 +151,11 @@ window.CctvRender = (() => {
   function capture(cam, r, w, h, t, exposure = 1) {
     buf.width = w;
     buf.height = h;
-    if (!cam.img) return staticNoise(w >> 1, h >> 1);
+    if (!cam.img) {
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, 0, w, h);
+      return;
+    }
     const { crop } = cam;
     // Slight drift: the mount is never perfectly still
     const jx = reduceMotion ? 0 : Math.sin(t * 0.7 + cam.blobs[0].x * 9) * crop.w * 0.004;
