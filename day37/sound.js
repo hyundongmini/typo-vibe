@@ -1,8 +1,8 @@
 // Web Audio for the fridge (no audio files): compressor hum, expiry alarm, the static
-// crackle when a feed is killed, and the door. Off until the viewer turns it on.
+// crackle when a feed is killed, and the door. On by default; browsers hold it until the first gesture.
 window.Sound = (() => {
   let ac = null, master = null, noise = null, hum = null;
-  let isOn = false;
+  let isUnlocked = false;
 
   function ensure() {
     if (ac) return true;
@@ -63,13 +63,6 @@ window.Sound = (() => {
     hum = { out, stop: [...parts, rumble, lfo] };
   }
 
-  function stopHum() {
-    if (!hum) return;
-    hum.stop.forEach(n => n.stop());
-    hum.out.disconnect();
-    hum = null;
-  }
-
   function beep(t, f, dur, vol) {
     const o = ac.createOscillator();
     const g = ac.createGain();
@@ -125,21 +118,17 @@ window.Sound = (() => {
   };
 
   function sfx(name) {
-    if (!isOn || !ensure()) return;
+    if (!isUnlocked) return;
     SFX[name](ac.currentTime + 0.01);
   }
 
-  function toggle() {
-    if (!ensure()) return false;
-    isOn = !isOn;
-    if (isOn) {
-      if (ac.state === 'suspended') ac.resume();
-      startHum();
-    } else {
-      stopHum();
-    }
-    return isOn;
+  // Call from a user gesture: starts the hum and lets the other sounds play from then on
+  function unlock() {
+    if (isUnlocked || !ensure()) return;
+    isUnlocked = true;
+    if (ac.state === 'suspended') ac.resume();
+    startHum();
   }
 
-  return { sfx, toggle, isOn: () => isOn };
+  return { sfx, unlock };
 })();

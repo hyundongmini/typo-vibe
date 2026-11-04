@@ -16,41 +16,38 @@ body {
 }
 button { font: inherit; color: inherit; }
 
-.topbar {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  min-height: 48px;
-  padding: 6px max(16px, env(safe-area-inset-left));
-  border-bottom: 1px solid #222;
-}
+/* The only chrome: a small way home in the corner */
 .home {
-  color: var(--ink);
+  position: fixed;
+  top: max(12px, env(safe-area-inset-top));
+  left: max(12px, env(safe-area-inset-left));
+  z-index: 5;
+  color: var(--muted);
   text-decoration: none;
-  font-size: 13px;
-  border: 1px solid var(--ink);
+  font-size: 12px;
+  border: 1px solid #333;
   padding: 4px 10px;
+  background: rgba(0, 0, 0, 0.6);
 }
-.home:hover, .home:focus-visible { background: var(--ink); color: var(--bg); outline: none; }
-.title { font-size: 15px; font-weight: 400; letter-spacing: 0.04em; }
+.home:hover, .home:focus-visible { color: var(--bg); background: var(--ink); border-color: var(--ink); outline: none; }
 
-/* Monitor wall with the log beside it; stacked on narrow screens */
-.wrap {
-  padding: 16px;
+/* Gallery: the monitor wall centred on black, a small wall label under it */
+.wall {
+  min-height: 100svh;
   display: grid;
-  grid-template-columns: auto minmax(240px, 320px);
-  justify-content: center;
-  align-items: start;
-  gap: 12px 16px;
+  place-content: center;
+  justify-items: center;
+  gap: 14px;
+  padding: 52px 16px 20px;
 }
 
-/* 3 x 4 cameras of 4:3 make a square; with your own camera it becomes 4 x 4 (4:3) */
+/* 3 x 4 cameras of 4:3 make a square, like a wall of monitors */
 .stage {
-  --aspect: 1;
   position: relative;
-  width: min(100vw - 32px - 336px, calc((100svh - 110px) * var(--aspect)));
-  min-width: 288px;
-  aspect-ratio: var(--aspect);
+  width: min(100vw - 32px, 100svh - 150px);
+  min-width: min(100vw - 32px, 288px);
+  aspect-ratio: 1;
+  box-shadow: 0 0 60px rgba(120, 160, 255, 0.08);
   background: #000;
   overflow: hidden;
 }
@@ -75,8 +72,6 @@ button { font: inherit; color: inherit; }
 .cell:focus-visible { outline: 3px solid #3a7bff; outline-offset: -3px; }
 .stage.has-open .cell:not(.is-open) { display: none; }
 .cell.is-open { grid-column: 1 / -1; grid-row: 1 / 4; cursor: zoom-out; }
-.stage.wide .cell.is-open { grid-row: 1 / -1; }
-.cell.empty { cursor: default; pointer-events: none; }
 
 /* On-screen display, like the reference: white type on black boxes */
 .osd-label {
@@ -110,17 +105,18 @@ button { font: inherit; color: inherit; }
   pointer-events: none;
 }
 .osd-center:empty { display: none; }
-.osd-door {
+.osd-auto, .osd-door {
   position: absolute;
   display: none;
   font-size: 4.4cqw;
   padding: 0 1.2cqw;
   pointer-events: none;
 }
+.osd-auto { top: 9cqw; right: 3cqw; background: var(--alarm); color: #fff; }
+.cell.is-auto .osd-auto { display: block; }
 .osd-door { left: 50%; top: 50%; transform: translate(-50%, -50%); background: #fff; color: #000; }
 .stage.door-open .cell:not(.dead) .osd-door { display: block; }
-/* With your own camera the open feed fills the stage, so lift the time above the info strip */
-.stage.wide .cell.is-open .osd-time { bottom: 27%; }
+.cell.is-open .osd-auto { font-size: 2.2cqw; top: 4.6cqw; right: 1.8cqw; }
 .cell.is-open .osd-center { font-size: 3.5cqw; }
 .cell.is-open .osd-door { font-size: 2.6cqw; }
 .cell.is-open .osd-label { font-size: 4.2cqw; top: 1.6cqw; }
@@ -197,52 +193,7 @@ button { font: inherit; color: inherit; }
 .btn.alarm { border-color: var(--alarm); color: var(--alarm); }
 .btn.alarm:hover:not(:disabled), .btn.alarm:focus-visible { background: var(--alarm); color: #fff; }
 
-/* ---------- side panel ---------- */
-.panel {
-  display: grid;
-  gap: 10px;
-  align-content: start;
-  max-height: calc(100svh - 110px);
-  min-height: 0;
-}
-.controls { display: grid; gap: 8px; }
-.speed { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
-.speed .btn { display: grid; gap: 2px; padding: 6px 4px; text-align: center; }
-.speed .btn small { font-size: 10px; color: var(--muted); }
-.speed .btn[aria-pressed="true"] { background: var(--alarm); border-color: var(--alarm); color: #fff; }
-.speed .btn[aria-pressed="true"] small { color: #ffe0e0; }
-.mine-form { display: grid; gap: 8px; padding: 10px; border: 1px solid #333; font-size: 12px; }
-.mine-form[hidden] { display: none; }
-.mine-preview { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; background: #111; }
-.mine-preview:not([src]) { display: none; }
-.mine-form label { display: grid; gap: 4px; color: var(--muted); }
-.mine-form input, .mine-form select {
-  min-height: 40px;
-  padding: 6px 8px;
-  background: #111;
-  color: var(--ink);
-  border: 1px solid #444;
-  font: inherit;
-}
-.mine-actions { display: flex; gap: 8px; }
-.mine-note { color: var(--muted); line-height: 1.5; }
-.log-title { font-size: 12px; font-weight: 400; color: var(--muted); border-bottom: 1px solid #222; padding-bottom: 4px; }
-.log {
-  list-style: none;
-  display: grid;
-  align-content: start;
-  gap: 3px;
-  font-size: 11px;
-  line-height: 1.4;
-  overflow-y: auto;
-  min-height: 120px;
-  max-height: 46svh;
-}
-.log li { word-break: break-all; }
-.log time { color: var(--muted); }
-.log li.alarm { color: var(--alarm); }
-
-/* Restock / loading: all cameras drop to static */
+/* Restock / loading caption over the whole wall */
 .signal {
   position: absolute;
   inset: 0;
@@ -257,22 +208,17 @@ button { font: inherit; color: inherit; }
 .signal strong { font-size: clamp(22px, 6vw, 48px); font-weight: 400; background: #000; padding: 0 12px; }
 .signal span { font-size: clamp(12px, 2vw, 16px); background: #000; padding: 0 8px; }
 
-.credit { grid-column: 1 / -1; font-size: 11px; color: var(--muted); text-align: center; }
-.credit a { color: inherit; }
+.caption { text-align: center; display: grid; gap: 4px; color: var(--muted); font-size: 11px; line-height: 1.5; }
+.caption h1 { color: var(--ink); font-size: 14px; font-weight: 400; letter-spacing: 0.06em; }
+.caption a { color: inherit; }
 
-/* Index cards embed the page in an iframe */
-.preview .credit, .preview .topbar, .preview .panel { display: none; }
-.preview .wrap { grid-template-columns: auto; }
-
-@media (max-width: 900px) {
-  .wrap { grid-template-columns: 1fr; justify-items: center; }
-  .stage { width: min(100%, calc((100svh - 110px) * var(--aspect))); min-width: 0; }
-  .panel { width: 100%; max-height: none; }
-  .log { max-height: 40svh; }
-}
+/* Index cards embed the page in an iframe: just the wall */
+.preview .home, .preview .caption { display: none; }
+.preview .wall { padding: 0; min-height: 0; }
+.preview .stage { width: 100vw; }
 
 @media (max-width: 600px) {
-  .wrap { padding: 10px; }
+  .wall { padding: 52px 10px 16px; }
   .info { font-size: 11px; gap: 8px; }
   .info-list { gap: 2px 10px; }
 }

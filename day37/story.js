@@ -2,13 +2,8 @@
 // box: the watched item in the photo, as [x, y, w, h] fractions of the full photo
 // decay: brown (browning, wilting) | grey (spoiling meat) | murky (drink clouding) | mold
 window.FRIDGE = {
-  // Fridge hours per real second. real follows the wall clock, so a reload days later finds it worse
-  speeds: [
-    { id: 'real', hoursPerSecond: 1 / 3600, label: '×1', hint: '실시간' },
-    { id: 'fast', hoursPerSecond: 0.1, label: '×360', hint: '1초 = 6분' },
-    { id: 'faster', hoursPerSecond: 1.5, label: '×5400', hint: '1초 = 1.5시간' },
-  ],
-  defaultSpeed: 'faster',
+  // One real second is this many hours in the fridge
+  hoursPerSecond: 1.5,
   // A week of watching, then someone restocks the fridge
   loopHours: 168,
   restockSeconds: 1.6,
@@ -16,10 +11,9 @@ window.FRIDGE = {
   // Real seconds between the door opening, and how long it stays open
   doorEvery: [25, 50],
   doorSeconds: 2.4,
-  maxLog: 80,
-  // Your own photo: the watched spot defaults to the middle of the frame
-  userBox: [0.3, 0.28, 0.4, 0.44],
-  userShelfDays: [1, 3, 7],
+  // A feed that just passed its date zooms in by itself for this long, then rests
+  autoZoomSeconds: 3,
+  autoRestSeconds: 4,
   // Share of shelf life when the camera starts tracking (임박)
   watchFrom: 0.7,
 
@@ -60,40 +54,12 @@ window.FRIDGE = {
     tagUnknown: code => `${code} D-??`,
     overview: (watch, expired) => `WATCH ${watch} / EXPIRED ${expired}`,
     cellLabel: (n, name, status) => `카메라 ${n}, ${name}, ${status}. 눌러서 크게 보기`,
+    caption: '냉장고 CCTV 12채널, 1초 = 1.5시간. 칸을 누르면 크게 보입니다.',
     noTarget: 'NO TARGET',
+    autoTrack: 'AUTO TRACK',
     doorOpen: 'DOOR OPEN',
     dispose: '버리기 (DISPOSE)',
     disposedStatus: '버림',
-    sound: { on: '♪ 소리 켜짐', off: '♪ 소리 꺼짐' },
-    speedLabel: '감시 속도',
-    logTitle: '감시 로그',
-    // Log lines: [time] CAMxx CODE event
-    log: {
-      watch: '임박 — TRACKING',
-      expired: 'EXPIRED',
-      rotten: 'ROTTING',
-      flies: 'MOTION DETECTED (FLIES)',
-      disposed: 'DISPOSED — FEED OFF',
-      doorOpen: 'DOOR OPEN',
-      doorClose: 'DOOR CLOSED — NOTHING TAKEN',
-      restock: 'RESTOCK — ALL FEEDS RESET',
-      newCam: 'NEW CAMERA ONLINE',
-      speed: label => `SPEED ${label}`,
-    },
-    mine: {
-      add: '📷 내 냉장고 사진 넣기',
-      replace: '📷 내 냉장고 사진 바꾸기',
-      name: '품목 이름',
-      namePlaceholder: '예: 어제 산 두부',
-      defaultName: '내 냉장고',
-      shelf: '유통기한',
-      days: n => `${n}일 뒤`,
-      submit: '카메라 달기',
-      cancel: '취소',
-      code: 'MINE',
-      privacy: '사진은 이 브라우저 안에서만 쓰이고 어디에도 올라가지 않습니다. 새로고침하면 사라집니다.',
-      failed: '사진을 열 수 없습니다. 다른 사진으로 해 주세요.',
-    },
     info: {
       item: '품목',
       stocked: '넣은 날',
