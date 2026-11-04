@@ -34,14 +34,23 @@ button { font: inherit; color: inherit; }
 .home:hover, .home:focus-visible { background: var(--ink); color: var(--bg); outline: none; }
 .title { font-size: 15px; font-weight: 400; letter-spacing: 0.04em; }
 
-.wrap { padding: 16px; display: grid; justify-items: center; gap: 10px; }
+/* Monitor wall with the log beside it; stacked on narrow screens */
+.wrap {
+  padding: 16px;
+  display: grid;
+  grid-template-columns: auto minmax(240px, 320px);
+  justify-content: center;
+  align-items: start;
+  gap: 12px 16px;
+}
 
-/* 3 x 4 cameras of 4:3 make a square, like a wall of monitors */
+/* 3 x 4 cameras of 4:3 make a square; with your own camera it becomes 4 x 4 (4:3) */
 .stage {
+  --aspect: 1;
   position: relative;
-  width: min(100%, calc(100svh - 120px));
-  min-width: min(100%, 288px);
-  aspect-ratio: 1;
+  width: min(100vw - 32px - 336px, calc((100svh - 110px) * var(--aspect)));
+  min-width: 288px;
+  aspect-ratio: var(--aspect);
   background: #000;
   overflow: hidden;
 }
@@ -66,6 +75,9 @@ button { font: inherit; color: inherit; }
 .cell:focus-visible { outline: 3px solid #3a7bff; outline-offset: -3px; }
 .stage.has-open .cell:not(.is-open) { display: none; }
 .cell.is-open { grid-column: 1 / -1; grid-row: 1 / 4; cursor: zoom-out; }
+.stage.wide .cell.is-open { grid-row: 1 / -1; }
+.cell.offline { cursor: default; }
+.cell.offline .osd-rec { display: none; }
 
 /* On-screen display, like the reference: white type on black boxes */
 .osd-label {
@@ -90,6 +102,31 @@ button { font: inherit; color: inherit; }
 .osd-time { left: 2cqw; }
 .osd-extra { left: 2cqw; bottom: 8.5cqw; color: var(--alarm); }
 .osd-extra:empty { display: none; }
+.osd-center {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 7cqw;
+  pointer-events: none;
+}
+.osd-center:empty { display: none; }
+.osd-auto, .osd-door {
+  position: absolute;
+  display: none;
+  font-size: 4.4cqw;
+  padding: 0 1.2cqw;
+  pointer-events: none;
+}
+.osd-auto { top: 9cqw; right: 3cqw; background: var(--alarm); color: #fff; }
+.cell.is-auto .osd-auto { display: block; }
+.osd-door { left: 50%; top: 50%; transform: translate(-50%, -50%); background: #fff; color: #000; }
+.stage.door-open .cell:not(.offline):not(.dead) .osd-door { display: block; }
+/* With your own camera the open feed fills the stage, so lift the time above the info strip */
+.stage.wide .cell.is-open .osd-time { bottom: 27%; }
+.cell.is-open .osd-center { font-size: 3.5cqw; }
+.cell.is-open .osd-auto { font-size: 2.2cqw; top: 4.6cqw; right: 1.8cqw; }
+.cell.is-open .osd-door { font-size: 2.6cqw; }
 .cell.is-open .osd-label { font-size: 4.2cqw; top: 1.6cqw; }
 .cell.is-open .osd-rec { font-size: 2.2cqw; top: 1.8cqw; right: 1.8cqw; }
 .cell.is-open .osd-time, .cell.is-open .osd-extra { font-size: 2.2cqw; bottom: 1.4cqw; }
@@ -136,29 +173,78 @@ button { font: inherit; color: inherit; }
   left: 0;
   right: 0;
   bottom: 0;
-  height: 25%;
+  min-height: 25%;
   padding: 3% 3.5%;
   display: flex;
   gap: 16px;
   align-items: flex-start;
   justify-content: space-between;
-  background: #000;
+  background: rgba(0, 0, 0, 0.82);
   border-top: 1px solid #333;
-  font-size: clamp(11px, 1.7vw, 15px);
+  font-size: clamp(11px, 1.6vw, 14px);
 }
 .info[hidden] { display: none; }
 .info-list { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; }
 .info-list dt { color: var(--muted); }
 .info-list dd.alarm { color: var(--alarm); }
-.info-close {
-  flex: none;
+.info-actions { display: grid; gap: 8px; flex: none; }
+.btn {
   min-height: 44px;
   padding: 6px 12px;
   background: none;
   border: 1px solid var(--ink);
   cursor: pointer;
+  font-size: 13px;
 }
-.info-close:hover, .info-close:focus-visible { background: var(--ink); color: var(--bg); outline: none; }
+.btn:hover:not(:disabled), .btn:focus-visible { background: var(--ink); color: var(--bg); outline: none; }
+.btn:disabled { opacity: 0.35; cursor: default; }
+.btn.alarm { border-color: var(--alarm); color: var(--alarm); }
+.btn.alarm:hover:not(:disabled), .btn.alarm:focus-visible { background: var(--alarm); color: #fff; }
+
+/* ---------- side panel ---------- */
+.panel {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  max-height: calc(100svh - 110px);
+  min-height: 0;
+}
+.controls { display: grid; gap: 8px; }
+.speed { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+.speed .btn { display: grid; gap: 2px; padding: 6px 4px; text-align: center; }
+.speed .btn small { font-size: 10px; color: var(--muted); }
+.speed .btn[aria-pressed="true"] { background: var(--alarm); border-color: var(--alarm); color: #fff; }
+.speed .btn[aria-pressed="true"] small { color: #ffe0e0; }
+.mine-form { display: grid; gap: 8px; padding: 10px; border: 1px solid #333; font-size: 12px; }
+.mine-form[hidden] { display: none; }
+.mine-preview { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; background: #111; }
+.mine-preview:not([src]) { display: none; }
+.mine-form label { display: grid; gap: 4px; color: var(--muted); }
+.mine-form input, .mine-form select {
+  min-height: 40px;
+  padding: 6px 8px;
+  background: #111;
+  color: var(--ink);
+  border: 1px solid #444;
+  font: inherit;
+}
+.mine-actions { display: flex; gap: 8px; }
+.mine-note { color: var(--muted); line-height: 1.5; }
+.log-title { font-size: 12px; font-weight: 400; color: var(--muted); border-bottom: 1px solid #222; padding-bottom: 4px; }
+.log {
+  list-style: none;
+  display: grid;
+  align-content: start;
+  gap: 3px;
+  font-size: 11px;
+  line-height: 1.4;
+  overflow-y: auto;
+  min-height: 120px;
+  max-height: 46svh;
+}
+.log li { word-break: break-all; }
+.log time { color: var(--muted); }
+.log li.alarm { color: var(--alarm); }
 
 /* Restock / loading: all cameras drop to static */
 .signal {
@@ -175,11 +261,19 @@ button { font: inherit; color: inherit; }
 .signal strong { font-size: clamp(22px, 6vw, 48px); font-weight: 400; background: #000; padding: 0 12px; }
 .signal span { font-size: clamp(12px, 2vw, 16px); background: #000; padding: 0 8px; }
 
-.credit { font-size: 11px; color: var(--muted); text-align: center; }
+.credit { grid-column: 1 / -1; font-size: 11px; color: var(--muted); text-align: center; }
 .credit a { color: inherit; }
 
 /* Index cards embed the page in an iframe */
-.preview .credit, .preview .topbar { display: none; }
+.preview .credit, .preview .topbar, .preview .panel { display: none; }
+.preview .wrap { grid-template-columns: auto; }
+
+@media (max-width: 900px) {
+  .wrap { grid-template-columns: 1fr; justify-items: center; }
+  .stage { width: min(100%, calc((100svh - 110px) * var(--aspect))); min-width: 0; }
+  .panel { width: 100%; max-height: none; }
+  .log { max-height: 40svh; }
+}
 
 @media (max-width: 600px) {
   .wrap { padding: 10px; }

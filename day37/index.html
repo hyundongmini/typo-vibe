@@ -20,14 +20,41 @@
     <div class="cells" id="cells"></div>
     <div class="info" id="info" hidden>
       <dl class="info-list" id="info-list"></dl>
-      <button type="button" class="info-close" id="info-close"></button>
+      <div class="info-actions">
+        <button type="button" class="btn alarm" id="dispose"></button>
+        <button type="button" class="btn" id="info-close"></button>
+      </div>
     </div>
     <p class="signal" id="signal" hidden><strong id="signal-title"></strong><span id="signal-sub"></span></p>
   </section>
+
+  <aside class="panel">
+    <div class="controls">
+      <div class="speed" role="group" id="speed"></div>
+      <button type="button" class="btn" id="sound" aria-pressed="false"></button>
+      <button type="button" class="btn" id="add-mine"></button>
+      <input type="file" id="mine-file" accept="image/*" hidden>
+    </div>
+    <form class="mine-form" id="mine-form" hidden>
+      <img class="mine-preview" id="mine-preview" alt="">
+      <label><span id="mine-name-label"></span><input type="text" id="mine-name" maxlength="16"></label>
+      <label><span id="mine-shelf-label"></span><select id="mine-shelf"></select></label>
+      <div class="mine-actions">
+        <button type="submit" class="btn" id="mine-submit"></button>
+        <button type="button" class="btn" id="mine-cancel"></button>
+      </div>
+      <p class="mine-note" id="mine-note"></p>
+    </form>
+    <h2 class="log-title" id="log-title"></h2>
+    <ol class="log" id="log" aria-live="off"></ol>
+  </aside>
+
   <p class="credit"><a id="credit" target="_blank" rel="noopener"></a></p>
 </main>
 
 <script src="story.js"></script>
+<script src="render.js"></script>
+<script src="sound.js"></script>
 <script src="cctv.js"></script>
 </body>
 </html>
