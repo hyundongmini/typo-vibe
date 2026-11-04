@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>유통기한 감시 중 — typo-vibe</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/galmuri@2.39.3/dist/galmuri.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <a class="home" href="../index.html">← 홈</a>
+  <h1 class="title" id="title"></h1>
+</header>
+
+<main class="wrap">
+  <section class="stage" id="stage" aria-label="냉장고 CCTV">
+    <canvas class="screen" id="screen" aria-hidden="true"></canvas>
+    <div class="cells" id="cells"></div>
+    <div class="info" id="info" hidden>
+      <dl class="info-list" id="info-list"></dl>
+      <button type="button" class="info-close" id="info-close"></button>
+    </div>
+    <p class="signal" id="signal" hidden><strong id="signal-title"></strong><span id="signal-sub"></span></p>
+  </section>
+  <p class="credit"><a id="credit" target="_blank" rel="noopener"></a></p>
+</main>
+
+<script src="story.js"></script>
+<script src="cctv.js"></script>
+</body>
+</html>
