@@ -11,20 +11,22 @@ window.CctvRender = (() => {
     return t * t * (3 - 2 * t);
   };
 
-  // Crop a photo to the 4:3 camera frame, centered
-  function cropFor(img) {
-    const want = 4 / 3, have = img.width / img.height;
+  // Crop a photo to fill a camera frame of the given aspect (width / height), keeping the
+  // watched item in the middle so narrow monitors don't cut it off
+  function cropFor(img, want, box) {
+    const have = img.width / img.height;
+    const cx = (box[0] + box[2] / 2) * img.width, cy = (box[1] + box[3] / 2) * img.height;
     if (have > want) {
       const w = img.height * want;
-      return { x: (img.width - w) / 2, y: 0, w, h: img.height };
+      return { x: Math.min(img.width - w, Math.max(0, cx - w / 2)), y: 0, w, h: img.height };
     }
     const h = img.width / want;
-    return { x: 0, y: (img.height - h) / 2, w: img.width, h };
+    return { x: 0, y: Math.min(img.height - h, Math.max(0, cy - h / 2)), w: img.width, h };
   }
 
-  // The item's box in camera-frame fractions (0..1)
-  function boxInFrame(cam) {
-    const { img, crop } = cam;
+  // The item's box in camera-frame fractions (0..1) for a given crop
+  function boxInFrame(cam, crop) {
+    const { img } = cam;
     const [bx, by, bw, bh] = cam.box;
     return {
       x: (bx * img.width - crop.x) / crop.w,
@@ -35,8 +37,8 @@ window.CctvRender = (() => {
   }
 
   // r: age as a share of shelf life (1 = the expiry date)
-  function ageItem(cam, r, w, h, t) {
-    const b = boxInFrame(cam);
+  function ageItem(cam, crop, r, w, h, t) {
+    const b = boxInFrame(cam, crop);
     const x = b.x * w, y = b.y * h, bw = b.w * w, bh = b.h * h;
     const wear = smooth(0.75, 1.6, r);
     if (wear <= 0) return;
@@ -148,7 +150,7 @@ window.CctvRender = (() => {
     ctx.putImageData(frame, 0, 0);
   }
 
-  function capture(cam, r, w, h, t, exposure = 1) {
+  function capture(cam, crop, r, w, h, t, exposure = 1) {
     buf.width = w;
     buf.height = h;
     if (!cam.img) {
@@ -156,12 +158,11 @@ window.CctvRender = (() => {
       ctx.fillRect(0, 0, w, h);
       return;
     }
-    const { crop } = cam;
     // Slight drift: the mount is never perfectly still
     const jx = reduceMotion ? 0 : Math.sin(t * 0.7 + cam.blobs[0].x * 9) * crop.w * 0.004;
     const jy = reduceMotion ? 0 : Math.cos(t * 0.5 + cam.blobs[1].y * 9) * crop.h * 0.004;
     ctx.drawImage(cam.img, crop.x + jx, crop.y + jy, crop.w, crop.h, 0, 0, w, h);
-    ageItem(cam, r, w, h, t);
+    ageItem(cam, crop, r, w, h, t);
     cctvLook(w, h, t, exposure);
   }
 

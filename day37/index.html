@@ -11,10 +11,14 @@
 
 <a class="home" href="../index.html">← 홈</a>
 
-<main class="wall">
+<!-- Photos: USDA Food Safety and Inspection Service, public domain, via Wikimedia Commons
+     https://commons.wikimedia.org/w/index.php?search=%22Cut+Waste+in+Refrigerators%22&title=Special:MediaSearch&type=image -->
+<main class="wall" id="wall">
+  <h1 class="sr-only">유통기한 감시 중</h1>
   <section class="stage" id="stage" aria-label="냉장고 CCTV">
     <canvas class="screen" id="screen" aria-hidden="true"></canvas>
     <div class="cells" id="cells"></div>
+    <div class="cell open-view" id="open-view" hidden></div>
     <div class="info" id="info" hidden>
       <dl class="info-list" id="info-list"></dl>
       <div class="info-actions">
@@ -25,17 +29,18 @@
     <p class="signal" id="signal" hidden><strong id="signal-title"></strong><span id="signal-sub"></span></p>
   </section>
 
-  <!-- Gallery wall label -->
-  <footer class="caption">
-    <h1 id="caption-title"></h1>
-    <p id="caption-meta"></p>
-    <p><a id="credit" target="_blank" rel="noopener"></a></p>
-  </footer>
+  <!-- Emergency-broadcast style log, shown beside the wall on wide windows -->
+  <section class="alert" aria-label="감시 로그">
+    <h2 class="alert-title" id="alert-title"></h2>
+    <p class="alert-sub" id="alert-sub"></p>
+    <ol class="alert-log" id="alert-log" aria-live="off"></ol>
+  </section>
 </main>
 
 <script src="story.js"></script>
 <script src="render.js"></script>
 <script src="sound.js"></script>
+<script src="alert.js"></script>
 <script src="cctv.js"></script>
 </body>
 </html>

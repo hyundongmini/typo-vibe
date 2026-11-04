@@ -11,6 +11,10 @@ window.FRIDGE = {
   // Real seconds between the door opening, and how long it stays open
   doorEvery: [25, 50],
   doorSeconds: 2.4,
+  // Wide windows split into 9 monitors + the alert screen; the 12 channels take turns on them
+  splitAspect: 1.25,
+  splitMinWidth: 700,
+  rotateSeconds: 6,
   // A feed that just passed its date zooms in by itself for this long, then rests
   autoZoomSeconds: 3,
   autoRestSeconds: 4,
@@ -33,10 +37,7 @@ window.FRIDGE = {
     { file: 'img/cam12.jpg', name: '포일에 싼 무언가', code: 'UNKNOWN', shelfHours: 144, box: [0.35, 0.42, 0.15, 0.2], decay: ['mold'], unknown: true },
   ],
 
-  credit: {
-    text: '사진: USDA Food Safety and Inspection Service, 퍼블릭 도메인 (Wikimedia Commons)',
-    url: 'https://commons.wikimedia.org/w/index.php?search=%22Cut+Waste+in+Refrigerators%22&title=Special:MediaSearch&type=image',
-  },
+  // Photos: USDA Food Safety and Inspection Service, public domain, via Wikimedia Commons (credited in index.html)
 
   ui: {
     title: '유통기한 감시 중',
@@ -54,9 +55,22 @@ window.FRIDGE = {
     tagUnknown: code => `${code} D-??`,
     overview: (watch, expired) => `WATCH ${watch} / EXPIRED ${expired}`,
     cellLabel: (n, name, status) => `카메라 ${n}, ${name}, ${status}. 눌러서 크게 보기`,
-    caption: '냉장고 CCTV 12채널, 1초 = 1.5시간. 칸을 누르면 크게 보입니다.',
     noTarget: 'NO TARGET',
     autoTrack: 'AUTO TRACK',
+    alertTitle: 'FRIDGE ALERT SYSTEM',
+    alertSub: '*** 유통기한 감시 중 ***',
+    // Alert lines: CAMxx CODE event
+    log: {
+      online: 'ALL CAMERAS ONLINE',
+      watch: 'NEAR EXPIRY',
+      expired: 'EXPIRED',
+      rotten: 'ROTTING',
+      flies: 'MOTION DETECTED: FLIES',
+      disposed: 'DISPOSED — FEED OFF',
+      doorOpen: 'DOOR OPEN',
+      doorClose: 'DOOR CLOSED — NOTHING TAKEN',
+      restock: 'RESTOCK — ALL FEEDS RESET',
+    },
     doorOpen: 'DOOR OPEN',
     dispose: '버리기 (DISPOSE)',
     disposedStatus: '버림',
