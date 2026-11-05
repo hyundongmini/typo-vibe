@@ -1,20 +1,25 @@
-// First person: you look down at your cat on your lap; your hands come in from the bottom.
-// Flat print style: a small palette on cream paper, one black ink outline on every shape.
+// First person: your own cat on your lap looking up at you, printed like a riso poster from
+// a real photo. The ears fold back and the pupils go wide as the din gets to it.
+// Your hands come in from the sides; the lettering and bubbles sit on top.
 window.Scene = (() => {
   const NS = 'http://www.w3.org/2000/svg';
   const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const INK = '#1b1916', CREAM = '#ece0c6', BRICK = '#a9412b', MUSTARD = '#e3b448', NAVY = '#28367a';
-  const SKIN = '#f2d6bd', SLEEVE = '#f1ebdd', BLANKET = '#f4efe4';
-  const CAT = '#f7f2e6', CAT_GREY = '#8a8a84', PINK = '#efa7b1', IRIS = '#c3c46a';
+  const INK = '#1b1916', PAPER = '#ece0c6', BRICK = '#a9412b', NAVY = '#28367a';
+  // Pupil size per mood, as a share of each eye's dark core printed in key
+  const PUPIL = { calm: 0.5, grumpy: 1, alarmed: 1.5, panic: 2 };
+  const FLAT_STEPS = 4;
 
-  // The cat's ear centres in the 1000 x 700 view (left / right of the screen)
+  // The cat's ear centres in the 1000 x 700 view; moved to match the photo on every layout
   const EARS = [{ x: 404, y: 188 }, { x: 596, y: 188 }];
   // Where each arm comes in from, just below the screen
   const SHOULDERS = [{ x: 20, y: 780 }, { x: 980, y: 780 }];
 
-  let svg, room, art, catG, words, bubbles, dust, clockHands, notice;
-  const arms = [], hands = [], ears = [];
+  let svg, canvas, ctx, words, bubbles, dust, photo;
+  let img = null, src = null, place = null;
+  const prints = new Map();
+  const arms = [], hands = [];
   const live = { words: [], dust: [], bubbles: [] };
+  const cat = { mood: 'grumpy', flat: 0, puff: 0 };
   let shakeUntil = 0;
   let awayK = 0, isAway = false;
 
@@ -25,170 +30,179 @@ window.Scene = (() => {
     return e;
   };
 
-  /* ---------- build ---------- */
+  /* ---------- the printed cat ---------- */
 
-  function buildRoom(ui) {
-    const still = el('g', { filter: 'url(#wobble)' }, art);
-    el('rect', { width: 1000, height: 700, fill: CREAM, class: 'no-ink' }, still);
-    // Solid black band across the ceiling, like the night sky in a print
-    el('rect', { width: 1000, height: 70, fill: INK, class: 'no-ink' }, still);
-    // The front door with the works notice, far side of the room
-    el('rect', { x: 64, y: 120, width: 150, height: 330, rx: 3, fill: MUSTARD }, still);
-    el('rect', { x: 92, y: 280, width: 94, height: 170, fill: NAVY }, still);
-    el('circle', { cx: 194, cy: 300, r: 6, fill: INK }, still);
-    notice = el('g', {}, art);
-    el('rect', { x: 86, y: 152, width: 106, height: 84, fill: '#f7f1e3' }, notice);
-    el('rect', { x: 126, y: 146, width: 26, height: 10, fill: '#e9d9a6' }, notice);
-    ui.notice.forEach((line, i) => {
-      const t = el('text', { x: 139, y: 172 + i * 17, 'text-anchor': 'middle', 'font-size': i === 0 ? 13 : 11, 'font-weight': i === 0 ? 900 : 600, fill: i === 0 ? BRICK : INK }, notice);
-      t.textContent = line;
+  // Fit the photo: as big as the window allows with both ears well on screen, sitting on the
+  // bottom. On a phone that means the body runs off the sides.
+  function layout() {
+    const v = visible();
+    const { crop, ears } = photo;
+    const ratio = crop.h / crop.w;
+    const span = (ears[1].x - ears[0].x) / crop.w;
+    const w = Math.min((v.y1 - v.y0) / ratio, (0.78 * (v.x1 - v.x0)) / span);
+    const mid = ((ears[0].x + ears[1].x) / 2 - crop.x) / crop.w;
+    place = { x: 500 - w * mid, y: v.y1 - w * ratio, w, h: w * ratio };
+    ears.forEach((e, i) => {
+      EARS[i].x = place.x + ((e.x - crop.x) / crop.w) * w;
+      EARS[i].y = place.y + ((e.y - crop.y) / crop.h) * place.h;
     });
-    // Wall clock: the working day runs on it
-    const clock = el('g', {}, art);
-    el('circle', { cx: 840, cy: 180, r: 52, fill: '#f7f1e3' }, clock);
-    for (let h = 0; h < 12; h++) {
-      const a = (h / 12) * Math.PI * 2;
-      el('line', { x1: 840 + Math.sin(a) * 40, y1: 180 - Math.cos(a) * 40, x2: 840 + Math.sin(a) * 46, y2: 180 - Math.cos(a) * 46, stroke: INK, 'stroke-width': 3 }, clock);
+    // Print at about the size it's shown, within reason for a phone's CPU
+    const css = place.w * svg.getScreenCTM().a;
+    const width = Math.round(Math.min(1100, Math.max(420, css * Math.min(2, devicePixelRatio || 1))));
+    if (!src || Math.abs(src.w - width) / width > 0.15) {
+      const k = 1 / crop.w, kh = 1 / crop.h;
+      src = Riso.prepare(img, crop, width, photo.eyes.map(e => ({
+        x: (e.x - crop.x) * k, y: (e.y - crop.y) * kh, rx: e.r * k, ry: e.r * kh, ink: 'mustard', below: e.below, core: e.core,
+      })));
+      prints.clear();
+      warmUp();
     }
-    clockHands = {
-      hour: el('line', { x1: 840, y1: 180, x2: 840, y2: 152, stroke: INK, 'stroke-width': 5, 'stroke-linecap': 'round' }, clock),
-      minute: el('line', { x1: 840, y1: 180, x2: 840, y2: 140, stroke: BRICK, 'stroke-width': 3, 'stroke-linecap': 'round' }, clock),
+  }
+
+  // Ears bend back around their base, strongest at the ear and fading out into the head
+  function earWarp(flat) {
+    if (!flat) return undefined;
+    const s = src.w / photo.crop.w;
+    const ears = photo.ears.map((e, i) => ({
+      cx: (e.x - photo.crop.x) * s, cy: (e.y - photo.crop.y) * s,
+      px: (e.pivot[0] - photo.crop.x) * s, py: (e.pivot[1] - photo.crop.y) * s,
+      r: photo.earRadius * s,
+      a: (i ? 1 : -1) * flat * 0.75,
+    }));
+    return (x, y) => {
+      let sx = x, sy = y;
+      for (const e of ears) {
+        const d = Math.hypot(x - e.cx, y - e.cy);
+        if (d > e.r * 1.6) continue;
+        const t = Math.min(1, Math.max(0, (e.r * 1.6 - d) / (e.r * 1.1)));
+        const f = t * t * (3 - 2 * t);
+        const a = -e.a * f, c = Math.cos(a), si = Math.sin(a);
+        const dx = x - e.px, dy = y - e.py + e.r * 0.25 * f * Math.abs(e.a);
+        sx = e.px + dx * c - dy * si;
+        sy = e.py + dx * si + dy * c;
+      }
+      return [sx, sy];
     };
-    el('circle', { cx: 840, cy: 180, r: 4, fill: INK }, clock);
-
-    // Your lap under the duvet
-    const bed = el('g', { filter: 'url(#wobble)' }, art);
-    el('path', { d: 'M-20 470 Q200 410 500 430 Q800 410 1020 470 L1020 720 L-20 720 Z', fill: BLANKET }, bed);
-    el('path', { d: 'M120 560 Q180 520 260 540 M760 540 Q830 520 890 570 M60 650 Q140 610 230 640 M790 640 Q860 610 950 650', fill: 'none', stroke: INK, 'stroke-width': 2.5, 'stroke-linecap': 'round' }, bed);
   }
 
-  function buildCat() {
-    catG = el('g', { id: 'cat' }, art);
-    const body = el('g', { id: 'cat-body' }, catG);
-    const bodyPath = 'M300 640 Q290 470 400 420 Q500 385 600 420 Q710 470 700 640 Z';
-    el('clipPath', { id: 'cat-body-clip' }, body).appendChild(el('path', { d: bodyPath }));
-    el('path', { d: bodyPath, fill: CAT }, body);
-    // Grey saddle over the shoulder, like the photo
-    el('ellipse', { cx: 660, cy: 470, rx: 70, ry: 60, fill: CAT_GREY, 'clip-path': 'url(#cat-body-clip)' }, body);
-    // Chest fluff
-    el('path', { d: 'M450 470 l10 16 l10 -14 l10 16 l10 -14 l10 16 l10 -14 l10 16', fill: 'none', stroke: INK, 'stroke-width': 2.5, 'stroke-linejoin': 'round' }, body);
-    // Front paws on the duvet
-    [438, 562].forEach(x => {
-      el('path', { d: `M${x - 44} 660 Q${x - 46} 610 ${x} 606 Q${x + 46} 610 ${x + 44} 660 Z`, fill: CAT }, body);
-      el('path', { d: `M${x - 14} 646 v12 M${x + 14} 646 v12`, fill: 'none', stroke: INK, 'stroke-width': 2.5, 'stroke-linecap': 'round' }, body);
-    });
-    const tail = el('g', { id: 'cat-tail' }, catG);
-    el('path', { d: 'M690 600 Q800 610 820 540 Q830 500 800 480', fill: 'none', stroke: INK, 'stroke-width': 40, 'stroke-linecap': 'round' }, tail);
-    el('path', { d: 'M690 600 Q800 610 820 540 Q830 500 800 480', fill: 'none', stroke: CAT, 'stroke-width': 34, 'stroke-linecap': 'round' }, tail);
-    el('path', { d: 'M822 520 Q828 498 800 480', fill: 'none', stroke: CAT_GREY, 'stroke-width': 34, 'stroke-linecap': 'round' }, tail);
-
-    const head = el('g', { id: 'cat-head' }, catG);
-    EARS.forEach((p, i) => {
-      const side = i ? 1 : -1;
-      const ear = el('g', {}, head);
-      // Big pointed ears: grey outside, pink inside
-      el('path', { d: `M${-46 * side} 52 Q${-40 * side} -40 ${-8 * side} -78 Q${30 * side} -30 ${50 * side} 40 Z`, fill: CAT_GREY }, ear);
-      el('path', { d: `M${-26 * side} 36 Q${-22 * side} -20 ${-8 * side} -48 Q${16 * side} -14 ${28 * side} 30 Z`, fill: PINK }, ear);
-      ears.push({ g: ear, x: p.x, y: p.y + 30, side });
-    });
-    const face = 'M350 300 Q350 210 430 196 Q500 186 570 196 Q650 210 650 300 Q664 380 600 420 Q500 452 400 420 Q336 380 350 300 Z';
-    el('clipPath', { id: 'cat-head-clip' }, head).appendChild(el('path', { d: face }));
-    el('path', { d: face, fill: CAT }, head);
-    // Grey cap over the top of the head, reaching down past the left eye
-    const cap = el('g', { 'clip-path': 'url(#cat-head-clip)' }, head);
-    el('path', { d: 'M330 180 L520 180 Q500 230 470 250 Q440 270 430 330 Q400 340 360 330 Z', fill: CAT_GREY }, cap);
-    el('path', { d: 'M560 180 L680 180 L680 270 Q630 260 600 230 Q580 210 560 180 Z', fill: CAT_GREY }, cap);
-    // Whiskers
-    el('path', { d: 'M412 384 L330 372 M412 396 L332 402 M588 384 L670 372 M588 396 L668 402', fill: 'none', stroke: INK, 'stroke-width': 2, 'stroke-linecap': 'round' }, head);
-    el('g', { id: 'cat-face' }, head);
+  function printFor(flatStep, mood) {
+    const key = `${flatStep}|${mood}`;
+    if (!prints.has(key)) {
+      const c = document.createElement('canvas');
+      c.width = src.w;
+      c.height = src.h;
+      Riso.print(c.getContext('2d'), src, { sample: earWarp(flatStep / FLAT_STEPS), pupil: PUPIL[mood] });
+      prints.set(key, c);
+    }
+    return prints.get(key);
   }
+
+  // Ink the other expressions in the background, a few at a time, before they're needed
+  let warmTimer = 0;
+  function warmUp() {
+    clearTimeout(warmTimer);
+    const todo = [];
+    for (let f = 0; f <= FLAT_STEPS; f++) Object.keys(PUPIL).forEach(m => todo.push([f, m]));
+    const next = () => {
+      const job = todo.shift();
+      if (!job || !src) return;
+      printFor(...job);
+      warmTimer = setTimeout(next, 30);
+    };
+    warmTimer = setTimeout(next, 30);
+  }
+
+  function resizeCanvas() {
+    const dpr = Math.min(2, devicePixelRatio || 1);
+    canvas.width = Math.round(innerWidth * dpr);
+    canvas.height = Math.round(innerHeight * dpr);
+    if (img && img.complete && img.naturalWidth) layout();
+  }
+
+  /* ---------- build ---------- */
 
   // A hand seen from your side: palm and four fingers pointing away, thumb in
   function handShape(g, side) {
-    el('path', { d: 'M-34 -8 Q-36 40 0 46 Q36 40 34 -8 Z', fill: SKIN }, g);
+    el('path', { d: 'M-34 -8 Q-36 40 0 46 Q36 40 34 -8 Z' }, g);
     [-25, -9, 7, 23].forEach((x, k) => {
       const len = [34, 44, 42, 32][k];
-      el('rect', { x: x - 7, y: -8 - len, width: 15, height: len + 14, rx: 7.5, fill: SKIN }, g);
+      el('rect', { x: x - 7, y: -8 - len, width: 15, height: len + 14, rx: 7.5 }, g);
     });
-    el('rect', { x: side < 0 ? 22 : -40, y: 2, width: 18, height: 36, rx: 9, fill: SKIN, transform: `rotate(${side < 0 ? -38 : 38} ${side < 0 ? 31 : -31} 20)` }, g);
+    el('rect', { x: side < 0 ? 22 : -40, y: 2, width: 18, height: 36, rx: 9, transform: `rotate(${side < 0 ? -38 : 38} ${side < 0 ? 31 : -31} 20)` }, g);
   }
 
   function buildHands() {
-    const layer = el('g', {}, art);
+    // One flat ink for both arms, overprinted on the cat
+    const layer = el('g', { class: 'hands', fill: BRICK }, svg);
     for (let i = 0; i < 2; i++) {
-      // Ink outline underneath, sleeve on top: an outlined tube
-      const outline = el('path', { fill: 'none', stroke: INK, 'stroke-width': 62, 'stroke-linecap': 'round' }, layer);
-      const sleeve = el('path', { fill: 'none', stroke: SLEEVE, 'stroke-width': 56, 'stroke-linecap': 'round' }, layer);
-      arms.push([outline, sleeve]);
-      const g = el('g', { class: 'hand' }, layer);
+      arms.push(el('path', { fill: 'none', stroke: BRICK, 'stroke-width': 58, 'stroke-linecap': 'round' }, layer));
+      const g = el('g', {}, layer);
       handShape(g, i ? 1 : -1);
       hands.push(g);
       setHand(i, null);
     }
   }
 
-  function init(root, ui) {
+  // Resolves once the photo is printed and the ears are where the photo has them
+  function init(root, ui, photoConfig) {
     svg = root;
+    photo = photoConfig;
+    canvas = document.getElementById('print');
+    ctx = canvas.getContext('2d');
     el('defs', {}, svg).innerHTML = `
-      <filter id="wobble" x="-2%" y="-2%" width="104%" height="104%">
-        <feTurbulence type="fractalNoise" baseFrequency="0.03" numOctaves="2" seed="7" result="n"/>
-        <feDisplacementMap in="SourceGraphic" in2="n" scale="3.5" xChannelSelector="R" yChannelSelector="G"/>
-      </filter>
       <filter id="grain" x="0" y="0" width="100%" height="100%">
         <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" seed="3" stitchTiles="stitch"/>
         <feColorMatrix type="matrix" values="0 0 0 0 0.12  0 0 0 0 0.09  0 0 0 0 0.05  0 0 0 0.6 0"/>
       </filter>`;
-    room = el('g', { id: 'room' }, svg);
-    art = el('g', {}, room);
-    buildRoom(ui);
-    buildCat();
-    dust = el('g', {}, room);
+    dust = el('g', {}, svg);
     words = el('g', { class: 'words' }, svg);
     buildHands();
     bubbles = el('g', {}, svg);
-    el('rect', { width: 1000, height: 700, filter: 'url(#grain)', class: 'grain no-ink' }, svg);
-    setCat({ mood: 'grumpy', flat: 0, puff: 0 });
+    el('rect', { x: -500, y: -500, width: 2000, height: 1700, filter: 'url(#grain)', class: 'grain' }, svg);
+    addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+    img = new Image();
+    img.src = photo.file;
+    return img.decode().then(() => {
+      layout();
+      printFor(0, cat.mood);
+    });
   }
 
   /* ---------- the cat ---------- */
 
-  const EYES = {
-    // Looking up at you, unimpressed
-    grumpy: (lx, rx) => `
-      <circle cx="${lx}" cy="316" r="27" fill="${IRIS}"/><ellipse cx="${lx}" cy="312" rx="8" ry="18" fill="${INK}" class="no-ink"/>
-      <circle cx="${rx}" cy="316" r="27" fill="${IRIS}"/><ellipse cx="${rx}" cy="312" rx="8" ry="18" fill="${INK}" class="no-ink"/>
-      <path d="M${lx - 30} 298 L${lx + 28} 306 M${rx + 30} 298 L${rx - 28} 306" stroke="${INK}" stroke-width="6" stroke-linecap="round"/>`,
-    alarmed: (lx, rx) => `
-      <circle cx="${lx}" cy="314" r="30" fill="${IRIS}"/><circle cx="${lx}" cy="312" r="20" fill="${INK}" class="no-ink"/><circle cx="${lx - 7}" cy="304" r="5" fill="#fff" class="no-ink"/>
-      <circle cx="${rx}" cy="314" r="30" fill="${IRIS}"/><circle cx="${rx}" cy="312" r="20" fill="${INK}" class="no-ink"/><circle cx="${rx - 7}" cy="304" r="5" fill="#fff" class="no-ink"/>`,
-    panic: (lx, rx) => `
-      <circle cx="${lx}" cy="312" r="33" fill="${IRIS}"/><circle cx="${lx}" cy="312" r="27" fill="${INK}" class="no-ink"/><circle cx="${lx - 9}" cy="302" r="6" fill="#fff" class="no-ink"/>
-      <circle cx="${rx}" cy="312" r="33" fill="${IRIS}"/><circle cx="${rx}" cy="312" r="27" fill="${INK}" class="no-ink"/><circle cx="${rx - 9}" cy="302" r="6" fill="#fff" class="no-ink"/>`,
-    calm: (lx, rx) => `
-      <path d="M${lx - 24} 318 Q${lx} 334 ${lx + 24} 318 M${rx - 24} 318 Q${rx} 334 ${rx + 24} 318" stroke="${INK}" stroke-width="5" fill="none" stroke-linecap="round"/>`,
-  };
-  const MOUTH = {
-    closed: `<path d="M488 356 Q500 350 512 356 Q508 370 500 372 Q492 370 488 356 Z" fill="${PINK}"/>
-      <path d="M482 390 Q492 398 500 386 Q508 398 518 390" stroke="${INK}" stroke-width="3" fill="none" stroke-linecap="round"/>
-      <circle cx="532" cy="404" r="5" fill="#6f7277" class="no-ink"/>`,
-    hiss: `<path d="M488 354 Q500 348 512 354 Q508 368 500 370 Q492 368 488 354 Z" fill="${PINK}"/>
-      <path d="M476 384 Q500 424 524 384 Z" fill="#7a2e38"/><path d="M482 386 l4 10 l4 -10 M510 386 l4 10 l4 -10" fill="#fff"/>
-      <circle cx="532" cy="404" r="5" fill="#6f7277" class="no-ink"/>`,
-  };
-
-  let catKey = '';
-  // flat: 0 ears up .. 1 flattened sideways; puff: 0 .. 1 fur standing up
+  // flat: 0 ears up .. 1 folded back; puff: 0 .. 1 fur standing up
   function setCat({ mood, flat, puff }) {
-    const key = `${mood}|${Math.round(flat * 10)}|${Math.round(puff * 10)}`;
-    if (key === catKey) return;
-    catKey = key;
-    svg.querySelector('#cat-face').innerHTML = EYES[mood](446, 554) + (mood === 'panic' ? MOUTH.hiss : MOUTH.closed);
-    ears.forEach(e => e.g.setAttribute('transform', `translate(${e.x} ${e.y + flat * 14}) rotate(${e.side * (6 + flat * 62)})`));
-    svg.querySelector('#cat-body').setAttribute('transform', `translate(500 640) scale(${1 + puff * 0.1} ${1 + puff * 0.14}) translate(-500 -640)`);
+    cat.mood = mood;
+    cat.flat = flat;
+    cat.puff = puff;
   }
 
   function setAway(away) {
     isAway = away;
+  }
+
+  function drawCat(now, loud) {
+    const m = svg.getScreenCTM();
+    const dpr = canvas.width / innerWidth;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = PAPER;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    if (!src || awayK > 0.995) return;
+    const pr = printFor(Math.round(cat.flat * FLAT_STEPS), cat.mood);
+    const amp = reduceMotion ? 0 : loud * 9;
+    ctx.setTransform(m.a * dpr, 0, 0, m.d * dpr, m.e * dpr, m.f * dpr);
+    // Pivot at the bottom middle of the photo: the cat sits on your lap
+    const bx = place.x + place.w / 2, by = place.y + place.h;
+    ctx.translate(bx + (Math.random() - 0.5) * amp, by + (Math.random() - 0.5) * amp + awayK * place.h * 0.8);
+    if (now < shakeUntil && !reduceMotion) ctx.rotate(Math.sin(now / 35) * 0.06);
+    const breathe = cat.mood === 'calm' && !reduceMotion ? Math.sin(now / 700) * 0.006 : 0;
+    ctx.scale(1 + cat.puff * 0.05, 1 + cat.puff * 0.07 + breathe);
+    ctx.globalCompositeOperation = 'multiply';
+    ctx.globalAlpha = 1 - awayK;
+    ctx.drawImage(pr, -place.w / 2, -place.h, place.w, place.h);
   }
 
   /* ---------- hands ---------- */
@@ -200,7 +214,7 @@ window.Scene = (() => {
     const p = at || { x: s.x - side * 60, y: 800 };
     // Arms come in from the sides of the screen with the elbow low, so they don't cover the cat's face
     const cx = s.x - side * 60, cy = Math.max(p.y + 120, 560);
-    arms[i].forEach(a => a.setAttribute('d', `M${s.x} ${s.y} Q${cx} ${cy} ${p.x} ${p.y + 30}`));
+    arms[i].setAttribute('d', `M${s.x} ${s.y} Q${cx} ${cy} ${p.x} ${p.y + 30}`);
     // Over an ear the hand turns to cup it
     const isCupping = coveringEar !== null && coveringEar !== undefined;
     const tilt = isCupping ? side * 24 : side * -8;
@@ -214,14 +228,14 @@ window.Scene = (() => {
     return pt.matrixTransform(svg.getScreenCTM().inverse());
   }
 
-  // The part of the room actually on screen (a phone crops the sides)
+  // The part of the view actually on screen (a phone crops the sides)
   function visible() {
     const r = svg.getBoundingClientRect();
     const a = toSvg(r.left, r.top), b = toSvg(r.right, r.bottom);
     return { x0: Math.max(0, a.x), y0: Math.max(0, a.y), x1: Math.min(1000, b.x), y1: Math.min(700, b.y) };
   }
 
-  /* ---------- noise lettering, bubbles, room ---------- */
+  /* ---------- noise lettering, bubbles, dust ---------- */
 
   const WORD_STYLE = {
     drill: { size: 90, fill: INK, life: 0.8 },
@@ -238,14 +252,14 @@ window.Scene = (() => {
     const w = v.x1 - v.x0;
     // The shaft is beyond the right-hand wall; the din comes from there
     const x = kind === 'purr' ? 500 + (Math.random() - 0.5) * 120 : v.x0 + w * (0.35 + Math.random() * 0.6);
-    const y = kind === 'purr' ? 470 : 110 + Math.random() * 300;
+    const y = kind === 'purr' ? place.y + place.h * 0.62 : v.y0 + 110 + Math.random() * 300;
     live.words.push({ t, x, y, age: 0, life: st.life, kind, rot: (Math.random() - 0.5) * 18, drift: kind === 'purr' ? -30 : -80 - Math.random() * 60 });
   }
 
   function bubble(text) {
     const width = 30 + text.length * 22;
     const v = visible();
-    const x = Math.min(640, v.x1 - width - 10), y = 150;
+    const x = Math.min(640, v.x1 - width - 10), y = Math.max(v.y0 + 70, place.y + 40);
     const g = el('g', {}, bubbles);
     el('rect', { x, y: y - 30, width, height: 46, rx: 22, fill: '#f7f1e3', stroke: INK, 'stroke-width': 3 }, g);
     el('path', { d: `M${x + 16} ${y + 14} L${x - 10} ${y + 34} L${x + 34} ${y + 14} Z`, fill: '#f7f1e3', stroke: INK, 'stroke-width': 3, 'stroke-linejoin': 'round' }, g);
@@ -256,17 +270,13 @@ window.Scene = (() => {
     live.bubbles = [{ g, age: 0 }];
   }
 
+  // Plaster dust shaken loose from the ceiling
   function dustFall(strength) {
+    const v = visible();
     for (let i = 0; i < Math.max(1, Math.round(3 * strength)); i++) {
-      const d = el('rect', { width: 4, height: 4, fill: CREAM, class: 'no-ink' }, dust);
-      live.dust.push({ d, x: Math.random() * 1000, y: 70, v: 70 + Math.random() * 90 });
+      const d = el('rect', { width: 3, height: 3, fill: INK }, dust);
+      live.dust.push({ d, x: v.x0 + Math.random() * (v.x1 - v.x0), y: v.y0, v: 70 + Math.random() * 90 });
     }
-  }
-
-  function setClock(hours) {
-    const h = (hours % 12) / 12, m = hours % 1;
-    clockHands.hour.setAttribute('transform', `rotate(${h * 360} 840 180)`);
-    clockHands.minute.setAttribute('transform', `rotate(${m * 360} 840 180)`);
   }
 
   function catShake() {
@@ -275,17 +285,11 @@ window.Scene = (() => {
 
   // loud: 0..1 what's coming out of the speakers right now
   function frame(dt, now, loud) {
-    const amp = reduceMotion ? 0 : loud * 9;
-    room.setAttribute('transform', amp ? `translate(${(Math.random() - 0.5) * amp} ${(Math.random() - 0.5) * amp})` : '');
-    notice.setAttribute('transform', reduceMotion ? '' : `rotate(${Math.sin(now / 60) * loud * 4} 139 150)`);
-
     // The cat slinks off under the bed when it's had enough, and creeps back later
     awayK += ((isAway ? 1 : 0) - awayK) * Math.min(1, dt * (isAway ? 6 : 2));
-    const head = now < shakeUntil && !reduceMotion ? `rotate(${Math.sin(now / 35) * 10} 500 420)` : '';
-    svg.querySelector('#cat-head').setAttribute('transform', head);
-    catG.setAttribute('transform', `translate(0 ${awayK * 520})`);
-    catG.style.opacity = String(1 - awayK);
-    svg.querySelector('#cat-tail').setAttribute('transform', reduceMotion ? '' : `rotate(${Math.sin(now / 380) * 5 * (1 + loud * 4)} 690 600)`);
+    drawCat(now, loud);
+    const amp = reduceMotion ? 0 : loud * 6;
+    words.setAttribute('transform', amp ? `translate(${(Math.random() - 0.5) * amp} ${(Math.random() - 0.5) * amp})` : '');
 
     if (!reduceMotion && Math.random() < loud * dt * 6) dustFall(loud);
 
@@ -323,5 +327,5 @@ window.Scene = (() => {
     });
   }
 
-  return { init, EARS, setHand, setCat, setAway, setClock, toSvg, word, bubble, catShake, frame };
+  return { init, EARS, setHand, setCat, setAway, toSvg, word, bubble, catShake, frame };
 })();

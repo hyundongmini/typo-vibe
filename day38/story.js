@@ -19,6 +19,17 @@ window.NOISE = {
     { file: 'sound/phammer.m4a', kind: 'hammer', weight: 1 },
   ],
 
+  // The cat, from a real photo (pixel positions in the photo file)
+  photo: {
+    file: 'cat.jpg',
+    crop: { x: 150, y: 0, w: 362, h: 330 },
+    // Where a hand cups each ear, and the point the ear folds back around
+    ears: [{ x: 218, y: 78, pivot: [252, 112] }, { x: 420, y: 70, pivot: [392, 104] }],
+    earRadius: 38,
+    // Irises get a flat mustard; the darkest part of each (the pupil) stays black
+    eyes: [{ x: 300, y: 150, r: 22, below: 0.5, core: 0.1 }, { x: 387, y: 148, r: 22, below: 0.5, core: 0.1 }],
+  },
+
   // How much one covered ear takes off for the cat (two ears: twice this)
   muffle: 0.42,
   // The cat bolts after this long at its wits' end, and comes back after a while (seconds)
