@@ -3,7 +3,9 @@
 window.Scene = (() => {
   const NS = 'http://www.w3.org/2000/svg';
   const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const SKIN = '#f1c9a5', SLEEVE = '#b8b2d6', CAT = '#f7f5f0', CAT_SHADE = '#e3ddd3';
+  const SKIN = '#f6d8c4', SLEEVE = '#f4f2ee', HAIR = '#3a2a24';
+  // White short-haired cat with a grey cap and grey ears
+  const CAT = '#fbfbf8', CAT_SHADE = '#dedfdc', CAT_GREY = '#8f9297';
 
   // Ear centres in the 1000 x 700 view; "left" means the left side of the screen (a mirror)
   const EARS = {
@@ -14,7 +16,7 @@ window.Scene = (() => {
   };
   const SHOULDERS = [{ x: 434, y: 352 }, { x: 566, y: 352 }];
   // Hands resting on the cat's back
-  const REST = [{ x: 458, y: 470 }, { x: 542, y: 470 }];
+  const REST = [{ x: 446, y: 498 }, { x: 554, y: 498 }];
 
   let svg, room, words, dust, bubbles, lamp, frame;
   const arms = [], hands = [];
@@ -91,36 +93,52 @@ window.Scene = (() => {
     el('rect', { x: 412, y: 480, width: 176, height: 64, rx: 26, fill: '#4a5568' }, room);
     [440, 530].forEach(x => el('rect', { x, y: 540, width: 30, height: 40, rx: 10, fill: '#4a5568' }, room));
     [436, 526].forEach(x => el('ellipse', { cx: x + 19, cy: 584, rx: 24, ry: 10, fill: '#f5f5f5' }, room));
-    el('rect', { x: 418, y: 326, width: 164, height: 176, rx: 64, fill: SLEEVE }, room);
+    // Long hair falling behind the shoulders
+    el('path', { d: 'M434 236 Q426 166 500 164 Q574 166 566 236 L584 336 Q544 352 500 346 Q456 352 416 336 Z', fill: HAIR }, room);
+    el('rect', { x: 418, y: 326, width: 164, height: 176, rx: 64, fill: SLEEVE, stroke: '#dcd8d0', 'stroke-width': 2 }, room);
     el('rect', { x: 486, y: 296, width: 28, height: 40, fill: SKIN }, room);
     Object.entries({ myLeft: EARS.myLeft, myRight: EARS.myRight }).forEach(([, p]) => {
       el('ellipse', { cx: p.x, cy: p.y, rx: 12, ry: 18, fill: SKIN }, room);
       el('ellipse', { cx: p.x, cy: p.y, rx: 5, ry: 9, fill: '#e3a989' }, room);
     });
     el('circle', { cx: 500, cy: 250, r: 64, fill: SKIN }, room);
-    // Hair: a short bob with bangs
-    el('path', { d: 'M436 250 Q432 182 500 178 Q568 182 564 250 Q556 214 530 206 Q512 226 470 222 Q448 226 436 250 Z', fill: '#2b2422' }, room);
+    // Hair on top, with strands swept to one side over the forehead
+    el('path', { d: 'M437 248 Q432 180 500 176 Q568 180 563 248 Q558 214 534 202 Q516 214 486 210 Q458 214 437 248 Z', fill: HAIR }, room);
+    el('path', { d: 'M486 204 Q462 214 452 262 Q446 226 462 204 Z', fill: HAIR }, room);
     el('g', { id: 'me-face' }, room);
   }
 
   function buildCat() {
     const cat = el('g', { id: 'cat' }, room);
     const tail = el('g', { id: 'cat-tail' }, cat);
-    el('path', { d: 'M594 500 Q650 492 646 446 Q644 420 624 414', fill: 'none', stroke: CAT_SHADE, 'stroke-width': 30, 'stroke-linecap': 'round' }, tail);
-    el('path', { d: 'M594 500 Q650 492 646 446 Q644 420 624 414', fill: 'none', stroke: CAT, 'stroke-width': 24, 'stroke-linecap': 'round' }, tail);
+    el('path', { d: 'M594 500 Q650 492 646 446 Q644 420 624 414', fill: 'none', stroke: CAT_SHADE, 'stroke-width': 24, 'stroke-linecap': 'round' }, tail);
+    el('path', { d: 'M594 500 Q650 492 646 446 Q644 420 624 414', fill: 'none', stroke: CAT, 'stroke-width': 19, 'stroke-linecap': 'round' }, tail);
+    el('path', { d: 'M636 428 Q630 416 622 414', fill: 'none', stroke: CAT_GREY, 'stroke-width': 17, 'stroke-linecap': 'round' }, tail);
     const body = el('g', { id: 'cat-body' }, cat);
-    el('path', { d: fluff(500, 482, 108, 50, 11, 0.06), fill: CAT, stroke: CAT_SHADE, 'stroke-width': 2 }, body);
+    const bodyPath = fluff(500, 482, 104, 46, 9, 0.025);
+    el('clipPath', { id: 'cat-body-clip' }, body).appendChild(el('path', { d: bodyPath }));
+    el('path', { d: bodyPath, fill: CAT, stroke: CAT_SHADE, 'stroke-width': 2 }, body);
+    // A grey saddle on the back
+    el('ellipse', { cx: 574, cy: 452, rx: 46, ry: 20, fill: CAT_GREY, 'clip-path': 'url(#cat-body-clip)' }, body);
     [470, 530].forEach(x => el('ellipse', { cx: x, cy: 520, rx: 18, ry: 11, fill: CAT, stroke: CAT_SHADE, 'stroke-width': 2 }, body));
     const head = el('g', { id: 'cat-head' }, cat);
     ['catLeft', 'catRight'].forEach((name, i) => {
       const p = EARS[name];
       const ear = el('g', { id: `cat-ear-${i}`, transform: `translate(${p.x} ${p.y + 6})` }, head);
-      el('path', { d: 'M-15 6 Q-6 -24 0 -22 Q6 -24 15 6 Z', fill: CAT, stroke: CAT_SHADE, 'stroke-width': 2 }, ear);
-      el('path', { d: 'M-8 3 Q-3 -13 0 -12 Q3 -13 8 3 Z', fill: '#f1b9c0' }, ear);
+      // Big pointed ears, grey outside and pink inside
+      el('path', { d: 'M-19 10 Q-12 -30 -2 -40 Q8 -30 19 10 Z', fill: CAT_GREY }, ear);
+      el('path', { d: 'M-10 6 Q-6 -18 -2 -26 Q4 -18 10 6 Z', fill: '#f1b9c0' }, ear);
     });
-    el('path', { d: fluff(500, 428, 56, 46, 10, 0.07), fill: CAT, stroke: CAT_SHADE, 'stroke-width': 2 }, head);
-    // Silver shading round the eyes and the flat face of a Persian
-    [481, 519].forEach(x => el('ellipse', { cx: x, cy: 426, rx: 15, ry: 12, fill: '#e2ddd4' }, head));
+    const headPath = fluff(500, 428, 52, 44, 8, 0.02);
+    el('clipPath', { id: 'cat-head-clip' }, head).appendChild(el('path', { d: headPath }));
+    el('path', { d: headPath, fill: CAT, stroke: CAT_SHADE, 'stroke-width': 2 }, head);
+    // Grey cap over the top of the head, reaching down past the left eye
+    const cap = el('g', { 'clip-path': 'url(#cat-head-clip)' }, head);
+    el('ellipse', { cx: 468, cy: 394, rx: 34, ry: 24, fill: CAT_GREY }, cap);
+    el('ellipse', { cx: 532, cy: 390, rx: 30, ry: 18, fill: CAT_GREY }, cap);
+    el('ellipse', { cx: 470, cy: 414, rx: 16, ry: 12, fill: CAT_GREY }, cap);
+    // The little grey spot by the mouth
+    el('circle', { cx: 511, cy: 451, r: 3.2, fill: '#6f7277' }, head);
     el('g', { id: 'cat-face' }, head);
   }
 
@@ -158,9 +176,12 @@ window.Scene = (() => {
   /* ---------- faces ---------- */
 
   const ME_FACES = {
-    calm: `<ellipse cx="478" cy="256" rx="4.5" ry="5.5" fill="#2b2422"/><ellipse cx="522" cy="256" rx="4.5" ry="5.5" fill="#2b2422"/>
-      <path d="M466 240 Q478 235 489 239 M511 239 Q522 235 534 240" stroke="#2b2422" stroke-width="3" fill="none" stroke-linecap="round"/>
-      <path d="M489 285 Q500 292 511 285" stroke="#8a4b3a" stroke-width="3" fill="none" stroke-linecap="round"/>`,
+    calm: `<circle cx="478" cy="257" r="6" fill="#5a3a2c"/><circle cx="522" cy="257" r="6" fill="#5a3a2c"/>
+      <circle cx="480" cy="255" r="1.8" fill="#fff"/><circle cx="524" cy="255" r="1.8" fill="#fff"/>
+      <path d="M468 252 Q478 246 489 252 M511 252 Q522 246 532 252" stroke="#2b2422" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+      <path d="M466 240 L489 238 M511 238 L534 240" stroke="#5a4036" stroke-width="3" fill="none" stroke-linecap="round"/>
+      <ellipse cx="468" cy="276" rx="9" ry="5" fill="#f2a9a9" opacity="0.45"/><ellipse cx="532" cy="276" rx="9" ry="5" fill="#f2a9a9" opacity="0.45"/>
+      <path d="M490 285 Q500 290 510 285" stroke="#c0706a" stroke-width="3" fill="none" stroke-linecap="round"/>`,
     bothered: `<ellipse cx="478" cy="257" rx="4.5" ry="4" fill="#2b2422"/><ellipse cx="522" cy="257" rx="4.5" ry="4" fill="#2b2422"/>
       <path d="M465 238 L489 245 M535 238 L511 245" stroke="#2b2422" stroke-width="3.5" fill="none" stroke-linecap="round"/>
       <path d="M489 288 L511 288" stroke="#8a4b3a" stroke-width="3" fill="none" stroke-linecap="round"/>`,
@@ -189,19 +210,19 @@ window.Scene = (() => {
 
   const CAT_EYES = {
     // Half-lidded, like the photo: unimpressed
-    grumpy: `<circle cx="481" cy="426" r="8" fill="#c79a3e"/><ellipse cx="481" cy="427" rx="3" ry="6" fill="#222"/>
-      <circle cx="519" cy="426" r="8" fill="#c79a3e"/><ellipse cx="519" cy="427" rx="3" ry="6" fill="#222"/>
+    grumpy: `<circle cx="481" cy="426" r="8" fill="#c3c46a"/><ellipse cx="481" cy="427" rx="3" ry="6" fill="#222"/>
+      <circle cx="519" cy="426" r="8" fill="#c3c46a"/><ellipse cx="519" cy="427" rx="3" ry="6" fill="#222"/>
       <path d="M471 419 L492 424 M529 419 L508 424" stroke="#9a948a" stroke-width="5" stroke-linecap="round"/>`,
-    alarmed: `<circle cx="481" cy="426" r="10" fill="#c79a3e"/><circle cx="481" cy="426" r="7" fill="#222"/>
-      <circle cx="519" cy="426" r="10" fill="#c79a3e"/><circle cx="519" cy="426" r="7" fill="#222"/>
+    alarmed: `<circle cx="481" cy="426" r="10" fill="#c3c46a"/><circle cx="481" cy="426" r="7" fill="#222"/>
+      <circle cx="519" cy="426" r="10" fill="#c3c46a"/><circle cx="519" cy="426" r="7" fill="#222"/>
       <circle cx="478" cy="423" r="2" fill="#fff"/><circle cx="516" cy="423" r="2" fill="#fff"/>`,
-    panic: `<circle cx="481" cy="425" r="11.5" fill="#c79a3e"/><circle cx="481" cy="425" r="9" fill="#222"/>
-      <circle cx="519" cy="425" r="11.5" fill="#c79a3e"/><circle cx="519" cy="425" r="9" fill="#222"/>
+    panic: `<circle cx="481" cy="425" r="11.5" fill="#c3c46a"/><circle cx="481" cy="425" r="9" fill="#222"/>
+      <circle cx="519" cy="425" r="11.5" fill="#c3c46a"/><circle cx="519" cy="425" r="9" fill="#222"/>
       <circle cx="477" cy="421" r="2.5" fill="#fff"/><circle cx="515" cy="421" r="2.5" fill="#fff"/>`,
     calm: `<path d="M472 426 Q481 432 490 426 M510 426 Q519 432 528 426" stroke="#8a8378" stroke-width="3.5" fill="none" stroke-linecap="round"/>`,
   };
   const CAT_MOUTH = {
-    closed: `<path d="M496 438 L504 438 L500 443 Z" fill="#e8909c"/><path d="M493 448 Q500 452 500 444 Q500 452 507 448" stroke="#8a8378" stroke-width="2" fill="none" stroke-linecap="round"/>`,
+    closed: `<path d="M494 436 Q500 433 506 436 Q504 443 500 444 Q496 443 494 436 Z" fill="#f0a3ae"/><path d="M493 448 Q500 452 500 444 Q500 452 507 448" stroke="#8a8378" stroke-width="2" fill="none" stroke-linecap="round"/>`,
     hiss: `<path d="M496 437 L504 437 L500 442 Z" fill="#e8909c"/><path d="M490 446 Q500 462 510 446 Z" fill="#7a2e38"/><path d="M493 447 l2 5 l2 -5 M503 447 l2 5 l2 -5" fill="#fff"/>`,
   };
 
