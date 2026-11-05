@@ -12,8 +12,25 @@
 <a class="home" href="../index.html">← 홈</a>
 
 <main class="stage">
-  <svg id="scene" viewBox="0 0 1000 700" preserveAspectRatio="xMidYMid slice" role="group"></svg>
+  <svg id="scene" viewBox="0 0 1000 700" preserveAspectRatio="xMidYMid slice" role="img"></svg>
+  <p class="clock" id="clock" aria-live="off"></p>
   <p class="hint" id="hint"></p>
+
+  <section class="card" id="intro" aria-labelledby="intro-title">
+    <h1 id="intro-title">소음</h1>
+    <div class="card-text" id="intro-text"></div>
+    <p class="card-note" id="intro-note"></p>
+    <button type="button" class="btn" id="start"></button>
+    <p class="card-error" id="start-error" role="alert"></p>
+  </section>
+
+  <section class="card" id="end" aria-labelledby="end-title" hidden>
+    <h2 id="end-title"></h2>
+    <p class="card-note" id="end-sub"></p>
+    <ul class="card-stats" id="end-stats"></ul>
+    <button type="button" class="btn" id="again"></button>
+    <p class="card-credit"><a id="credit" target="_blank" rel="noopener"></a></p>
+  </section>
 </main>
 
 <script src="story.js"></script>
