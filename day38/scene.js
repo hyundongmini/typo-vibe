@@ -3,9 +3,13 @@
 window.Scene = (() => {
   const NS = 'http://www.w3.org/2000/svg';
   const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const SKIN = '#f6d8c4', SLEEVE = '#f4f2ee', HAIR = '#3a2a24';
+  // A small print-like palette: brick red, greens, mustard, navy, black on cream paper.
+  // Every filled shape gets the same black ink outline from style.css.
+  const INK = '#1b1916', CREAM = '#ece0c6', BRICK = '#a9412b', MUSTARD = '#e3b448', NAVY = '#28367a';
+  const GREEN = ['#557d3f', '#4a7037', '#3f6533'];
+  const SKIN = '#f2d6bd', SLEEVE = '#f1ebdd', HAIR = '#1f1a17';
   // White short-haired cat with a grey cap and grey ears
-  const CAT = '#fbfbf8', CAT_SHADE = '#dedfdc', CAT_GREY = '#8f9297';
+  const CAT = '#f7f2e6', CAT_SHADE = INK, CAT_GREY = '#8a8a84';
 
   // Ear centres in the 1000 x 700 view; "left" means the left side of the screen (a mirror)
   const EARS = {
@@ -18,7 +22,7 @@ window.Scene = (() => {
   // Hands resting on the cat's back
   const REST = [{ x: 446, y: 498 }, { x: 554, y: 498 }];
 
-  let svg, room, words, dust, bubbles, lamp, frame;
+  let svg, room, art, words, dust, bubbles, lamp, frame;
   const arms = [], hands = [];
   const live = { words: [], dust: [], bubbles: [] };
   const swing = { lamp: 0, lampV: 0, frame: 0 };
@@ -49,57 +53,60 @@ window.Scene = (() => {
   /* ---------- build ---------- */
 
   function buildRoom(notice) {
-    el('rect', { width: 1000, height: 700, fill: '#efe6d8' }, room);
-    // Faint wallpaper stripes
-    for (let x = 20; x < 1000; x += 40) el('rect', { x, y: 0, width: 14, height: 580, fill: '#e9dfcf' }, room);
-    el('rect', { y: 580, width: 1000, height: 120, fill: '#c9a983' }, room);
-    el('rect', { y: 572, width: 1000, height: 10, fill: '#b8956c' }, room);
+    // Things that never move get the hand-drawn wobble filter (it's costly on moving parts)
+    const still = el('g', { filter: 'url(#wobble)' }, art);
+    el('rect', { width: 1000, height: 700, fill: CREAM, class: 'no-ink' }, still);
+    // A solid black band across the ceiling, like the night sky in a print
+    el('rect', { width: 1000, height: 150, fill: INK, class: 'no-ink' }, still);
+    el('rect', { y: 578, width: 1000, height: 122, fill: '#e2d2ad' }, still);
+    el('ellipse', { cx: 500, cy: 630, rx: 330, ry: 44, fill: BRICK }, still);
 
     // Front door with the works notice taped on
-    el('rect', { x: 70, y: 200, width: 150, height: 380, rx: 4, fill: '#b98b5e' }, room);
-    el('rect', { x: 82, y: 212, width: 126, height: 356, rx: 3, fill: 'none', stroke: '#a67a4f', 'stroke-width': 3 }, room);
-    el('circle', { cx: 198, cy: 400, r: 7, fill: '#e6c56a' }, room);
-    const paper = el('g', { transform: 'rotate(-3 145 290)' }, room);
-    el('rect', { x: 92, y: 244, width: 106, height: 96, fill: '#fffdf7', stroke: '#ddd6c8' }, paper);
-    el('rect', { x: 132, y: 238, width: 26, height: 10, fill: 'rgba(230, 220, 170, 0.8)' }, paper);
+    el('rect', { x: 70, y: 200, width: 150, height: 380, rx: 3, fill: MUSTARD }, still);
+    el('rect', { x: 98, y: 366, width: 94, height: 176, rx: 2, fill: NAVY }, still);
+    el('circle', { cx: 200, cy: 392, r: 6, fill: INK }, still);
+    const paper = el('g', { transform: 'rotate(-3 145 290)' }, still);
+    el('rect', { x: 92, y: 244, width: 106, height: 96, fill: '#f7f1e3' }, paper);
+    el('rect', { x: 132, y: 238, width: 26, height: 10, fill: '#e9d9a6' }, paper);
     notice.forEach((line, i) => {
-      const t = el('text', { x: 145, y: 262 + i * 17, 'text-anchor': 'middle', 'font-size': i === 0 ? 13 : 10.5, 'font-weight': i === 0 ? 900 : 600, fill: i === 0 ? '#c0392b' : '#333' }, paper);
+      const t = el('text', { x: 145, y: 262 + i * 17, 'text-anchor': 'middle', 'font-size': i === 0 ? 13 : 10.5, 'font-weight': i === 0 ? 900 : 600, fill: i === 0 ? BRICK : INK }, paper);
       t.textContent = line;
     });
 
-    // Picture frame that goes crooked with every blow
-    frame = el('g', {}, room);
-    el('rect', { x: 770, y: 170, width: 120, height: 96, fill: '#7a5a3a' }, frame);
-    el('rect', { x: 780, y: 180, width: 100, height: 76, fill: '#dfe8ee' }, frame);
-    el('path', { d: fluff(830, 230, 26, 20, 7, 0.06), fill: '#fff' }, frame);
-    el('path', { d: 'M812 214 L818 196 L826 212 M834 212 L842 196 L848 214', fill: '#fff', stroke: '#fff', 'stroke-width': 3, 'stroke-linejoin': 'round' }, frame);
+    // Picture frame that goes crooked with every blow: a little cat drawing
+    frame = el('g', {}, art);
+    el('rect', { x: 770, y: 176, width: 120, height: 96, fill: BRICK }, frame);
+    el('rect', { x: 782, y: 188, width: 96, height: 72, fill: CREAM }, frame);
+    el('path', { d: 'M806 250 Q806 214 830 212 Q854 214 854 250 Z', fill: CAT }, frame);
+    el('path', { d: 'M812 222 L816 204 L826 214 Z M848 222 L844 204 L834 214 Z', fill: CAT_GREY }, frame);
 
     // Ceiling lamp, swinging from the top
-    lamp = el('g', {}, room);
-    el('line', { x1: 500, y1: 0, x2: 500, y2: 92, stroke: '#555', 'stroke-width': 3 }, lamp);
-    el('path', { d: 'M466 92 L534 92 L556 132 L444 132 Z', fill: '#f3d27a' }, lamp);
-    el('ellipse', { cx: 500, cy: 134, rx: 56, ry: 6, fill: '#fff3c4' }, lamp);
+    lamp = el('g', {}, art);
+    el('line', { x1: 500, y1: 0, x2: 500, y2: 92, stroke: CREAM, 'stroke-width': 3 }, lamp);
+    el('path', { d: 'M466 92 L534 92 L556 132 L444 132 Z', fill: MUSTARD }, lamp);
   }
 
   function buildSofaAndMe() {
     // Sofa
-    el('rect', { x: 270, y: 330, width: 460, height: 180, rx: 44, fill: '#5b8c85' }, room);
-    el('rect', { x: 236, y: 410, width: 84, height: 160, rx: 32, fill: '#527f79' }, room);
-    el('rect', { x: 680, y: 410, width: 84, height: 160, rx: 32, fill: '#527f79' }, room);
-    el('rect', { x: 296, y: 486, width: 408, height: 86, rx: 22, fill: '#4d7a74' }, room);
-    [300, 690].forEach(x => el('rect', { x, y: 568, width: 14, height: 18, fill: '#3b2f26' }, room));
+    const sofa = el('g', { filter: 'url(#wobble)' }, art);
+    el('rect', { x: 270, y: 330, width: 460, height: 180, rx: 44, fill: GREEN[0] }, sofa);
+    el('rect', { x: 236, y: 410, width: 84, height: 160, rx: 32, fill: GREEN[1] }, sofa);
+    el('rect', { x: 680, y: 410, width: 84, height: 160, rx: 32, fill: GREEN[1] }, sofa);
+    el('rect', { x: 296, y: 486, width: 408, height: 86, rx: 22, fill: GREEN[2] }, sofa);
+    [300, 690].forEach(x => el('rect', { x, y: 568, width: 14, height: 18, fill: INK }, sofa));
+    const room = art;
 
     // You
-    el('rect', { x: 412, y: 480, width: 176, height: 64, rx: 26, fill: '#4a5568' }, room);
-    [440, 530].forEach(x => el('rect', { x, y: 540, width: 30, height: 40, rx: 10, fill: '#4a5568' }, room));
-    [436, 526].forEach(x => el('ellipse', { cx: x + 19, cy: 584, rx: 24, ry: 10, fill: '#f5f5f5' }, room));
+    el('rect', { x: 412, y: 480, width: 176, height: 64, rx: 26, fill: NAVY }, room);
+    [440, 530].forEach(x => el('rect', { x, y: 540, width: 30, height: 40, rx: 10, fill: NAVY }, room));
+    [436, 526].forEach(x => el('ellipse', { cx: x + 19, cy: 584, rx: 24, ry: 10, fill: INK }, room));
     // Long hair falling behind the shoulders
     el('path', { d: 'M434 236 Q426 166 500 164 Q574 166 566 236 L584 336 Q544 352 500 346 Q456 352 416 336 Z', fill: HAIR }, room);
-    el('rect', { x: 418, y: 326, width: 164, height: 176, rx: 64, fill: SLEEVE, stroke: '#dcd8d0', 'stroke-width': 2 }, room);
+    el('rect', { x: 418, y: 326, width: 164, height: 176, rx: 64, fill: SLEEVE }, room);
     el('rect', { x: 486, y: 296, width: 28, height: 40, fill: SKIN }, room);
     Object.entries({ myLeft: EARS.myLeft, myRight: EARS.myRight }).forEach(([, p]) => {
       el('ellipse', { cx: p.x, cy: p.y, rx: 12, ry: 18, fill: SKIN }, room);
-      el('ellipse', { cx: p.x, cy: p.y, rx: 5, ry: 9, fill: '#e3a989' }, room);
+      el('ellipse', { cx: p.x, cy: p.y, rx: 4, ry: 8, fill: '#dcae92', class: 'no-ink' }, room);
     });
     el('circle', { cx: 500, cy: 250, r: 64, fill: SKIN }, room);
     // Hair on top, with strands swept to one side over the forehead
@@ -109,7 +116,7 @@ window.Scene = (() => {
   }
 
   function buildCat() {
-    const cat = el('g', { id: 'cat' }, room);
+    const cat = el('g', { id: 'cat' }, art);
     const tail = el('g', { id: 'cat-tail' }, cat);
     el('path', { d: 'M594 500 Q650 492 646 446 Q644 420 624 414', fill: 'none', stroke: CAT_SHADE, 'stroke-width': 24, 'stroke-linecap': 'round' }, tail);
     el('path', { d: 'M594 500 Q650 492 646 446 Q644 420 624 414', fill: 'none', stroke: CAT, 'stroke-width': 19, 'stroke-linecap': 'round' }, tail);
@@ -143,16 +150,19 @@ window.Scene = (() => {
   }
 
   function buildArms() {
-    const layer = el('g', {}, room);
+    const layer = el('g', {}, art);
     for (let i = 0; i < 2; i++) {
-      arms.push(el('path', { fill: 'none', stroke: SLEEVE, 'stroke-width': 30, 'stroke-linecap': 'round' }, layer));
+      // Ink outline underneath, sleeve on top: an outlined tube
+      const outline = el('path', { fill: 'none', stroke: INK, 'stroke-width': 35, 'stroke-linecap': 'round' }, layer);
+      const sleeve = el('path', { fill: 'none', stroke: SLEEVE, 'stroke-width': 30, 'stroke-linecap': 'round' }, layer);
+      arms.push([outline, sleeve]);
     }
     for (let i = 0; i < 2; i++) {
       const g = el('g', { class: 'hand', 'data-hand': i }, layer);
       // A bigger invisible circle makes the hand easy to grab with a finger
-      el('circle', { r: 44, fill: 'transparent' }, g);
-      el('ellipse', { rx: 25, ry: 28, fill: SKIN, stroke: '#d9a982', 'stroke-width': 2 }, g);
-      el('ellipse', { cx: i ? -20 : 20, cy: 6, rx: 9, ry: 14, fill: SKIN, stroke: '#d9a982', 'stroke-width': 2, transform: `rotate(${i ? 30 : -30} ${i ? -20 : 20} 6)` }, g);
+      el('circle', { r: 44, fill: 'transparent', class: 'no-ink' }, g);
+      el('ellipse', { rx: 25, ry: 28, fill: SKIN }, g);
+      el('ellipse', { cx: i ? -20 : 20, cy: 6, rx: 9, ry: 14, fill: SKIN, transform: `rotate(${i ? 30 : -30} ${i ? -20 : 20} 6)` }, g);
       hands.push(g);
     }
   }
@@ -160,8 +170,17 @@ window.Scene = (() => {
   function init(root, ui) {
     svg = root;
     el('defs', {}, svg).innerHTML = `
-      <filter id="muffle" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur id="muffle-blur" stdDeviation="0"/></filter>`;
+      <filter id="muffle" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur id="muffle-blur" stdDeviation="0"/></filter>
+      <filter id="wobble" x="-2%" y="-2%" width="104%" height="104%">
+        <feTurbulence type="fractalNoise" baseFrequency="0.03" numOctaves="2" seed="7" result="n"/>
+        <feDisplacementMap in="SourceGraphic" in2="n" scale="3.5" xChannelSelector="R" yChannelSelector="G"/>
+      </filter>
+      <filter id="grain" x="0" y="0" width="100%" height="100%">
+        <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" seed="3" stitchTiles="stitch"/>
+        <feColorMatrix type="matrix" values="0 0 0 0 0.12  0 0 0 0 0.09  0 0 0 0 0.05  0 0 0 0.6 0"/>
+      </filter>`;
     room = el('g', { id: 'room' }, svg);
+    art = el('g', { class: 'art' }, room);
     buildRoom(ui.notice);
     buildSofaAndMe();
     buildCat();
@@ -169,6 +188,8 @@ window.Scene = (() => {
     dust = el('g', {}, room);
     words = el('g', { filter: 'url(#muffle)', class: 'words' }, svg);
     bubbles = el('g', {}, svg);
+    // Paper grain over everything, like a risograph print
+    el('rect', { width: 1000, height: 700, filter: 'url(#grain)', class: 'grain no-ink' }, svg);
     setMe('calm');
     setCat({ mood: 'grumpy', flat: 0, puff: 0 });
   }
@@ -176,29 +197,27 @@ window.Scene = (() => {
   /* ---------- faces ---------- */
 
   const ME_FACES = {
-    calm: `<circle cx="478" cy="257" r="6" fill="#5a3a2c"/><circle cx="522" cy="257" r="6" fill="#5a3a2c"/>
-      <circle cx="480" cy="255" r="1.8" fill="#fff"/><circle cx="524" cy="255" r="1.8" fill="#fff"/>
-      <path d="M468 252 Q478 246 489 252 M511 252 Q522 246 532 252" stroke="#2b2422" stroke-width="2.5" fill="none" stroke-linecap="round"/>
-      <path d="M466 240 L489 238 M511 238 L534 240" stroke="#5a4036" stroke-width="3" fill="none" stroke-linecap="round"/>
-      <ellipse cx="468" cy="276" rx="9" ry="5" fill="#f2a9a9" opacity="0.45"/><ellipse cx="532" cy="276" rx="9" ry="5" fill="#f2a9a9" opacity="0.45"/>
-      <path d="M490 285 Q500 290 510 285" stroke="#c0706a" stroke-width="3" fill="none" stroke-linecap="round"/>`,
-    bothered: `<ellipse cx="478" cy="257" rx="4.5" ry="4" fill="#2b2422"/><ellipse cx="522" cy="257" rx="4.5" ry="4" fill="#2b2422"/>
-      <path d="M465 238 L489 245 M535 238 L511 245" stroke="#2b2422" stroke-width="3.5" fill="none" stroke-linecap="round"/>
-      <path d="M489 288 L511 288" stroke="#8a4b3a" stroke-width="3" fill="none" stroke-linecap="round"/>`,
-    pained: `<path d="M469 250 L483 256 L469 262 M531 250 L517 256 L531 262" stroke="#2b2422" stroke-width="3.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-      <path d="M465 236 L489 246 M535 236 L511 246" stroke="#2b2422" stroke-width="3.5" fill="none" stroke-linecap="round"/>
-      <rect x="486" y="280" width="28" height="12" rx="3" fill="#fff" stroke="#8a4b3a" stroke-width="2.5"/>
-      <path d="M495 280 V292 M505 280 V292" stroke="#8a4b3a" stroke-width="2"/>`,
-    frantic: `<path d="M469 250 L483 256 L469 262 M531 250 L517 256 L531 262" stroke="#2b2422" stroke-width="3.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-      <path d="M464 234 L489 246 M536 234 L511 246" stroke="#2b2422" stroke-width="4" fill="none" stroke-linecap="round"/>
-      <path d="M484 290 q4 -8 8 0 t8 0 t8 0 t8 0" stroke="#8a4b3a" stroke-width="3" fill="none" stroke-linecap="round"/>
-      <path d="M556 222 q6 10 0 16 q-6 -6 0 -16 Z" fill="#7ec4ef"/><path d="M548 206 q5 8 0 13 q-5 -5 0 -13 Z" fill="#7ec4ef"/>
-      <path d="M528 206 l10 0 M533 201 l0 10 M540 210 l8 0" stroke="#e74c3c" stroke-width="3" stroke-linecap="round"/>`,
+    calm: `<circle cx="478" cy="257" r="4.5" fill="#1b1916" class="no-ink"/><circle cx="522" cy="257" r="4.5" fill="#1b1916" class="no-ink"/>
+      <path d="M467 241 L489 239 M511 239 L533 241" stroke="#1b1916" stroke-width="3" fill="none" stroke-linecap="round"/>
+      <ellipse cx="468" cy="276" rx="9" ry="5" fill="#e8a48f" opacity="0.7" class="no-ink"/><ellipse cx="532" cy="276" rx="9" ry="5" fill="#e8a48f" opacity="0.7" class="no-ink"/>
+      <path d="M490 285 Q500 290 510 285" stroke="#a9412b" stroke-width="3" fill="none" stroke-linecap="round"/>`,
+    bothered: `<ellipse cx="478" cy="257" rx="4.5" ry="4" fill="#1b1916" class="no-ink"/><ellipse cx="522" cy="257" rx="4.5" ry="4" fill="#1b1916" class="no-ink"/>
+      <path d="M465 238 L489 245 M535 238 L511 245" stroke="#1b1916" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+      <path d="M489 288 L511 288" stroke="#a9412b" stroke-width="3" fill="none" stroke-linecap="round"/>`,
+    pained: `<path d="M469 250 L483 256 L469 262 M531 250 L517 256 L531 262" stroke="#1b1916" stroke-width="3.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M465 236 L489 246 M535 236 L511 246" stroke="#1b1916" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+      <rect x="486" y="280" width="28" height="12" rx="3" fill="#fff" stroke="#a9412b" stroke-width="2.5"/>
+      <path d="M495 280 V292 M505 280 V292" stroke="#a9412b" stroke-width="2"/>`,
+    frantic: `<path d="M469 250 L483 256 L469 262 M531 250 L517 256 L531 262" stroke="#1b1916" stroke-width="3.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M464 234 L489 246 M536 234 L511 246" stroke="#1b1916" stroke-width="4" fill="none" stroke-linecap="round"/>
+      <path d="M484 290 q4 -8 8 0 t8 0 t8 0 t8 0" stroke="#a9412b" stroke-width="3" fill="none" stroke-linecap="round"/>
+      <path d="M556 222 q6 10 0 16 q-6 -6 0 -16 Z" fill="#6b8fc9"/><path d="M548 206 q5 8 0 13 q-5 -5 0 -13 Z" fill="#6b8fc9"/>
+      <path d="M528 206 l10 0 M533 201 l0 10 M540 210 l8 0" stroke="#a9412b" stroke-width="3" stroke-linecap="round"/>`,
     // Both your ears covered: the world goes soft
-    relieved: `<path d="M470 257 Q478 251 486 257 M514 257 Q522 251 530 257" stroke="#2b2422" stroke-width="3.5" fill="none" stroke-linecap="round"/>
-      <path d="M466 240 Q478 236 489 240 M511 240 Q522 236 534 240" stroke="#2b2422" stroke-width="3" fill="none" stroke-linecap="round"/>
-      <path d="M492 286 Q500 290 508 286" stroke="#8a4b3a" stroke-width="3" fill="none" stroke-linecap="round"/>
-      <ellipse cx="468" cy="274" rx="9" ry="5" fill="#f2a1a1" opacity="0.6"/><ellipse cx="532" cy="274" rx="9" ry="5" fill="#f2a1a1" opacity="0.6"/>`,
+    relieved: `<path d="M470 257 Q478 251 486 257 M514 257 Q522 251 530 257" stroke="#1b1916" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+      <path d="M466 240 Q478 236 489 240 M511 240 Q522 236 534 240" stroke="#1b1916" stroke-width="3" fill="none" stroke-linecap="round"/>
+      <path d="M492 286 Q500 290 508 286" stroke="#a9412b" stroke-width="3" fill="none" stroke-linecap="round"/>
+      <ellipse cx="468" cy="274" rx="9" ry="5" fill="#e8a48f" opacity="0.7" class="no-ink"/><ellipse cx="532" cy="274" rx="9" ry="5" fill="#e8a48f" opacity="0.7" class="no-ink"/>`,
   };
 
   let meMood = '';
@@ -212,17 +231,17 @@ window.Scene = (() => {
     // Half-lidded, like the photo: unimpressed
     grumpy: `<circle cx="481" cy="426" r="8" fill="#c3c46a"/><ellipse cx="481" cy="427" rx="3" ry="6" fill="#222"/>
       <circle cx="519" cy="426" r="8" fill="#c3c46a"/><ellipse cx="519" cy="427" rx="3" ry="6" fill="#222"/>
-      <path d="M471 419 L492 424 M529 419 L508 424" stroke="#9a948a" stroke-width="5" stroke-linecap="round"/>`,
+      <path d="M471 419 L492 424 M529 419 L508 424" stroke="#1b1916" stroke-width="5" stroke-linecap="round"/>`,
     alarmed: `<circle cx="481" cy="426" r="10" fill="#c3c46a"/><circle cx="481" cy="426" r="7" fill="#222"/>
       <circle cx="519" cy="426" r="10" fill="#c3c46a"/><circle cx="519" cy="426" r="7" fill="#222"/>
-      <circle cx="478" cy="423" r="2" fill="#fff"/><circle cx="516" cy="423" r="2" fill="#fff"/>`,
+      <circle cx="478" cy="423" r="2" fill="#fff" class="no-ink"/><circle cx="516" cy="423" r="2" fill="#fff" class="no-ink"/>`,
     panic: `<circle cx="481" cy="425" r="11.5" fill="#c3c46a"/><circle cx="481" cy="425" r="9" fill="#222"/>
       <circle cx="519" cy="425" r="11.5" fill="#c3c46a"/><circle cx="519" cy="425" r="9" fill="#222"/>
-      <circle cx="477" cy="421" r="2.5" fill="#fff"/><circle cx="515" cy="421" r="2.5" fill="#fff"/>`,
-    calm: `<path d="M472 426 Q481 432 490 426 M510 426 Q519 432 528 426" stroke="#8a8378" stroke-width="3.5" fill="none" stroke-linecap="round"/>`,
+      <circle cx="477" cy="421" r="2.5" fill="#fff" class="no-ink"/><circle cx="515" cy="421" r="2.5" fill="#fff" class="no-ink"/>`,
+    calm: `<path d="M472 426 Q481 432 490 426 M510 426 Q519 432 528 426" stroke="#1b1916" stroke-width="3.5" fill="none" stroke-linecap="round"/>`,
   };
   const CAT_MOUTH = {
-    closed: `<path d="M494 436 Q500 433 506 436 Q504 443 500 444 Q496 443 494 436 Z" fill="#f0a3ae"/><path d="M493 448 Q500 452 500 444 Q500 452 507 448" stroke="#8a8378" stroke-width="2" fill="none" stroke-linecap="round"/>`,
+    closed: `<path d="M494 436 Q500 433 506 436 Q504 443 500 444 Q496 443 494 436 Z" fill="#f0a3ae"/><path d="M493 448 Q500 452 500 444 Q500 452 507 448" stroke="#1b1916" stroke-width="2" fill="none" stroke-linecap="round"/>`,
     hiss: `<path d="M496 437 L504 437 L500 442 Z" fill="#e8909c"/><path d="M490 446 Q500 462 510 446 Z" fill="#7a2e38"/><path d="M493 447 l2 5 l2 -5 M503 447 l2 5 l2 -5" fill="#fff"/>`,
   };
 
@@ -251,7 +270,7 @@ window.Scene = (() => {
     // Elbow bows outward so the arm reads as an arm, not a stick
     const cx = (i ? Math.max(s.x, x) : Math.min(s.x, x)) + side * 70;
     const cy = (s.y + y) / 2 + 30;
-    arms[i].setAttribute('d', `M${s.x} ${s.y} Q${cx} ${cy} ${x} ${y}`);
+    arms[i].forEach(p => p.setAttribute('d', `M${s.x} ${s.y} Q${cx} ${cy} ${x} ${y}`));
     const scale = covering ? 1.08 : 1;
     const tilt = covering ? side * -10 : 0;
     hands[i].setAttribute('transform', `translate(${x} ${y}) rotate(${tilt}) scale(${scale})`);
@@ -275,12 +294,12 @@ window.Scene = (() => {
   /* ---------- noise typography, bubbles, room motion ---------- */
 
   const WORD_STYLE = {
-    drill: { size: 64, weight: 900, fill: '#1e1e1e', life: 0.9 },
-    hammer: { size: 120, weight: 900, fill: '#c0392b', life: 0.7 },
-    grind: { size: 58, weight: 800, fill: '#2b4a9e', life: 1.1 },
-    motor: { size: 50, weight: 700, fill: '#555', life: 1.2 },
-    muffled: { size: 46, weight: 500, fill: '#8a8070', life: 1.3 },
-    purr: { size: 22, weight: 600, fill: '#b08a5a', life: 1.6 },
+    drill: { size: 64, weight: 900, fill: INK, life: 0.9 },
+    hammer: { size: 120, weight: 900, fill: BRICK, life: 0.7 },
+    grind: { size: 58, weight: 900, fill: NAVY, life: 1.1 },
+    motor: { size: 50, weight: 800, fill: GREEN[2], life: 1.2 },
+    muffled: { size: 46, weight: 600, fill: '#9a8d72', life: 1.3 },
+    purr: { size: 22, weight: 700, fill: BRICK, life: 1.6 },
   };
 
   // loud: 0..1, how loud it is to you; the works are on the right, so words come from that side
@@ -307,9 +326,9 @@ window.Scene = (() => {
     // Keep the bubble on screen when a narrow window crops the room
     at.x = Math.min(at.x, visible().x1 - width - 8);
     const g = el('g', { class: 'bubble' }, bubbles);
-    el('rect', { x: at.x, y: at.y - 24, width, height: 36, rx: 16, fill: '#fff', stroke: '#222', 'stroke-width': 2 }, g);
-    el('path', { d: `M${at.x + 12} ${at.y + 10} L${at.x - 6} ${at.y + 22} L${at.x + 24} ${at.y + 10} Z`, fill: '#fff', stroke: '#222', 'stroke-width': 2, 'stroke-linejoin': 'round' }, g);
-    el('rect', { x: at.x + 10, y: at.y + 6, width: 18, height: 6, fill: '#fff' }, g);
+    el('rect', { x: at.x, y: at.y - 24, width, height: 36, rx: 16, fill: '#f7f1e3', stroke: INK, 'stroke-width': 2.5 }, g);
+    el('path', { d: `M${at.x + 12} ${at.y + 10} L${at.x - 6} ${at.y + 22} L${at.x + 24} ${at.y + 10} Z`, fill: '#f7f1e3', stroke: INK, 'stroke-width': 2.5, 'stroke-linejoin': 'round' }, g);
+    el('rect', { x: at.x + 10, y: at.y + 6, width: 18, height: 6, fill: '#f7f1e3' }, g);
     const t = el('text', { x: at.x + width / 2, y: at.y + 1, 'text-anchor': 'middle', 'font-size': 18, 'font-weight': 700, fill: '#222' }, g);
     t.textContent = text;
     // Only one bubble per speaker at a time
@@ -327,7 +346,7 @@ window.Scene = (() => {
     swing.frame += (Math.random() - 0.4) * 2.5 * strength;
     swing.frame = Math.max(-14, Math.min(14, swing.frame));
     for (let i = 0; i < 5; i++) {
-      const d = el('rect', { width: 3, height: 3, fill: '#a89c88' }, dust);
+      const d = el('rect', { width: 3, height: 3, fill: CREAM, class: 'no-ink' }, dust);
       live.dust.push({ d, x: 300 + Math.random() * 600, y: 0, v: 60 + Math.random() * 80 });
     }
   }
