@@ -12,6 +12,7 @@ const els = {
   introText: $('#intro-text'),
   controls: $('#controls'),
   note: $('#intro-note'),
+  credit: $('#intro-credit'),
   start: $('#start'),
   error: $('#start-error'),
   hud: $('#hud'),
@@ -46,6 +47,7 @@ function fillText() {
   lines(els.introText, UI.intro);
   lines(els.controls, [...UI.controls, UI.touch]);
   els.note.textContent = UI.headphones;
+  els.credit.textContent = UI.credit;
   els.start.textContent = UI.loading;
   els.catLabel.textContent = UI.gauges.cat;
   els.earLabel.textContent = UI.gauges.ear;

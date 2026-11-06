@@ -1,6 +1,7 @@
 // The physical side: two three-segment ragdoll arms (upper arm, forearm, palm) hanging from
 // shoulders fixed to the camera, the cat and the bed as obstacles, and the ear sensors.
-// A held palm is pulled to its target by a weakly damped spring, F = k (T - p) - c v.
+// A held palm is pulled to its target by a weakly damped spring, F = k (T - p) - c v;
+// a free one is pulled more softly back to rest on the duvet.
 import * as THREE from 'three';
 import { CFG } from './config.js';
 
@@ -23,7 +24,7 @@ export function createPhysics(RAPIER, camera, cat) {
 
   // The bed, the cat's body and head
   const ground = fixed(new THREE.Vector3(0, 0, 0));
-  solid(RAPIER.ColliderDesc.cuboid(1.1, 0.25, 0.7).setTranslation(0, 0.3, -0.85), ground);
+  solid(RAPIER.ColliderDesc.cuboid(0.8, 0.25, 0.375).setTranslation(0, 0.3, -0.5), ground);
   solid(RAPIER.ColliderDesc.ball(cat.bodyRadius).setTranslation(cat.bodyWorld.x, cat.bodyWorld.y, cat.bodyWorld.z), ground);
   solid(RAPIER.ColliderDesc.ball(CFG.cat.headRadius).setTranslation(cat.headWorld.x, cat.headWorld.y, cat.headWorld.z), ground);
   const catEars = cat.earWorld.map(p => sensor(CFG.cat.earSensorRadius, ground, p));
@@ -67,15 +68,16 @@ export function createPhysics(RAPIER, camera, cat) {
   });
 
   const f = new THREE.Vector3();
-  // targets[i]: a THREE.Vector3 the palm is pulled to, or null to let the arm hang
+  const rest = [-1, 1].map(s => new THREE.Vector3(-s * a.rest[0], a.rest[1], a.rest[2]));
+  // targets[i]: a THREE.Vector3 the palm is pulled to, or null to let it rest on the duvet
   function step(targets) {
     const dt = world.timestep;
     arms.forEach((arm, i) => {
-      const T = targets[i];
-      arm.target = T;
-      if (!T) return;
+      arm.target = targets[i];
+      const T = targets[i] || rest[i];
+      const k = targets[i] ? a.k : a.restK, c = targets[i] ? a.c : a.restC;
       const p = arm.palm.translation(), v = arm.palm.linvel();
-      f.set(a.k * (T.x - p.x) - a.c * v.x, a.k * (T.y - p.y) - a.c * v.y, a.k * (T.z - p.z) - a.c * v.z);
+      f.set(k * (T.x - p.x) - c * v.x, k * (T.y - p.y) - c * v.y, k * (T.z - p.z) - c * v.z);
       if (f.length() > a.maxForce) f.setLength(a.maxForce);
       arm.palm.applyImpulse({ x: f.x * dt, y: f.y * dt, z: f.z * dt }, true);
     });

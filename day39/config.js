@@ -1,7 +1,10 @@
 // Everything tunable and every line of text for 어느 귀를 막을까.
 // Units are metres, kilograms and seconds.
 export const CFG = {
-  camera: { pos: [0, 1.05, 0], lookAt: [0, 0.86, -0.42], fov: 62 },
+  camera: { pos: [0, 1.05, 0], lookAt: [0, 0.88, -0.5], fov: 62 },
+
+  // The flat around you: a 360 photo (Lebombo by Greg Zaal, Poly Haven, CC0)
+  room: { file: 'room.jpg', turn: 2.4, light: 0.55 },
 
   arm: {
     // Shoulders in camera space, a little below and beside your eyes
@@ -16,6 +19,11 @@ export const CFG = {
     k: 240,
     c: 2.6,
     maxForce: 90,
+    // Not held, each hand drifts back to rest on the duvet beside the cat (world, left hand;
+    // the right is mirrored), on a softer spring
+    rest: [-0.25, 0.6, -0.5],
+    restK: 70,
+    restC: 1.6,
   },
 
   // Your own ears, in camera space; the palm has to reach one of these
@@ -65,6 +73,7 @@ export const UI = {
   ],
   touch: '터치: 화면 왼쪽 손가락은 왼손, 오른쪽 손가락은 오른손',
   headphones: '이어폰이나 헤드폰을 끼면 막은 쪽 귀가 먹먹해지는 게 들려요.',
+  credit: '배경: Lebombo — Greg Zaal, Poly Haven (CC0)',
   loading: '불러오는 중…',
   start: '공사 시작',
   loadError: '3D 엔진을 불러오지 못했어요. 새로고침해 주세요.',

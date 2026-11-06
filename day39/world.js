@@ -1,7 +1,7 @@
-// What you see: a soft mint-and-white room, the cat in front of you on the bed, and the
-// meshes for your arms. Matte materials, soft light, a little bloom.
+// What you see: a real flat around you (a 360 photo, which also lights the scene), the cat
+// in front of you on the bed, and the meshes for your arms. Matte materials, a little bloom.
 import * as THREE from 'three';
-import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
@@ -10,9 +10,7 @@ import { CFG } from './config.js';
 
 const COLORS = {
   wall: 0xf3f8f6,
-  floor: 0x9fd6c2,
-  bed: 0xa9dcc9,
-  pillow: 0xffffff,
+  bed: 0xbfe3d5,
   cat: 0xf7f6f1,
   catInner: 0xf3cfd2,
   eye: 0x1f2d2a,
@@ -26,16 +24,22 @@ const matte = (color, extra = {}) => new THREE.MeshStandardMaterial({ color, rou
 export function createWorld(canvas) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
   renderer.setPixelRatio(Math.min(2, devicePixelRatio || 1));
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 0.92;
+  // Neutral tone mapping leaves the (already tone-mapped) photo nearly as it is
+  renderer.toneMapping = THREE.NeutralToneMapping;
+  renderer.toneMappingExposure = 1;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(COLORS.wall);
-  const pmrem = new THREE.PMREMGenerator(renderer);
-  scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-  scene.environmentIntensity = 0.3;
+  new THREE.TextureLoader().load(CFG.room.file, tex => {
+    tex.mapping = THREE.EquirectangularReflectionMapping;
+    tex.colorSpace = THREE.SRGBColorSpace;
+    scene.background = tex;
+    scene.environment = tex;
+    scene.environmentIntensity = CFG.room.light;
+    scene.backgroundRotation.y = scene.environmentRotation.y = CFG.room.turn;
+  });
 
   const camera = new THREE.PerspectiveCamera(CFG.camera.fov, 1, 0.02, 20);
   camera.position.set(...CFG.camera.pos);
@@ -43,9 +47,9 @@ export function createWorld(canvas) {
   camera.updateMatrixWorld();
   scene.add(camera);
 
-  // Soft daylight from a window up and to the left, plus a mint bounce from below
-  scene.add(new THREE.HemisphereLight(0xffffff, 0x9fd6c2, 0.7));
-  const sun = new THREE.DirectionalLight(0xfffaf2, 1.7);
+  // Soft daylight from the window, a touch of fill
+  scene.add(new THREE.HemisphereLight(0xf4fbff, 0xd8c6ad, 0.5));
+  const sun = new THREE.DirectionalLight(0xfffaf2, 1.3);
   sun.position.set(-1.2, 2.6, 0.8);
   sun.target.position.set(0, 0.7, -0.45);
   sun.castShadow = true;
@@ -83,24 +87,11 @@ export function createWorld(canvas) {
 }
 
 function buildRoom(scene) {
-  const floor = new THREE.Mesh(new THREE.PlaneGeometry(8, 8), matte(COLORS.floor));
-  floor.rotation.x = -Math.PI / 2;
-  floor.receiveShadow = true;
-  scene.add(floor);
-  const wall = new THREE.Mesh(new THREE.PlaneGeometry(8, 4), matte(COLORS.wall));
-  wall.position.set(0, 2, -1.5);
-  wall.receiveShadow = true;
-  scene.add(wall);
   // The bed you're sitting on, the cat in front of you on the duvet
-  const bed = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.5, 1.4), matte(COLORS.bed));
-  bed.position.set(0, 0.3, -0.85);
+  const bed = new THREE.Mesh(new RoundedBoxGeometry(1.6, 0.5, 0.75, 6, 0.08), matte(COLORS.bed, { roughness: 1 }));
+  bed.position.set(0, 0.3, -0.5);
   bed.receiveShadow = true;
   scene.add(bed);
-  const pillow = new THREE.Mesh(new THREE.SphereGeometry(0.3, 32, 16), matte(COLORS.pillow));
-  pillow.scale.set(1.5, 0.35, 0.8);
-  pillow.position.set(-0.55, 0.6, -1.25);
-  pillow.castShadow = pillow.receiveShadow = true;
-  scene.add(pillow);
 }
 
 // A white cat built from spheres and cones, sitting up and looking at you
