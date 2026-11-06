@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>어느 귀를 막을까 — typo-vibe</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<link rel="stylesheet" href="style.css">
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/",
+    "rapier": "https://cdn.jsdelivr.net/npm/@dimforge/rapier3d-compat@0.14.0/rapier.es.js"
+  }
+}
+</script>
+</head>
+<body>
+
+<a class="home" href="../index.html">← 홈</a>
+
+<main class="stage">
+  <canvas id="view" class="view" aria-label="무릎 앞에 앉은 하얀 고양이와 내 두 팔"></canvas>
+
+  <section class="hud" id="hud" hidden>
+    <div class="gauge">
+      <span class="gauge-label" id="label-cat"></span>
+      <span class="gauge-track"><span class="gauge-fill cat" id="gauge-cat"></span></span>
+    </div>
+    <div class="gauge">
+      <span class="gauge-label" id="label-ear"></span>
+      <span class="gauge-track"><span class="gauge-fill ear" id="gauge-ear"></span></span>
+    </div>
+    <ul class="chips" aria-label="막고 있는 귀">
+      <li id="chip-myL"></li><li id="chip-catL"></li><li id="chip-catR"></li><li id="chip-myR"></li>
+    </ul>
+  </section>
+  <p class="hint" id="hint"></p>
+
+  <section class="card" id="intro" aria-labelledby="intro-title">
+    <h1 id="intro-title">어느 귀를 막을까</h1>
+    <div class="card-text" id="intro-text"></div>
+    <div class="card-controls" id="controls"></div>
+    <p class="card-note" id="intro-note"></p>
+    <button type="button" class="btn" id="start" disabled></button>
+    <p class="card-error" id="start-error" role="alert"></p>
+  </section>
+
+  <section class="card" id="end" aria-labelledby="end-title" hidden>
+    <h2 id="end-title"></h2>
+    <ul class="card-stats" id="end-stats"></ul>
+    <button type="button" class="btn" id="again"></button>
+  </section>
+</main>
+
+<script type="module" src="main.js"></script>
+</body>
+</html>
