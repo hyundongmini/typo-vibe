@@ -24,7 +24,7 @@ export function createPhysics(RAPIER, camera, cat) {
 
   // The bed, the cat's body and head
   const ground = fixed(new THREE.Vector3(0, 0, 0));
-  solid(RAPIER.ColliderDesc.cuboid(0.8, 0.25, 0.375).setTranslation(0, 0.3, -0.5), ground);
+  solid(RAPIER.ColliderDesc.cuboid(0.78, 0.27, 1.05).setTranslation(0, 0.27, -1.25), ground);
   solid(RAPIER.ColliderDesc.ball(cat.bodyRadius).setTranslation(cat.bodyWorld.x, cat.bodyWorld.y, cat.bodyWorld.z), ground);
   solid(RAPIER.ColliderDesc.ball(CFG.cat.headRadius).setTranslation(cat.headWorld.x, cat.headWorld.y, cat.headWorld.z), ground);
   const catEars = cat.earWorld.map(p => sensor(CFG.cat.earSensorRadius, ground, p));

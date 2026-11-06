@@ -12,7 +12,6 @@ const els = {
   introText: $('#intro-text'),
   controls: $('#controls'),
   note: $('#intro-note'),
-  credit: $('#intro-credit'),
   start: $('#start'),
   error: $('#start-error'),
   hud: $('#hud'),
@@ -45,14 +44,13 @@ function fillText() {
     });
   };
   lines(els.introText, UI.intro);
-  lines(els.controls, [...UI.controls, UI.touch]);
+  lines(els.controls, UI.controls);
   els.note.textContent = UI.headphones;
-  els.credit.textContent = UI.credit;
   els.start.textContent = UI.loading;
   els.catLabel.textContent = UI.gauges.cat;
   els.earLabel.textContent = UI.gauges.ear;
   Object.entries(els.chips).forEach(([k, chip]) => (chip.textContent = UI.ears[k]));
-  els.hint.textContent = matchMedia('(pointer: coarse)').matches ? UI.touchHint : UI.hint;
+  els.hint.textContent = UI.hint;
   els.again.textContent = UI.again;
 }
 
@@ -95,45 +93,29 @@ async function boot() {
 
   /* ---------- pointing ---------- */
 
-  const mouse = { ndc: new THREE.Vector2(), buttons: 0 };
-  const touches = new Map();
+  // One pointer (any mouse button, or the first finger) drives both hands at once
+  const pointer = { ndc: new THREE.Vector2(), id: null };
   const toNdc = (e, v) => v.set((e.clientX / innerWidth) * 2 - 1, -(e.clientY / innerHeight) * 2 + 1);
 
   els.canvas.addEventListener('contextmenu', e => e.preventDefault());
   els.canvas.addEventListener('pointerdown', e => {
     e.preventDefault();
+    if (pointer.id !== null && pointer.id !== e.pointerId) return;
     els.canvas.setPointerCapture(e.pointerId);
-    if (e.pointerType === 'mouse') {
-      mouse.buttons = e.buttons;
-      toNdc(e, mouse.ndc);
-      return;
-    }
-    // A finger on the left half drives the left hand, unless that one's already taken
-    const taken = new Set([...touches.values()].map(t => t.side));
-    let side = e.clientX < innerWidth / 2 ? 0 : 1;
-    if (taken.has(side)) side = 1 - side;
-    if (taken.has(side)) return;
-    touches.set(e.pointerId, { side, ndc: toNdc(e, new THREE.Vector2()) });
+    pointer.id = e.pointerId;
+    toNdc(e, pointer.ndc);
   });
   els.canvas.addEventListener('pointermove', e => {
-    if (e.pointerType === 'mouse') {
-      // A second button pressed or let go during a drag only shows up here
-      mouse.buttons = e.buttons;
-      toNdc(e, mouse.ndc);
-    } else if (touches.has(e.pointerId)) {
-      toNdc(e, touches.get(e.pointerId).ndc);
-    }
+    if (e.pointerType === 'mouse' || e.pointerId === pointer.id) toNdc(e, pointer.ndc);
+    // Letting go of one mouse button while another is still down only shows up here
+    if (e.pointerId === pointer.id && e.pointerType === 'mouse' && !e.buttons) pointer.id = null;
   });
   const lift = e => {
-    if (e.pointerType === 'mouse') mouse.buttons = e.buttons;
-    else touches.delete(e.pointerId);
+    if (e.pointerId === pointer.id && !(e.pointerType === 'mouse' && e.buttons)) pointer.id = null;
   };
   els.canvas.addEventListener('pointerup', lift);
   els.canvas.addEventListener('pointercancel', lift);
-  addEventListener('blur', () => {
-    mouse.buttons = 0;
-    touches.clear();
-  });
+  addEventListener('blur', () => (pointer.id = null));
 
   // Where the pointer points: on the cat if it's over the cat, otherwise in the plane of the
   // cat's head. Near a screen edge it bends round to your own ear on that side.
@@ -155,22 +137,13 @@ async function boot() {
     return p;
   }
 
+  // Both hands go together, mirror images of each other across the middle of the screen:
+  // over the cat that's both its ears, at the edge both of yours
   const mirror = new THREE.Vector2();
   function targets() {
-    const t = [null, null];
-    touches.forEach(({ side, ndc }) => (t[side] = project(ndc)));
-    const isLeft = mouse.buttons & 1, isRight = mouse.buttons & 2;
-    if (isLeft && isRight) {
-      // Both hands: mirror images of each other across the middle of the screen
-      const here = project(mouse.ndc), there = project(mirror.set(-mouse.ndc.x, mouse.ndc.y));
-      t[0] = mouse.ndc.x <= 0 ? here : there;
-      t[1] = mouse.ndc.x <= 0 ? there : here;
-    } else if (isLeft) {
-      t[0] = project(mouse.ndc);
-    } else if (isRight) {
-      t[1] = project(mouse.ndc);
-    }
-    return t;
+    if (pointer.id === null) return [null, null];
+    const here = project(pointer.ndc), there = project(mirror.set(-pointer.ndc.x, pointer.ndc.y));
+    return pointer.ndc.x <= 0 ? [here, there] : [there, here];
   }
 
   /* ---------- the day ---------- */

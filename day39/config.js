@@ -3,9 +3,6 @@
 export const CFG = {
   camera: { pos: [0, 1.05, 0], lookAt: [0, 0.88, -0.5], fov: 62 },
 
-  // The flat around you: a 360 photo (Lebombo by Greg Zaal, Poly Haven, CC0)
-  room: { file: 'room.jpg', turn: 2.4, light: 0.55 },
-
   arm: {
     // Shoulders in camera space, a little below and beside your eyes
     shoulder: [0.19, -0.25, 0.02],
@@ -67,21 +64,18 @@ export const UI = {
     '고양이 귀를 막을까, 내 귀를 막을까.',
   ],
   controls: [
-    '좌클릭 누르는 동안 왼손, 우클릭 누르는 동안 오른손이 따라옵니다.',
-    '둘 다 누르면 두 손이 좌우 대칭으로 움직여요.',
-    '화면 가장자리로 끌면 내 귀를 막습니다.',
+    '마우스 버튼이나 손가락을 누르고 있는 동안 두 손이 함께 따라옵니다.',
+    '두 손은 화면 가운데를 기준으로 좌우 대칭으로 움직여요.',
+    '화면 가장자리로 끌면 내 두 귀를 막습니다.',
   ],
-  touch: '터치: 화면 왼쪽 손가락은 왼손, 오른쪽 손가락은 오른손',
   headphones: '이어폰이나 헤드폰을 끼면 막은 쪽 귀가 먹먹해지는 게 들려요.',
-  credit: '배경: Lebombo — Greg Zaal, Poly Haven (CC0)',
   loading: '불러오는 중…',
   start: '공사 시작',
   loadError: '3D 엔진을 불러오지 못했어요. 새로고침해 주세요.',
   noWebgl: '이 브라우저에서는 3D를 그릴 수 없어요.',
   gauges: { cat: '고양이 스트레스', ear: '내 귀 데미지' },
   ears: { catL: '고양이 왼귀', catR: '고양이 오른귀', myL: '내 왼귀', myR: '내 오른귀' },
-  hint: '좌클릭 · 우클릭을 누르고 있으세요',
-  touchHint: '손가락으로 누르고 있으세요',
+  hint: '누르고 있으면 두 손이 따라와요',
   word: ['두두두두', '두두두두두두', '두두두'],
   endCat: '고양이가 침대 밑으로 숨었다',
   endEar: '귀가 멍하다',

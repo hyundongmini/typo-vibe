@@ -111,7 +111,6 @@ button { font: inherit; color: inherit; }
 .card-note { font-size: 12px; opacity: 0.75; word-break: keep-all; }
 .card-error { color: #c0574b; font-size: 13px; }
 .card-error:empty { display: none; }
-.card-credit { font-size: 10px; opacity: 0.55; }
 .card-stats { list-style: none; display: grid; gap: 6px; font-size: 16px; font-weight: 700; }
 
 .btn {
