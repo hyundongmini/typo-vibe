@@ -47,7 +47,7 @@
     last: performance.now(),
   };
 
-  const sceneReady = Scene.init(svg, UI, N.photo);
+  Scene.init(svg, UI);
   svg.setAttribute('aria-label', UI.sceneLabel);
 
   /* ---------- holding the cat's ears ---------- */
@@ -228,6 +228,7 @@
   function setClock(elapsed) {
     const [h0, h1] = N.dayHours;
     const hours = h0 + (h1 - h0) * clamp(elapsed / N.daySeconds, 0, 1);
+    Scene.setClock(hours);
     els.clock.textContent = UI.clock(Math.floor(hours), Math.floor((hours % 1) * 60 / 10) * 10);
   }
 
@@ -309,10 +310,10 @@
       els.start.disabled = true;
       els.startError.textContent = '';
       try {
-        await Promise.all([Noise.load(N.sounds), sceneReady]);
+        await Noise.load(N.sounds);
         isLoaded = true;
       } catch (err) {
-        console.error('Could not load the sounds or the photo', err);
+        console.error('Could not load the construction sounds', err);
         els.startError.textContent = '소리를 불러오지 못했어요. 새로고침해 주세요.';
         els.start.disabled = false;
         return;

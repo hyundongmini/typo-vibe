@@ -14,21 +14,7 @@ window.NOISE = {
     { file: 'sound/next2.m4a', kind: 'drill', weight: 2 },
     { file: 'sound/next3.m4a', kind: 'drill', weight: 1 },
     { file: 'sound/next4.m4a', kind: 'drill', weight: 1 },
-    { file: 'sound/hammerdrill.m4a', kind: 'hammer', weight: 2 },
-    { file: 'sound/pick.m4a', kind: 'hammer', weight: 1 },
-    { file: 'sound/phammer.m4a', kind: 'hammer', weight: 1 },
   ],
-
-  // The cat, from a real photo (pixel positions in the photo file)
-  photo: {
-    file: 'cat.jpg',
-    crop: { x: 150, y: 0, w: 362, h: 330 },
-    // Where a hand cups each ear, and the point the ear folds back around
-    ears: [{ x: 218, y: 78, pivot: [252, 112] }, { x: 420, y: 70, pivot: [392, 104] }],
-    earRadius: 38,
-    // Irises get a flat mustard; the darkest part of each (the pupil) stays black
-    eyes: [{ x: 300, y: 150, r: 22, below: 0.5, core: 0.1 }, { x: 387, y: 148, r: 22, below: 0.5, core: 0.1 }],
-  },
 
   // How much one covered ear takes off for the cat (two ears: twice this)
   muffle: 0.42,
@@ -39,8 +25,7 @@ window.NOISE = {
   catPatience: [8, 12],
 
   words: {
-    drill: ['두두두두두두', '드르르르르륵', '두두두두두두두두'],
-    hammer: ['따다다다다닥', '쿵쿵쿵쿵', '두두두두두'],
+    drill: ['두두두두두두', '두두두두', '두두두두두두두두'],
     purr: ['그르릉…', '골골골…'],
     flee: '후다닥!',
   },
@@ -51,7 +36,7 @@ window.NOISE = {
     back: ['…냥', '(슬그머니 돌아왔다)'],
   },
 
-  credit: '소리: “Drilling next door” 1–4 (ezwa, 퍼블릭 도메인), Hammer drill · Pneumatic pick · Pneumatic hammer Z300 (Work With Sounds, CC BY 4.0) — Wikimedia Commons',
+  credit: '소리: “Drilling next door” 1–4 (ezwa, 퍼블릭 도메인) — Wikimedia Commons',
   creditUrl: 'https://commons.wikimedia.org/wiki/File:Drilling_next_door_1.ogg',
 
   ui: {
